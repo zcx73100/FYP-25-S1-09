@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 # from . import mysql
 from . import mongo  
 
+import os
+from werkzeug.utils import secure_filename
 
 import stripe
 from werkzeug.security import generate_password_hash
@@ -9,7 +11,7 @@ from werkzeug.security import check_password_hash
 from datetime import datetime
 
 from FYP25S109.controller import LoginController, CreateUserAccController, DisplayUserDetailController, UpdateUserRoleController, UpdateAccountDetailController
-from FYP25S109.entity import UserAccount
+from FYP25S109.entity import UserAccount, TutorialVideo
 
 boundary = Blueprint('boundary', __name__)  # Blueprints mean it has routes inside a bunch of URLs defined
 
@@ -52,17 +54,17 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        # ✅ Find user by username only
+        # Find user by username 
         user = mongo.db.useraccount.find_one({"username": username})
 
         if user:
-            stored_hashed_password = user["password"]  # ✅ Hashed password from MongoDB
+            stored_hashed_password = user["password"]  # 
 
-            # ✅ Debugging logs
+            
             print(f"[DEBUG] Entered Password: {password}")
             print(f"[DEBUG] Stored Hashed Password: {stored_hashed_password}")
 
-            if check_password_hash(stored_hashed_password, password):  # ✅ Compare hashed passwords
+            if check_password_hash(stored_hashed_password, password): 
                 session['username'] = username
                 session['role'] = user['role']
                 session['user_authenticated'] = True
@@ -169,10 +171,10 @@ def sign_up():
 
                 hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
 
-                # ✅ Debugging: Print assigned role before insertion
+                # Debugging: Print assigned role before insertion
                 print(f"[DEBUG] Assigned Role: {role}")
 
-                # ✅ Insert new user with assigned role
+                # Insert new user with assigned role
                 mongo.db.useraccount.insert_one({
                     "username": username,
                     "password": hashed_password,
@@ -213,17 +215,17 @@ def accDetails():
 def accDetails():
     if 'username' not in session:
         flash("You must be logged in to view account details.", category='error')
-        return redirect(url_for('boundary.login'))  # Redirect to login if not authenticated
+        return redirect(url_for('boundary.login'))  
 
     username = session.get('username')
 
-    # ✅ Fetch user info from MongoDB
+    # Fetch user info 
     user_info = mongo.db.useraccount.find_one(
         {"username": username},
         {"_id": 0, "username": 1, "name": 1, "surname": 1, "date_of_birth": 1, "email": 1, "role": 1}
     )
 
-    print(f"[DEBUG] Fetched User Info: {user_info}")  # ✅ Debugging log
+    print(f"[DEBUG] Fetched User Info: {user_info}") 
 
     if not user_info:
         flash("User details not found.", category='error')
@@ -247,7 +249,7 @@ def update_account_detail():
             "date_of_birth": request.form.get("date_of_birth"),
         }
 
-        # ✅ Remove empty fields
+        # Remove empty fields
         updated_data = {key: value for key, value in updated_data.items() if value}
 
         if UpdateAccountDetailController.update_account_detail(username, updated_data):
@@ -257,7 +259,7 @@ def update_account_detail():
 
         return redirect(url_for('boundary.accDetails'))
 
-    # ✅ Fetch user details to pre-fill form
+    # Fetch user details
     user_info = DisplayUserDetailController.get_user_info(username)
 
     if not user_info:
@@ -506,8 +508,51 @@ def confirm_teacher(username):
 
     return redirect(url_for("boundary.confirm_teacher_page"))
 
-# 
-
-
 
 # Upload Tutorial Video        
+UPLOAD_FOLDER = 'uploads/videos'
+ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
+
+# Ensure the directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Function to check allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@boundary.route('/uploadTutorial', methods=['GET', 'POST'])
+def upload_tutorial():
+    """Allows users to upload tutorial videos."""
+    if 'username' not in session:
+        flash("You must be logged in to upload a tutorial video.", category='error')
+        return redirect(url_for('boundary.login'))
+
+    if request.method == 'POST':
+        file = request.files.get('file')
+        title = request.form.get("title")
+        username = session["username"]
+
+        # ✅ Create a `TutorialVideo` instance
+        video = TutorialVideo(title=title, video_name=file.filename, video_file=file, username=username)
+
+        # ✅ Save the video
+        result = video.save_video()
+
+        flash(result["message"], category="success" if result["success"] else "error")
+        return redirect(url_for('boundary.upload_tutorial'))
+
+    return render_template("uploadTutorial.html")
+
+@boundary.route('/uploadedVideos', methods=['GET'])
+def view_uploaded_videos():
+    if 'username' not in session:
+        flash("You must be logged in to view uploaded videos.", category='error')
+        return redirect(url_for('boundary.login'))
+
+    # ✅ Fetch videos uploaded by the user
+    user_videos = list(mongo.db.videos.find(
+        {"uploader": session['username']},
+        {"_id": 0, "title": 1, "description": 1, "file_path": 1, "status": 1}
+    ))
+
+    return render_template("viewUploadedVideos.html", videos=user_videos)

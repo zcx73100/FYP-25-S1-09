@@ -1,8 +1,17 @@
 from flask import session
 # from . import mysql
 from . import mongo
+import os
+import logging
+from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename 
 
+UPLOAD_FOLDER = 'static/uploads/videos'
+ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
+
+# Ensure the directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 class UserAccount:
     def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None):
@@ -17,7 +26,6 @@ class UserAccount:
 
     @staticmethod
     def createUserAcc(userAcc):
-        """✅ Create a new user account in MongoDB."""
         try:
             print(f"[DEBUG] Attempting to insert user: {userAcc.username}, {userAcc.email}, {userAcc.role}")
 
@@ -47,7 +55,6 @@ class UserAccount:
 
     @staticmethod
     def login(username, password):
-        """✅ Authenticate user login using MongoDB."""
         try:
             user = mongo.db.useraccount.find_one({"username": username})
 
@@ -62,7 +69,6 @@ class UserAccount:
 
     @staticmethod
     def get_user_info(username):
-        """✅ Retrieve user information from MongoDB."""
         try:
             user_data = mongo.db.useraccount.find_one(
                 {"username": username},
@@ -75,20 +81,19 @@ class UserAccount:
 
     @staticmethod
     def update_role(username, new_role):
-        """✅ Confirm user as a Teacher by updating their role in MongoDB."""
         try:
-            # ✅ Check if the user exists
+            # Check if the user exists
             user = mongo.db.useraccount.find_one({"username": username})
             if not user:
                 print(f"[ERROR] User '{username}' not found in database.")
                 return False
 
-            # ✅ Prevent redundant updates
+            # Prevent redundant updates
             if user.get("role") == new_role:
                 print(f"[WARNING] User '{username}' is already a '{new_role}'. No update needed.")
                 return True
-
-            # ✅ Perform the update
+            
+            # Perform the update
             update_result = mongo.db.useraccount.update_one(
                 {"username": username, "role": "User"},  # Only update if role is "User"
                 {"$set": {"role": new_role}}
@@ -148,6 +153,52 @@ class UserAccount:
         except Exception as e:
             print(f"[ERROR] Failed to update password: {str(e)}")
             return False
+        
+        
+class TutorialVideo:
+    def __init__(self, title=None, video_name=None, video_file=None, username=None):
+        self.title = title
+        self.video_name = video_name
+        self.video_file = video_file
+        self.username = username
+
+    @staticmethod
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    def save_video(self):
+        try:
+            if not self.video_file or self.video_file.filename == '':
+                raise ValueError("No file selected for upload.")
+
+            if not self.allowed_file(self.video_file.filename):
+                raise ValueError("Invalid file format. Allowed: mp4, mov, avi, mkv.")
+
+            # Secure filename
+            filename = secure_filename(self.video_file.filename)
+            file_path = os.path.join(UPLOAD_FOLDER, filename)
+
+            # Save file to server
+            self.video_file.save(file_path)
+
+            # Prepare video metadata
+            video_data = {
+                'title': self.title,
+                'video_name': filename,
+                'file_path': file_path,  # Store the path instead of file content
+                'username': self.username,
+                'status': 'Pending',
+                'upload_date': datetime.utcnow()
+            }
+
+            # Insert into MongoDB
+            mongo.db.videos.insert_one(video_data)
+
+            return {"success": True, "message": "Video uploaded successfully. Awaiting approval."}
+        except Exception as e:
+            logging.error(f"Error saving video to database: {e}")
+            return {"success": False, "message": str(e)}
+        
 """
     @staticmethod
     def createUserAcc(userAcc):
