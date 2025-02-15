@@ -31,10 +31,11 @@
         <tbody>
             {% for user in users %}
             <tr>
-                <td>{{ user[0] }}</td>  <!-- Username -->
-                <td>{{ user[1] }}</td>  <!-- Email -->
+                <td>{{ user.username }}</td>
+                <td>{{ user.email }}</td>
+                
                 <td>
-                    <form action="{{ url_for('boundary.confirm_teacher', username=user[0]) }}" method="POST">
+                    <form action="{{ url_for('boundary.confirm_teacher', username=user.username) }}" method="POST">
                         <button type="submit" class="btn btn-success">Confirm as Teacher</button>
                     </form>
                 </td>
