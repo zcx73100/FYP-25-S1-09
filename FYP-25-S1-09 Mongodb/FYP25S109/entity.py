@@ -1,7 +1,8 @@
 from flask import session
 # from . import mysql
 from . import mongo
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
 
 class UserAccount:
     def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None):
@@ -74,10 +75,22 @@ class UserAccount:
 
     @staticmethod
     def update_role(username, new_role):
-        """✅ Updates the role of a user in MongoDB."""
+        """✅ Confirm user as a Teacher by updating their role in MongoDB."""
         try:
+            # ✅ Check if the user exists
+            user = mongo.db.useraccount.find_one({"username": username})
+            if not user:
+                print(f"[ERROR] User '{username}' not found in database.")
+                return False
+
+            # ✅ Prevent redundant updates
+            if user.get("role") == new_role:
+                print(f"[WARNING] User '{username}' is already a '{new_role}'. No update needed.")
+                return True
+
+            # ✅ Perform the update
             update_result = mongo.db.useraccount.update_one(
-                {"username": username},
+                {"username": username, "role": "User"},  # Only update if role is "User"
                 {"$set": {"role": new_role}}
             )
 
@@ -85,13 +98,56 @@ class UserAccount:
                 print(f"[DEBUG] Role updated successfully: {username} → {new_role}")
                 return True
             else:
-                print(f"[ERROR] Role update failed for {username}.")
+                print(f"[ERROR] Role update failed for {username}. Ensure user exists and is not already a Teacher.")
                 return False
 
         except Exception as e:
             print(f"[ERROR] Failed to update role: {e}")
             return False
 
+    @staticmethod
+    def update_account_detail(username, updated_data):
+        try:
+            if not updated_data:
+                print(f"[WARNING] No update data provided for {username}.")
+                return False
+
+            update_result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": updated_data}
+            )
+
+            if update_result.modified_count > 0:
+                print(f"[DEBUG] User Update: Username={username} | Updated Fields={updated_data}")
+                return True
+            else:
+                print(f"[WARNING] No changes made for {username}.")
+                return False
+
+        except Exception as e:
+            print(f"[ERROR] Failed to update user info: {str(e)}")  
+            return False
+
+    @staticmethod
+    def update_password(username, new_password):
+        try:
+            hashed_password = generate_password_hash(new_password)
+
+            update_result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"password": hashed_password}}
+            )
+
+            if update_result.modified_count > 0:
+                print(f"[DEBUG] Password updated successfully for {username}.")
+                return True
+            else:
+                print(f"[WARNING] Password update failed for {username}.")
+                return False
+
+        except Exception as e:
+            print(f"[ERROR] Failed to update password: {str(e)}")
+            return False
 """
     @staticmethod
     def createUserAcc(userAcc):

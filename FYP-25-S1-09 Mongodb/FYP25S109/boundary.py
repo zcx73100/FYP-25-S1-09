@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from datetime import datetime
 
-from FYP25S109.controller import LoginController, CreateUserAccController, DisplayUserDetailController, UpdateUserRoleController
+from FYP25S109.controller import LoginController, CreateUserAccController, DisplayUserDetailController, UpdateUserRoleController, UpdateAccountDetailController
 from FYP25S109.entity import UserAccount
 
 boundary = Blueprint('boundary', __name__)  # Blueprints mean it has routes inside a bunch of URLs defined
@@ -220,7 +220,7 @@ def accDetails():
     # ✅ Fetch user info from MongoDB
     user_info = mongo.db.useraccount.find_one(
         {"username": username},
-        {"_id": 0, "username": 1, "name": 1, "surname": 1, "email": 1, "role": 1}
+        {"_id": 0, "username": 1, "name": 1, "surname": 1, "date_of_birth": 1, "email": 1, "role": 1}
     )
 
     print(f"[DEBUG] Fetched User Info: {user_info}")  # ✅ Debugging log
@@ -230,6 +230,98 @@ def accDetails():
         return redirect(url_for('boundary.home'))
 
     return render_template("accountDetails.html", user_info=user_info)
+
+# Edit Account Details
+@boundary.route('/updateAccDetail', methods=['GET', 'POST'])
+def update_account_detail():
+    if 'username' not in session:
+        flash("You must be logged in to update account details.", category='error')
+        return redirect(url_for('boundary.login'))
+
+    username = session['username']
+
+    if request.method == 'POST':
+        updated_data = {
+            "name": request.form.get("name"),
+            "surname": request.form.get("surname"),
+            "date_of_birth": request.form.get("date_of_birth"),
+        }
+
+        # ✅ Remove empty fields
+        updated_data = {key: value for key, value in updated_data.items() if value}
+
+        if UpdateAccountDetailController.update_account_detail(username, updated_data):
+            flash("Account details updated successfully!", category='success')
+        else:
+            flash("Failed to update account details.", category='error')
+
+        return redirect(url_for('boundary.accDetails'))
+
+    # ✅ Fetch user details to pre-fill form
+    user_info = DisplayUserDetailController.get_user_info(username)
+
+    if not user_info:
+        flash("User details not found.", category='error')
+        return redirect(url_for('boundary.home'))
+
+    return render_template("updateAccDetail.html", user_info=user_info)
+
+
+ 
+
+# Update Password
+@boundary.route('/update_password', methods=['GET', 'POST'])
+def update_password():
+    """Allows authenticated users to update their password securely."""
+    if 'username' not in session:
+        flash("You must be logged in to change your password.", category='error')
+        return redirect(url_for('boundary.login'))
+
+    username = session['username']
+
+    if request.method == 'POST':
+        old_password = request.form.get("old_password")
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+
+        # ✅ Fetch user from database
+        user = mongo.db.useraccount.find_one({"username": username})
+        if not user:
+            flash("User not found.", category='error')
+            return redirect(url_for('boundary.accDetails'))
+
+        stored_hashed_password = user.get("password")
+
+        # ✅ Validate Old Password
+        if not check_password_hash(stored_hashed_password, old_password):
+            flash("Incorrect current password.", category='error')
+            return redirect(url_for('boundary.update_password'))
+
+        # ✅ Validate New Password
+        if new_password != confirm_password:
+            flash("New passwords do not match.", category='error')
+            return redirect(url_for('boundary.update_password'))
+        if len(new_password) < 7:
+            flash("New password must be at least 7 characters long.", category='error')
+            return redirect(url_for('boundary.update_password'))
+
+        # ✅ Hash New Password
+        hashed_new_password = generate_password_hash(new_password)
+
+        # ✅ Update Password in Database
+        update_result = mongo.db.useraccount.update_one(
+            {"username": username},
+            {"$set": {"password": hashed_new_password}}
+        )
+
+        if update_result.modified_count > 0:
+            flash("Password updated successfully!", category='success')
+            return redirect(url_for('boundary.accDetails'))
+        else:
+            flash("Failed to update password. Try again.", category='error')
+
+    return render_template("updatePassword.html")
+
 
 # Admin
 # Create Admin
@@ -380,16 +472,17 @@ def confirm_teacher(username):
 
     return redirect(url_for("boundary.confirm_teacher_page"))
 """
-
-@boundary.route('/confirmTeacher', methods=['GET'])
+@boundary.route('/confirmTeacher/', methods=['GET','POST'])
 def confirm_teacher_page():
     """Show all users with role 'User' for Admin approval."""
     if session.get('role') != "Admin":
         flash("Access Denied! Only Admins can confirm teachers.", category="error")
         return redirect(url_for("boundary.home"))
 
-    # ✅ Fetch users with role "User"
+    # ✅ Fetch users with role "User" from MongoDB
     users = list(mongo.db.useraccount.find({"role": "User"}, {"_id": 0, "username": 1, "email": 1}))
+
+    print(f"[DEBUG] Users fetched: {users}")  # ✅ Debugging output
 
     return render_template("confirmTeacher.html", users=users)
 
@@ -409,9 +502,12 @@ def confirm_teacher(username):
     if update_result.modified_count > 0:
         flash(f"{username} is now a Teacher!", category="success")
     else:
-        flash("Failed to update role. Ensure the username exists.", category="error")
+        flash("Failed to update role. Ensure the username exists and is not already a Teacher.", category="error")
 
     return redirect(url_for("boundary.confirm_teacher_page"))
+
+# 
+
 
 
 # Upload Tutorial Video        
