@@ -106,3 +106,24 @@ footer {
     display: block;
     margin-top: 0;
 }
+
+
+.video-grid {
+    display: flex;  /* ✅ Arrange videos in a row */
+    flex-wrap: wrap;  /* ✅ Allow wrapping if the screen is small */
+    justify-content: center;  /* ✅ Center videos on the page */
+    gap: 20px;  /* ✅ Add space between videos */
+}
+
+.video-card {
+    flex: 1 1 300px;  /* ✅ Make videos responsive */
+    max-width: 400px;  /* ✅ Prevent videos from getting too large */
+    text-align: center;  /* ✅ Center text below the video */
+}
+
+.video-card video {
+    width: 100%;  /* ✅ Auto-size videos */
+    height: auto;  /* ✅ Maintain aspect ratio */
+    border-radius: 10px;  /* ✅ Rounded corners */
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);  /* ✅ Add a subtle shadow */
+}

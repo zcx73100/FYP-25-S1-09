@@ -1,5 +1,6 @@
 from flask import session  # Import session to check the logged-in user's role
 from FYP25S109 import entity
+import datetime
 import os
 import logging
 from . import mongo  
@@ -8,7 +9,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename 
 
 
-UPLOAD_FOLDER = 'static/uploads/videos'
+UPLOAD_FOLDER = 'FYP25S109/static/uploads/videos/'
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
 # Ensure the upload directory exists
@@ -151,25 +152,25 @@ class UploadTutorialController:
             if not UploadTutorialController.allowed_file(file.filename):
                 return {"success": False, "message": "Invalid file format. Allowed: mp4, mov, avi, mkv."}
 
-            # Secure filename to prevent security issues
+            # ✅ Secure filename to prevent security issues
             filename = secure_filename(file.filename)
             file_path = os.path.join(UPLOAD_FOLDER, filename)
 
-            #  Save file to the server
+            # ✅ Save file to the server
             file.save(file_path)
 
-            # Create a `TutorialVideo` entity
+            # ✅ Create a `TutorialVideo` object
             tutorial = TutorialVideo(
                 title=title,
                 video_name=filename,
-                video_file=file_path,  # Save path, not file content
+                video_file=file_path,  # Save file path, not file content
                 username=uploader
             )
 
-            mongo.db.videos.insert_one(tutorial.to_dict())
-
-            return {"success": True, "message": "Video uploaded successfully. Awaiting approval."}
+            # ✅ Save video to MongoDB using `save_video()`
+            return tutorial.save_video()
 
         except Exception as e:
             logging.error(f"Error uploading video: {str(e)}")
             return {"success": False, "message": f"Upload failed: {str(e)}"}
+

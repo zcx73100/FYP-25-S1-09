@@ -18,10 +18,15 @@ boundary = Blueprint('boundary', __name__)  # Blueprints mean it has routes insi
 YOUR_DOMAIN = "http://localhost:5000"
 
 # Homepage
-@boundary.route('/', methods=['GET', 'POST'])
-def home():
-    username = session.get('username')
-    return render_template("homepage.html", user_name=username)
+@boundary.route('/')
+def homepage():
+    """Fetch approved videos and display them on the homepage."""
+    approved_videos = list(mongo.db.tutorialvideo.find(
+        {"status": "Approved"},  # ✅ Show only approved videos
+        {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username":1}
+    ))
+
+    return render_template("homepage.html", videos=approved_videos)
 
 # Log In
 """
@@ -510,7 +515,7 @@ def confirm_teacher(username):
 
 
 # Upload Tutorial Video        
-UPLOAD_FOLDER = 'uploads/videos'
+UPLOAD_FOLDER = 'FYP25S109/static/uploads/videos/'
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
 # Ensure the directory exists
@@ -531,9 +536,10 @@ def upload_tutorial():
         file = request.files.get('file')
         title = request.form.get("title")
         username = session["username"]
+        user_role = session.get("role", "User")  # ✅ Retrieve user role, default to "User"
 
-        # ✅ Create a `TutorialVideo` instance
-        video = TutorialVideo(title=title, video_name=file.filename, video_file=file, username=username)
+        # ✅ Create a `TutorialVideo` instance and pass `user_role`
+        video = TutorialVideo(title=title, video_name=file.filename, video_file=file, username=username, user_role=user_role)
 
         # ✅ Save the video
         result = video.save_video()

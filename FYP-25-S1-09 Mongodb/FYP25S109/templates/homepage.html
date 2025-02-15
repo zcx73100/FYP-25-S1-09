@@ -1,10 +1,22 @@
 {% extends "base.html" %}
-
-{% block title %}Homepage{% endblock %}
-
 {% block content %}
-<div class="container text-center">
-    <h1>Welcome to the Homepage</h1>
-    <p class="lead">This is the main content area.</p>
-</div>
+    <h2>Welcome to the Homepage</h2>
+    <h3>Tutorial Videos</h3>
+
+    <div class="video-grid">  <!-- ✅ Changed class to "video-grid" for flexbox layout -->
+        {% if videos %}
+            {% for video in videos %}
+                <div class="video-card">
+                    <video controls>
+                        <source src="{{ url_for('static', filename='uploads/videos/' + video.video_name) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <h5>Name: {{ video.title }}</h5>  
+                    <h5>Uploaded By: {{ video.username }}</h5>  
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No videos available.</p>
+        {% endif %}
+    </div>
 {% endblock %}

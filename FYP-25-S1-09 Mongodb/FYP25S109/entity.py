@@ -6,12 +6,11 @@ import logging
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename 
+UPLOAD_FOLDER = 'FYP25S109/static/uploads/videos/'
 
-UPLOAD_FOLDER = 'static/uploads/videos'
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
 # Ensure the directory exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 class UserAccount:
     def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None):
@@ -156,49 +155,50 @@ class UserAccount:
         
         
 class TutorialVideo:
-    def __init__(self, title=None, video_name=None, video_file=None, username=None):
+    def __init__(self, title=None, video_name=None, video_file=None, username=None, user_role=None):
         self.title = title
         self.video_name = video_name
         self.video_file = video_file
         self.username = username
+        self.user_role = user_role  # Add user role for status logic
 
-    @staticmethod
-    def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    def to_dict(self):
+        """Convert video details to a dictionary for MongoDB insertion."""
+        return {
+            'title': self.title,
+            'video_name': self.video_name,
+            'file_path': self.video_file,  # Store only the file path
+            'username': self.username,
+            'status': 'Approved' if self.user_role == 'Admin' else 'Pending',  # Admin videos are auto-approved
+            'upload_date': datetime.utcnow()
+        }
 
     def save_video(self):
+        """Saves video details to MongoDB and stores the file on the server."""
         try:
-            if not self.video_file or self.video_file.filename == '':
+            if not self.video_file:
                 raise ValueError("No file selected for upload.")
 
-            if not self.allowed_file(self.video_file.filename):
-                raise ValueError("Invalid file format. Allowed: mp4, mov, avi, mkv.")
-
-            # Secure filename
+            # Secure filename to prevent security risks
             filename = secure_filename(self.video_file.filename)
             file_path = os.path.join(UPLOAD_FOLDER, filename)
 
-            # Save file to server
+            # Save file to the uploads folder
             self.video_file.save(file_path)
 
-            # Prepare video metadata
-            video_data = {
-                'title': self.title,
-                'video_name': filename,
-                'file_path': file_path,  # Store the path instead of file content
-                'username': self.username,
-                'status': 'Pending',
-                'upload_date': datetime.utcnow()
-            }
+            # Update file path before inserting into MongoDB
+            self.video_file = file_path
 
-            # Insert into MongoDB
-            mongo.db.videos.insert_one(video_data)
+            # Insert metadata into MongoDB
+            result = mongo.db.tutorialvideo.insert_one(self.to_dict())
+            print(f"[DEBUG] Inserted Video ID: {result.inserted_id}")  # Debugging log
 
-            return {"success": True, "message": "Video uploaded successfully. Awaiting approval."}
+            return {"success": True, "message": "Video uploaded successfully." if self.user_role == "Admin" else "Video uploaded successfully. Awaiting approval."}
+
         except Exception as e:
-            logging.error(f"Error saving video to database: {e}")
+            logging.error(f"Error saving video: {str(e)}")
             return {"success": False, "message": str(e)}
-        
 """
     @staticmethod
     def createUserAcc(userAcc):
