@@ -25,8 +25,9 @@ def homepage():
         {"status": "Approved"},  # ✅ Show only approved videos
         {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username":1}
     ))
+    username = session.get("username", None)
 
-    return render_template("homepage.html", videos=approved_videos)
+    return render_template("homepage.html", videos=approved_videos, username=username)
 
 # Log In
 """
@@ -86,10 +87,10 @@ def login():
 # Log Out
 @boundary.route('/logout')
 def logout():
-    session.pop('username', None)
-    session['user_authenticated'] = False
-    flash('You have been logged out', category='success')
-    return redirect(url_for('boundary.home'))
+    """Logs out the user and redirects to homepage."""
+    session.clear()
+    flash("You have been logged out.", category="info")
+    return redirect(url_for('boundary.homepage'))
 
 
 # Create Account
