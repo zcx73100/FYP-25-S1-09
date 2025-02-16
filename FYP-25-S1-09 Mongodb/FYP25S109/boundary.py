@@ -19,7 +19,7 @@ YOUR_DOMAIN = "http://localhost:5000"
 
 # Homepage
 @boundary.route('/')
-def homepage():
+def home():
     """Fetch approved videos and display them on the homepage."""
     approved_videos = list(mongo.db.tutorialvideo.find(
         {"status": "Approved"},  # ✅ Show only approved videos
