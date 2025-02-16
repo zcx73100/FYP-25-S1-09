@@ -20,40 +20,18 @@ YOUR_DOMAIN = "http://localhost:5000"
 # Homepage
 @boundary.route('/')
 def home():
-    """Fetch approved videos and display them on the homepage."""
-    approved_videos = list(mongo.db.tutorialvideo.find(
-        {"status": "Approved"},  # ✅ Show only approved videos
-        {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username":1}
+    admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
+
+    admin_videos = list(mongo.db.tutorialvideo.find(
+        {"username": {"$in": admin_users}},
+        {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
     ))
     username = session.get("username", None)
 
-    return render_template("homepage.html", videos=approved_videos, username=username)
+    return render_template("homepage.html", videos=admin_videos, username=username)
+
 
 # Log In
-"""
-@boundary.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-
-        user = LoginController.userLogin(username, password)
-
-        if user:
-            user_role = user[1]  # Get the role from database
-
-            session['username'] = username
-            session['role'] = user_role  # Auto-detected role
-            session['user_authenticated'] = True
-
-            flash(f'Login successful! You are logged in as {user_role.capitalize()}.', category='success')
-            return redirect(url_for('boundary.home'))
-        else:
-            flash('Wrong username or password.', category='error')
-
-    return render_template("login.html")
-"""
-
 @boundary.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -90,60 +68,10 @@ def logout():
     """Logs out the user and redirects to homepage."""
     session.clear()
     flash("You have been logged out.", category="info")
-    return redirect(url_for('boundary.homepage'))
+    return redirect(url_for('boundary.home'))
 
 
 # Create Account
-"""
-@boundary.route('/createAccount', methods=['GET', 'POST'])
-def sign_up():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password1 = request.form.get('password1')
-        password2 = request.form.get('password2')
-        email = request.form.get('email')
-        name = request.form.get('name')
-        surname = request.form.get('surname')
-        date_of_birth = request.form.get('date_of_birth')
-        role = request.form.get('role')  # Get role from hidden input
-
-        # Validation checks
-        if len(email) < 4:
-            flash('Email must be greater than 3 characters.', category='error')
-        elif len(name) < 2:
-            flash('First name must be greater than 1 character.', category='error')
-        elif password1 != password2:
-            flash('Passwords do not match.', category='error')
-        elif len(password1) < 7:
-            flash('Password must be at least 7 characters.', category='error')
-        elif role not in ["Admin", "Teacher", "Student", "User"]:
-            flash('Invalid role selection.', category='error')
-        else:
-            try:
-                # Convert date format
-                date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
-                formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
-
-                # Hash the password
-                hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
-
-                # Create UserAccount entity
-                userAcc = UserAccount(username, hashed_password, name, surname, email, formatted_date_of_birth, role)
-
-                # Insert into database
-                result = CreateUserAccController.createUserAcc(userAcc)
-
-                if result:
-                    flash('Account created successfully!', category='success')
-                    return redirect(url_for('boundary.login'))  # Redirect to login page
-                else:
-                    flash('Account creation failed. Try again.', category='error')
-            except ValueError:
-                flash('Invalid date format. Use YYYY-MM-DD.', category='error')
-
-    return render_template("createAccount.html")
-"""
-    
 @boundary.route('/createAccount', methods=['GET', 'POST'])
 def sign_up():
     if request.method == 'POST':
@@ -200,23 +128,6 @@ def sign_up():
 
 
 # User Account Details
-"""
-@boundary.route('/accountDetails', methods=['GET'])
-def accDetails():
-    if 'username' not in session:
-        flash("You must be logged in to view account details.", category='error')
-        return redirect(url_for('boundary.login'))  # Redirect to login if not authenticated
-
-    username = session.get('username')
-    user_info = DisplayUserDetailController.get_user_info(username)  # Fetch user info
-
-    if not user_info:
-        flash("User details not found.", category='error')
-        return redirect(url_for('boundary.home'))
-
-    return render_template("accountDetails.html", user_info=user_info)
-"""
-
 @boundary.route('/accountDetails', methods=['GET'])
 def accDetails():
     if 'username' not in session:
@@ -275,8 +186,6 @@ def update_account_detail():
     return render_template("updateAccDetail.html", user_info=user_info)
 
 
- 
-
 # Update Password
 @boundary.route('/update_password', methods=['GET', 'POST'])
 def update_password():
@@ -333,67 +242,8 @@ def update_password():
 
 # Admin
 # Create Admin
-"""
 @boundary.route('/createAccountAdmin', methods=['GET', 'POST'])
 def create_account_admin():
-    if 'role' not in session or session['role'] != 'Admin':
-        flash("Access Denied! Only Admins can create accounts.", category='error')
-        return redirect(url_for('boundary.home'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password1 = request.form.get('password1')
-        password2 = request.form.get('password2')
-        email = request.form.get('email')
-        name = request.form.get('name')
-        surname = request.form.get('surname')
-        date_of_birth = request.form.get('date_of_birth')
-        role = request.form.get('role')  # Admin selects the role
-
-        # Validation checks
-        if len(email) < 4:
-            flash('Email must be greater than 3 characters.', category='error')
-        elif len(name) < 2:
-            flash('First name must be greater than 1 character.', category='error')
-        elif password1 != password2:
-            flash('Passwords do not match.', category='error')
-        elif len(password1) < 7:
-            flash('Password must be at least 7 characters.', category='error')
-        elif role not in ["Admin", "Teacher", "Student"]:
-            flash('Invalid role selection.', category='error')
-        else:
-            try:
-                # Convert date format
-                date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
-                formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
-
-                # Hash the password
-                hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
-
-                # Create UserAccount entity
-                userAcc = UserAccount(username, hashed_password, name, surname, email, formatted_date_of_birth, role)
-
-                # Insert into database
-                result = CreateUserAccController.createUserAcc(userAcc)
-
-                if result:
-                    flash(f'Account created successfully! ({role})', category='success')
-                    return redirect(url_for('boundary.home'))  # Redirect to homepage
-                else:
-                    flash('Account creation failed. Try again.', category='error')
-            except ValueError:
-                flash('Invalid date format. Use YYYY-MM-DD.', category='error')
-
-    return render_template("createAccountAdmin.html")
-"""
-from flask import render_template, request, redirect, url_for, flash, session
-from werkzeug.security import generate_password_hash
-from datetime import datetime
-from FYP25S109 import mongo  # Assuming you're using MongoDB
-
-@boundary.route('/createAccountAdmin', methods=['GET', 'POST'])
-def create_account_admin():
-    # ✅ Ensure only Admins can access this route
     if session.get("role") != "Admin":
         flash("Unauthorized access! Only admins can create users.", category="error")
         return redirect(url_for("boundary.home"))
@@ -408,26 +258,21 @@ def create_account_admin():
         password2 = request.form.get('password2')
         role = request.form.get('role')
 
-        # ✅ Ensure passwords match
         if password1 != password2:
             flash("Passwords do not match.", category="error")
             return redirect(url_for("boundary.create_account_admin"))
 
-        # ✅ Validate role assignment (only valid roles allowed)
         valid_roles = ["Admin", "Teacher", "Student"]
         if role not in valid_roles:
             flash("Invalid role selection.", category="error")
             return redirect(url_for("boundary.create_account_admin"))
 
-        # ✅ Hash password
         hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
 
-        # ✅ Save user to database
         try:
             date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
             formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
 
-            # ✅ Insert user into MongoDB
             mongo.db.useraccount.insert_one({
                 "username": username,
                 "password": hashed_password,
@@ -439,47 +284,16 @@ def create_account_admin():
             })
 
             flash(f"Account created successfully! Assigned Role: {role}", category="success")
-            return redirect(url_for("boundary.home"))  # ✅ Redirect after success
+            return redirect(url_for("boundary.home"))  
         except ValueError:
             flash("Invalid date format. Use YYYY-MM-DD.", category="error")
             return redirect(url_for("boundary.create_account_admin"))
 
-    # ✅ Ensure GET requests return a valid response
     return render_template("createAccountAdmin.html")
 
 
 
 # Confirm Teacher
-"""
-@boundary.route('/confirmTeacher', methods=['GET'])
-def confirm_teacher_page():
-    if session.get('role') != "Admin":
-        flash("Access Denied! Only Admins can confirm teachers.", category="error")
-        return redirect(url_for("boundary.home"))
-
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT username, email FROM useraccount WHERE role = 'User'")
-    users = cur.fetchall()
-    cur.close()
-
-    return render_template("confirmTeacher.html", users=users)
-
-
-@boundary.route('/confirmTeacher/<username>', methods=['POST'])
-def confirm_teacher(username):
-    if session.get('role') != "Admin":
-        flash("Access Denied!", category="error")
-        return redirect(url_for("boundary.home"))
-
-    success = UpdateUserRoleController.change_role(username, "Teacher")
-
-    if success:
-        flash(f"{username} is now a Teacher!", category="success")
-    else:
-        flash("Failed to update role. Ensure the username exists.", category="error")
-
-    return redirect(url_for("boundary.confirm_teacher_page"))
-"""
 @boundary.route('/confirmTeacher/', methods=['GET','POST'])
 def confirm_teacher_page():
     """Show all users with role 'User' for Admin approval."""
@@ -487,10 +301,10 @@ def confirm_teacher_page():
         flash("Access Denied! Only Admins can confirm teachers.", category="error")
         return redirect(url_for("boundary.home"))
 
-    # ✅ Fetch users with role "User" from MongoDB
+    # Fetch users with role "User" from MongoDB
     users = list(mongo.db.useraccount.find({"role": "User"}, {"_id": 0, "username": 1, "email": 1}))
 
-    print(f"[DEBUG] Users fetched: {users}")  # ✅ Debugging output
+    print(f"[DEBUG] Users fetched: {users}")  # Debugging output
 
     return render_template("confirmTeacher.html", users=users)
 
@@ -501,7 +315,7 @@ def confirm_teacher(username):
         flash("Access Denied!", category="error")
         return redirect(url_for("boundary.home"))
 
-    # ✅ Update role in MongoDB
+    # Update role in MongoDB
     update_result = mongo.db.useraccount.update_one(
         {"username": username, "role": "User"},
         {"$set": {"role": "Teacher"}}
@@ -528,7 +342,6 @@ def allowed_file(filename):
 
 @boundary.route('/uploadTutorial', methods=['GET', 'POST'])
 def upload_tutorial():
-    """Allows users to upload tutorial videos."""
     if 'username' not in session:
         flash("You must be logged in to upload a tutorial video.", category='error')
         return redirect(url_for('boundary.login'))
@@ -537,12 +350,12 @@ def upload_tutorial():
         file = request.files.get('file')
         title = request.form.get("title")
         username = session["username"]
-        user_role = session.get("role", "User")  # ✅ Retrieve user role, default to "User"
+        user_role = session.get("role", "User")  
 
-        # ✅ Create a `TutorialVideo` instance and pass `user_role`
+        # Create a `TutorialVideo` instance and pass `user_role`
         video = TutorialVideo(title=title, video_name=file.filename, video_file=file, username=username, user_role=user_role)
 
-        # ✅ Save the video
+        # Save the video
         result = video.save_video()
 
         flash(result["message"], category="success" if result["success"] else "error")
@@ -556,10 +369,74 @@ def view_uploaded_videos():
         flash("You must be logged in to view uploaded videos.", category='error')
         return redirect(url_for('boundary.login'))
 
-    # ✅ Fetch videos uploaded by the user
+    # Fetch videos uploaded by the user
     user_videos = list(mongo.db.videos.find(
         {"uploader": session['username']},
-        {"_id": 0, "title": 1, "description": 1, "file_path": 1, "status": 1}
+        {"_id": 0, "title": 1, "description": 1, "file_path": 1}
     ))
 
     return render_template("viewUploadedVideos.html", videos=user_videos)
+
+# Delete Tutorial Video
+@boundary.route('/manageVideos')
+def manage_video():
+    
+    if 'username' not in session or session.get("role") != "Admin":
+        flash("You are not authorized to view this page.", category="error")
+        return redirect(url_for('boundary.home'))
+    
+    all_videos = list(mongo.db.tutorialvideo.find({}, {"_id": 1, "title": 1, "video_name": 1, "file_path": 1, "username": 1}))
+
+    return render_template("manageVideo.html", videos=all_videos, mongo=mongo)
+
+@boundary.route('/deleteVideo', methods=['POST'])
+def delete_video():
+    """Deletes a video from the database and storage with role-based permissions."""
+    
+    if 'username' not in session:
+        flash("You must be logged in to delete videos.", category="error")
+        return redirect(url_for('boundary.home'))
+
+    video_name = request.form.get("video_name")  # Get video name from form
+    username = session["username"]  # Get logged-in user
+    user_role = session.get("role", "User")  # Get user role
+
+    # Fetch video details from the database
+    video = mongo.db.tutorialvideo.find_one({"video_name": video_name})
+
+    if not video:
+        flash("Video not found!", category="error")
+        return redirect(url_for('boundary.home'))
+
+    uploader_username = video["username"]
+
+    # Fetch uploader role
+    uploader = mongo.db.useraccount.find_one({"username": uploader_username}, {"role": 1})
+    uploader_role = uploader["role"] if uploader else "User"
+
+    # Admins can delete if the uploader is not another Admin
+    if user_role == "Admin":
+        if uploader_role == "Admin" and uploader_username != username:
+            flash("You cannot delete videos uploaded by another Admin.", category="error")
+            return redirect(url_for('boundary.home'))
+
+    # Allow the uploader to delete their own video
+    if user_role == "Admin" or username == uploader_username:
+        # Get video file path
+        file_path = os.path.join("static/uploads/videos", video_name)
+
+        # Delete file from storage
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # Remove video from MongoDB
+        mongo.db.tutorialvideo.delete_one({"video_name": video_name})
+
+        flash("Video deleted successfully.", category="success")
+    else:
+        flash("You are not authorized to delete this video.", category="error")
+
+    return redirect(url_for('boundary.home'))
+
+
+# Add Avatar
