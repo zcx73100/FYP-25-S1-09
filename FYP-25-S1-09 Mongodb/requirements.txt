@@ -29,3 +29,5 @@ dlib==19.24.2
 requests==2.31.0
 typing_extensions==4.11.0
 
+#python --version
+#pip install torch torchvision torchaudio
