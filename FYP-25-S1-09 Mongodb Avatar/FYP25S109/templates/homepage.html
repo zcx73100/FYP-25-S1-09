@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2 style="text-align:center">Welcome to the Homepage</h2>
+    <h3 style="text-align:center">Tutorial Videos</h3>
+
+    <div class="video-grid">  <!-- ✅ Changed class to "video-grid" for flexbox layout -->
+        {% if videos %}
+            {% for video in videos %}
+                <div class="video-card">
+                    <video controls>
+                        <source src="{{ url_for('static', filename='uploads/videos/' + video.video_name) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <h5>Name: {{ video.title }}</h5>  
+                    <h5>Uploaded By: {{ video.username }}</h5>  
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="text-align:center">No videos available.</p>
+        {% endif %}
+    </div>
+   
+    <div class="avatar-grid">
+        {% if avatars %}
+            {% for avatar in avatars %}
+                <div class="avatar-card">
+                    <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="Avatar of {{ avatar.username }}" width="150" height="150">
+                    <h5>Uploaded By: {{ avatar.username }}</h5>
+                    <button class="delete-btn">Delete</button>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="text-align:center">No avatars available.</p>
+        {% endif %}
+    </div>
+
+
+
+    </div>
+{% endblock %}
