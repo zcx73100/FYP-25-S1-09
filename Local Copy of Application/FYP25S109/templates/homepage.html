@@ -19,17 +19,24 @@
             <p style="text-align:center">No videos available.</p>
         {% endif %}
     </div>
-    <div class="avatar-grid">  <!-- ✅ Added avatar-grid for flexbox layout -->
+    <h3 style="text-align:center">Avatars</h3>
+    <div class="avatar-grid">
         {% if avatars %}
             {% for avatar in avatars %}
                 <div class="avatar-card">
-                    <img src="{{ url_for('static', filename='uploads/avatars/' + avatar.username) }}" alt="Avatar">
-                    <h5>Uploaded By: {{ avatar.username }}</h5>  
+                    <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="Avatar of {{ avatar.username }}" width="150" height="150">
+                    <br/>
+                    <button>View Avatar Video</button>
+                    <p>Uploaded by: {{ avatar.username }}</p>
+                    <p>Uploaded on: {{ avatar.upload_date.strftime("%Y-%m-%d %H:%M:%S") }}</p>
                 </div>
             {% endfor %}
         {% else %}
             <p style="text-align:center">No avatars available.</p>
         {% endif %}
+    </div>
+
+
 
     </div>
 {% endblock %}

@@ -4,14 +4,22 @@ import os
 import logging
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename 
+from werkzeug.utils import secure_filename
 from rembg import remove
 from PIL import Image
 import io
 
-UPLOAD_FOLDER = 'FYP25S109/static/uploads/'
+# Separate Upload Folders
+UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
+UPLOAD_FOLDER_AVATAR = 'FYP25S109/static/uploads/avatar/'
+
+# Allowed Extensions
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
+
+# Ensure Directories Exist
+os.makedirs(UPLOAD_FOLDER_VIDEO, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER_AVATAR, exist_ok=True)
 
 class UserAccount:
     def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None):
@@ -26,12 +34,12 @@ class UserAccount:
     @staticmethod
     def create_user_acc(user_acc):
         try:
-            print(f"[DEBUG] Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
+            logging.debug(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
 
             existing_user = mongo.db.useraccount.find_one({"username": user_acc.username})
             if existing_user:
-                print("[ERROR] Username already exists.")
-                return False  
+                logging.error("Username already exists.")
+                return False
 
             mongo.db.useraccount.insert_one({
                 "username": user_acc.username,
@@ -43,11 +51,11 @@ class UserAccount:
                 "role": user_acc.role
             })
 
-            print("[DEBUG] User successfully inserted into MongoDB!")
+            logging.debug("User successfully inserted into MongoDB!")
             return True
 
         except Exception as e:
-            print(f"[ERROR] Database Insertion Error: {str(e)}")  
+            logging.error(f"Database Insertion Error: {str(e)}")
             return False
 
     @staticmethod
@@ -59,46 +67,46 @@ class UserAccount:
                 return user["username"], user["role"]
             return None
         except Exception as e:
-            print(f"[ERROR] Login failed: {e}")
+            logging.error(f"Login failed: {e}")
             return None
 
     @staticmethod
     def update_account_detail(username, updated_data):
         try:
             if not updated_data:
-                print(f"[WARNING] No update data provided for {username}.")
+                logging.warning(f"No update data provided for {username}.")
                 return False
 
             update_result = mongo.db.useraccount.update_one({"username": username}, {"$set": updated_data})
 
             if update_result.modified_count > 0:
-                print(f"[DEBUG] User Update: Username={username} | Updated Fields={updated_data}")
+                logging.debug(f"User Update: Username={username} | Updated Fields={updated_data}")
                 return True
-            print(f"[WARNING] No changes made for {username}.")
+            logging.warning(f"No changes made for {username}.")
             return False
 
         except Exception as e:
-            print(f"[ERROR] Failed to update user info: {str(e)}")  
+            logging.error(f"Failed to update user info: {str(e)}")
             return False
+
     @staticmethod
     def find_by_username(username):
-        """
-        Find a user by their username in the database.
-        """
         try:
-            print(f"[DEBUG] Finding user by username: {username}")  # Debugging: Print username
+            logging.debug(f"Finding user by username: {username}")
             user = mongo.db.useraccount.find_one({"username": username})
             return user
         except Exception as e:
-            print(f"[ERROR] Failed to find user by username: {str(e)}")
+            logging.error(f"Failed to find user by username: {str(e)}")
             return None
 
 class TutorialVideo:
-    def __init__(self, title=None, video_file=None, username=None, user_role=None):
+    def __init__(self, title=None, video_name=None ,video_file=None, username=None, user_role=None,description=None):
         self.title = title
+        self.video_name = video_name
         self.video_file = video_file
         self.username = username
-        self.user_role = user_role  
+        self.user_role = user_role
+        self.description = description
 
     def save_video(self):
         try:
@@ -106,74 +114,92 @@ class TutorialVideo:
                 raise ValueError("No file selected for upload.")
 
             filename = secure_filename(self.video_file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER, 'videos', filename)
+            file_path = os.path.join(UPLOAD_FOLDER_VIDEO, filename)
+
+            # Validate file extension
+            if filename.split('.')[-1].lower() not in ALLOWED_VIDEO_EXTENSIONS:
+                raise ValueError("Invalid video format.")
 
             self.video_file.save(file_path)
             status = 'Approved' if self.user_role == 'Admin' else 'Pending'
 
             mongo.db.tutorialvideo.insert_one({
                 'title': self.title,
+                'video_name': filename,
                 'file_path': file_path,
                 'username': self.username,
                 'status': status,
-                'upload_date': datetime.utcnow()
+                'upload_date': datetime.now(),
+                'description': self.description
             })
             return {"success": True, "message": "Video uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
 
         except Exception as e:
             logging.error(f"Error saving video: {str(e)}")
             return {"success": False, "message": str(e)}
-
+    def delete_video(video_id):
+        try:
+            video = mongo.db.tutorialvideo.find_one({"_id": video_id})
+            if video:
+                os.remove(video['file_path'])
+        except Exception as e:
+            logging.error(f"Error deleting video: {str(e)}")
+            return {"success": False, "message": str(e)}
+    def search_video(search_query):
+        try:
+            video = mongo.db.tutorialvideo.find_one({"title:": search_query})
+            return video
+        except Exception as e:
+            logging.error(f"Failed to find video by title: {str(e)}")
+            return None
 
 class Avatar:
-    def __init__(self, image_file, username=None):
+    def __init__(self, image_file, username=None,upload_date=None):
         self.image_file = image_file
         self.username = username
+        self.upload_date = upload_date
 
     def allowed_file(self, filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
     def save_image(self):
-        """
-        Save the image file, process it (e.g., remove background), and store it in the database.
-        """
         try:
             if not self.image_file:
                 raise ValueError("No file selected for upload.")
 
             filename = secure_filename(self.image_file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER, 'avatars', filename)
+            if not self.allowed_file(filename):
+                raise ValueError("Invalid image format.")
 
-            # Save the uploaded file
+            file_path = os.path.join(UPLOAD_FOLDER_AVATAR, filename)
             self.image_file.save(file_path)
 
-            # Process the image (e.g., remove background)
+            # Process image (e.g., remove background)
             try:
                 with open(file_path, "rb") as f:
-                    output_image = remove(f.read())  
+                    output_image = remove(f.read())
             except Exception as e:
-                print(f"[ERROR] Error reading or processing image: {str(e)}")
+                logging.error(f"Error processing image: {str(e)}")
                 return {"success": False, "message": f"Error processing image: {str(e)}"}
 
-            # Save the processed image
             processed_filename = f"processed_{filename}"
-            processed_file_path = os.path.join(UPLOAD_FOLDER, 'avatars', processed_filename)
+            processed_file_path = os.path.join(UPLOAD_FOLDER_AVATAR, processed_filename)
 
             try:
                 with open(processed_file_path, "wb") as f:
                     f.write(output_image)
             except Exception as e:
-                print(f"[ERROR] Error saving processed image: {str(e)}")
+                logging.error(f"Error saving processed image: {str(e)}")
                 return {"success": False, "message": f"Error saving processed image: {str(e)}"}
 
-            # Remove the original uploaded file
+            # Remove original uploaded file
             try:
                 os.remove(file_path)
             except Exception as e:
-                print(f"[ERROR] Error deleting original file: {str(e)}")
+                logging.error(f"Error deleting original file: {str(e)}")
                 return {"success": False, "message": f"Error deleting original file: {str(e)}"}
 
-            # Add the avatar to the database
+            # Add avatar to DB
             add_result = self.add_avatar(self.username, processed_file_path)
             if not add_result:
                 return {"success": False, "message": "Failed to add avatar to database."}
@@ -181,22 +207,26 @@ class Avatar:
             return {"success": True, "message": "Avatar uploaded successfully.", "file_path": processed_file_path}
 
         except Exception as e:
+            logging.error(f"Error processing avatar: {str(e)}")
             return {"success": False, "message": f"Error processing avatar: {str(e)}"}
 
     def add_avatar(self, username, file_path):
-        """
-        Add the avatar to the database.
-        """
         try:
-            print(f"[DEBUG] Adding avatar to database for user: {username}")  # Debugging: Print username
-            print(f"[DEBUG] File path: {file_path}")  # Debugging: Print file path
+            relative_path = file_path.split('static/')[1]  # Get relative path for Flask
 
             mongo.db.avatar.insert_one({
                 'username': username,
-                'file_path': file_path,
-                'upload_date': datetime.utcnow()
+                'file_path': relative_path,
+                'upload_date': datetime.now()
             })
             return True
         except Exception as e:
-            print(f"[ERROR] Error adding avatar to database: {str(e)}")  # Debugging: Print error
+            logging.error(f"Error adding avatar to database: {str(e)}")
             return False
+    def search_avatar(search_query):
+        try:
+            avatar = mongo.db.avatar.find_one({"username": search_query})
+            return avatar
+        except Exception as e:
+            logging.error(f"Failed to find avatar by username: {str(e)}")
+            return None
