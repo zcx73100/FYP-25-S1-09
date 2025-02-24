@@ -37,10 +37,23 @@ class LoginBoundary:
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
+
+            # Fetch user from DB
             user = mongo.db.useraccount.find_one({"username": username})
+
             if user:
+                # Check user status
+                if user.get('status') == 'suspended':
+                    flash('Your account is suspended. Please contact admin.', category='error')
+                    return redirect(url_for('boundary.login'))
+                elif user.get('status') == 'deleted':
+                    flash('This account has been deleted.', category='error')
+                    return redirect(url_for('boundary.login'))
+
+                # Validate password
                 stored_hashed_password = user["password"]
                 if check_password_hash(stored_hashed_password, password):
+                    # Successful login for active users only
                     session['username'] = username
                     session['role'] = user['role']
                     session['user_authenticated'] = True
@@ -50,6 +63,7 @@ class LoginBoundary:
                     flash('Wrong password.', category='error')
             else:
                 flash('Username does not exist.', category='error')
+
         return render_template("login.html")
 
 # Log Out
@@ -75,6 +89,7 @@ class CreateAccountBoundary:
             password1 = request.form.get('password1')
             password2 = request.form.get('password2')
             role = "Student" if session.get('role') == "Teacher" else "User"
+            
 
             if len(email) < 4:
                 flash('Email must be greater than 3 characters.', category='error')
@@ -96,7 +111,8 @@ class CreateAccountBoundary:
                         "role": role,
                         "name": name,
                         "surname": surname,
-                        "date_of_birth": formatted_date_of_birth
+                        "date_of_birth": formatted_date_of_birth,
+                        "status": "active"
                     })
                     flash(f'Account created successfully! Assigned Role: {role}', category='success')
                     return redirect(url_for('boundary.login'))
@@ -188,6 +204,56 @@ class UpdatePasswordBoundary:
                 flash("Failed to update password. Try again.", category='error')
         return render_template("updatePassword.html")
 
+class ResetPasswordBoundary:
+    @staticmethod
+    @boundary.route('/resetPassword', methods=['GET', 'POST'])
+    def reset_password():
+        if request.method == 'POST':
+            username = request.form.get("username")
+            new_password = request.form.get("new_password")
+            if len(new_password) < 7:
+                flash("Password must be at least 7 characters long.", category="error")
+                return redirect(url_for("boundary.reset_password"))
+            if ResetPasswordController.reset_password(username, new_password):
+                flash(f"Password reset for {username}.", category="success")
+            else:
+                flash("Failed to reset password. Ensure the username exists.", category="error")
+            return redirect(url_for("boundary.reset_password"))
+        return render_template("resetPassword.html")
+
+
+# Search     
+class SearchBoundary:
+    @staticmethod
+    @boundary.route('/search', methods=['GET'])
+    def search():
+        search_query = request.args.get('query', '').strip()
+        filter_type = request.args.get('filter', 'video')
+
+        print(f"Received Search Query: '{search_query}' | Filter: '{filter_type}'")
+
+        if not search_query:
+            flash("Please enter a search query.", category="error")
+            return redirect(url_for('boundary.home'))
+
+        if filter_type == 'video':
+            search_results = TutorialVideo.search_video(search_query)
+        elif filter_type == 'avatar':
+            search_results = Avatar.search_avatar(search_query)
+        else:
+            flash("Invalid filter type.", category="error")
+            return redirect(url_for('boundary.home'))
+
+        if not search_results:
+            flash(f"No {filter_type} results found.", category="info")
+        else:
+            print(f"Found {len(search_results)} results.")
+
+        return render_template("search.html", search_results=search_results, filter_type=filter_type)
+
+
+
+# -------------------------------------------------------------ADMIN-----------------------------------------------
 # Admin Create Account
 class CreateAccountAdminBoundary:
     @staticmethod
@@ -223,7 +289,8 @@ class CreateAccountAdminBoundary:
                     "role": role,
                     "name": name,
                     "surname": surname,
-                    "date_of_birth": formatted_date_of_birth
+                    "date_of_birth": formatted_date_of_birth,
+                    "status": "active"
                 })
                 flash(f"Account created successfully! Assigned Role: {role}", category="success")
                 return redirect(url_for("boundary.home"))
@@ -232,23 +299,8 @@ class CreateAccountAdminBoundary:
                 return redirect(url_for("boundary.create_account_admin"))
         return render_template("createAccountAdmin.html")
 
-class ResetPasswordBoundary:
-    @staticmethod
-    @boundary.route('/resetPassword', methods=['GET', 'POST'])
-    def reset_password():
-        if request.method == 'POST':
-            username = request.form.get("username")
-            new_password = request.form.get("new_password")
-            if len(new_password) < 7:
-                flash("Password must be at least 7 characters long.", category="error")
-                return redirect(url_for("boundary.reset_password"))
-            if ResetPasswordController.reset_password(username, new_password):
-                flash(f"Password reset for {username}.", category="success")
-            else:
-                flash("Failed to reset password. Ensure the username exists.", category="error")
-            return redirect(url_for("boundary.reset_password"))
-        return render_template("resetPassword.html")
-# Confirm Teacher
+
+# Admin Confirm Teacher
 class ConfirmTeacherBoundary:
     @staticmethod
     @boundary.route('/confirmTeacher/', methods=['GET', 'POST'])
@@ -275,7 +327,7 @@ class ConfirmTeacherBoundary:
             flash("Failed to update role. Ensure the username exists and is not already a Teacher.", category="error")
         return redirect(url_for("boundary.confirm_teacher_page"))
 
-# Upload Tutorial Video
+# Admin Upload Tutorial Video
 class UploadTutorialBoundary:
     UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
     ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
@@ -331,6 +383,8 @@ class AdminViewUploadedVideosBoundary:
             {"_id": 0, "title": 1, "file_path": 1, "status": 1, "upload_date": 1, "description": 1, "username": 1, "video_name": 1}
         ))
         return render_template("manageVideo.html", videos=admin_videos)
+    
+    
 # View Uploaded Videos (Single Video)
 class AdminViewSingleTutorialBoundary:
     @staticmethod
@@ -409,74 +463,98 @@ class AddAvatarBoundary:
             return redirect(url_for('boundary.admin_create_avatar'))
         return render_template("admin_add_avatar.html")
     
-"""    
-class SearchVideoBoundary:
+# Admin Manage User
+class ManageUserBoundary:
     @staticmethod
-    @boundary.route('/search/video', methods=['GET', 'POST'])
-    def search_video():
-        if request.method == 'POST':
-            search_query = request.form.get("search_query")
-            if not search_query:
-                flash("Please enter a search query.", category="error")
-                return redirect(url_for('boundary.home'))
-
-            # Call the function to search for video-related data
-            search_results = TutorialVideo.search_video(search_query)
-            
-            if not search_results:
-                flash("No video results found.", category="info")
-
-            return render_template("search.html", search_results=search_results, filter_type="video")
-        
-        return redirect(url_for('boundary.home'))
-
-
-class SearchAvatarBoundary:
-    @staticmethod
-    @boundary.route('/search/avatar', methods=['GET', 'POST'])
-    def search_avatar():
-        if request.method == 'POST':
-            search_query = request.form.get("search_query")
-            if not search_query:
-                flash("Please enter a search query.", category="error")
-                return redirect(url_for('boundary.home'))
-
-            # Call the function to search for avatar-related data
-            search_results = Avatar.search_avatar(search_query)
-            
-            if not search_results:
-                flash("No avatar results found.", category="info")
-
-            return render_template("search.html", search_results=search_results, filter_type="avatar")
-        
-        return redirect(url_for('boundary.home'))
-"""    
-   
-    
-class SearchBoundary:
-    @staticmethod
-    @boundary.route('/search', methods=['GET'])
-    def search():
-        search_query = request.args.get('query', '').strip()
-        filter_type = request.args.get('filter', 'video')
-
-        print(f"Received Search Query: '{search_query}' | Filter: '{filter_type}'")
-
-        if not search_query:
-            flash("Please enter a search query.", category="error")
+    @boundary.route('/admin/manageUsers', methods=['GET'])
+    def manage_users():
+        # Ensure only admins can access this page
+        if 'role' not in session or session.get('role') != 'Admin':
+            flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        if filter_type == 'video':
-            search_results = TutorialVideo.search_video(search_query)
-        elif filter_type == 'avatar':
-            search_results = Avatar.search_avatar(search_query)
-        else:
-            flash("Invalid filter type.", category="error")
+        # Fetch all users
+        users = list(mongo.db.useraccount.find({}, {"_id": 0, "username": 1, "email": 1, "role": 1, "status": 1}))
+        return render_template("manageUsers.html", users=users)
+
+    @staticmethod
+    @boundary.route('/admin/searchUser', methods=['GET'])
+    def search_user():
+        if 'role' not in session or session.get('role') != 'Admin':
+            flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        if not search_results:
-            flash(f"No {filter_type} results found.", category="info")
-        else:
-            print(f"Found {len(search_results)} results.")
+        query = request.args.get('query', '')
+        users = list(mongo.db.useraccount.find(
+            {"$or": [
+                {"username": {"$regex": query, "$options": "i"}},
+                {"email": {"$regex": query, "$options": "i"}},
+                {"role": {"$regex": query, "$options": "i"}}
+            ]},
+            {"_id": 0, "username": 1, "email": 1, "role": 1, "status": 1}
+        ))
 
-        return render_template("search.html", search_results=search_results, filter_type=filter_type)
+        return render_template("manageUsers.html", users=users)
+
+    @staticmethod
+    @boundary.route('/admin/suspendUser/<username>', methods=['POST'])
+    def suspend_user(username):
+        if 'role' not in session or session.get('role') != 'Admin':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        result = mongo.db.useraccount.update_one(
+            {"username": username},
+            {"$set": {"status": "suspended"}}
+        )
+
+        if result.modified_count:
+            flash(f"User {username} suspended successfully.", category='success')
+        else:
+            flash("User not found or already suspended.", category='error')
+
+        return redirect(url_for('boundary.manage_users'))
+
+# Delete User 
+    @staticmethod
+    @boundary.route('/admin/deleteUser/<username>', methods=['POST'])
+    def delete_user(username):
+        if 'role' not in session or session.get('role') != 'Admin':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        # Prevent self-deletion
+        if username == session.get('username'):
+            flash("You cannot delete your own account.", category='error')
+            return redirect(url_for('ManageUserBoundary.manage_users'))
+
+        # Permanently delete user from DB
+        result = mongo.db.useraccount.delete_one({"username": username})
+
+        if result.deleted_count:
+            flash(f"User {username} permanently deleted.", category='success')
+        else:
+            flash("User not found.", category='error')
+
+        return redirect(url_for('boundary.manage_users'))
+
+
+# Reactivate User
+    @staticmethod
+    @boundary.route('/admin/activateUser/<username>', methods=['POST'])
+    def activate_user(username):
+        if 'role' not in session or session.get('role') != 'Admin':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        result = mongo.db.useraccount.update_one(
+            {"username": username},
+            {"$set": {"status": "active"}}
+        )
+
+        if result.modified_count:
+            flash(f"User {username} reactivated successfully.", category='success')
+        else:
+            flash("Failed to reactivate user.", category='error')
+
+        return redirect(url_for('boundary.manage_users'))
