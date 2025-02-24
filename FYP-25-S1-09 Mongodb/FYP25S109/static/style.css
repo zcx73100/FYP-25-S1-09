@@ -1,129 +1,153 @@
 /* ========================= */
-/* ✅ GENERAL STYLES */
+/* ✅ FORM CONTAINER STYLES */
 /* ========================= */
-html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
+.formContainer {
+    max-width: 500px; /* Limit form width for better readability */
+    margin: 50px auto; /* Center the form vertically and horizontally */
+    padding: 30px; /* Add padding inside the form container */
+    background-color: #ffffff; /* White background for the form */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+.formContainer h1 {
+    text-align: center; /* Center the heading */
+    margin-bottom: 20px; /* Add spacing below the heading */
+    font-size: 2rem; /* Increase font size for emphasis */
+    color: #212529; /* Dark text color */
+}
+
+/* ========================= */
+/* ✅ FORM STYLES */
+/* ========================= */
+.forms {
     display: flex;
     flex-direction: column;
-    background-color: #f8f9fa; /* Light gray background */
+    gap: 15px; /* Add spacing between form elements */
 }
 
-/* Ensure the container expands properly */
-.container {
-    flex: 1; /* Allows the content to take up available space */
+.mb-3 {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Add spacing between label and input */
 }
 
-/* ========================= */
-/* ✅ NAVBAR FIXES */
-/* ========================= */
-.navbar {
-    padding: 10px 20px; /* Ensure navbar has proper padding */
-    margin-bottom: 0 !important; /* Remove any bottom margin */
-    z-index: 1000; /* Ensure navbar is above other elements */
+.mb-3 label {
+    font-size: 1rem; /* Label font size */
+    color: #495057; /* Slightly darker text color */
+    font-weight: 500; /* Medium font weight */
 }
 
-/* ✅ Fix the navbar brand ("Project Name") appearance */
-.navbar-brand {
-    border: none !important;
-    outline: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    background: none !important;
-    display: inline-block;
-    font-size: 1.5rem; /* Adjust if needed */
-    font-weight: bold;
-    color: white !important;
+.mb-3 input {
+    padding: 10px; /* Add padding to inputs */
+    border: 1px solid #ced4da; /* Light border */
+    border-radius: 5px; /* Rounded corners */
+    font-size: 1rem; /* Input text size */
+    color: #212529; /* Dark text color */
+    transition: border-color 0.3s ease; /* Smooth transition for focus */
 }
 
-/* Fix Navbar Links */
-.navbar-nav .nav-item {
-    margin-bottom: 5px; /* Add spacing between links in mobile */
-}
-
-/* ✅ Fix navbar toggler button visibility */
-.navbar-toggler {
-    border: 1px solid rgba(255, 255, 255, 0.3); /* Add a subtle border */
-    background: transparent;
-    padding: 6px; /* Ensure a clickable area */
-}
-
-.navbar-toggler:focus {
-    outline: none;
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.5); /* Add small glow */
+.mb-3 input:focus {
+    border-color: #80bdff; /* Highlight border on focus */
+    outline: none; /* Remove default outline */
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25); /* Add a subtle glow */
 }
 
 /* ========================= */
-/* ✅ RESPONSIVE NAVBAR */
+/* ✅ BUTTON STYLES */
 /* ========================= */
-@media (max-width: 991px) {
-    .navbar-collapse {
-        background: #212529; /* Ensure visibility */
-        padding: 10px;
-        text-align: center;
+.centerContainer {
+    display: flex;
+    justify-content: center; /* Center the button */
+    margin-top: 20px; /* Add spacing above the button */
+}
+
+.centerContainer button {
+    padding: 10px 20px; /* Add padding to the button */
+    background-color: #007bff; /* Primary button color */
+    color: #ffffff; /* White text */
+    border: none; /* Remove border */
+    border-radius: 5px; /* Rounded corners */
+    font-size: 1rem; /* Button text size */
+    cursor: pointer; /* Pointer cursor on hover */
+    transition: background-color 0.3s ease; /* Smooth transition */
+}
+
+.centerContainer button:hover {
+    background-color: #0056b3; /* Darker shade on hover */
+}
+
+/* ========================= */
+/* ✅ RESPONSIVE ADJUSTMENTS */
+/* ========================= */
+@media (max-width: 600px) {
+    .formContainer {
+        margin: 20px; /* Reduce margin on smaller screens */
+        padding: 20px; /* Reduce padding on smaller screens */
     }
 
-    .navbar-nav {
-        display: block; /* Stack items vertically */
+    .formContainer h1 {
+        font-size: 1.5rem; /* Smaller heading on smaller screens */
     }
 
-    .nav-item {
-        margin-bottom: 10px; /* Ensure spacing */
+    .mb-3 input {
+        font-size: 0.9rem; /* Smaller input text on smaller screens */
+    }
+
+    .centerContainer button {
+        font-size: 0.9rem; /* Smaller button text on smaller screens */
     }
 }
-
-/* ========================= */
-/* ✅ MAIN CONTENT AREA FIX */
-/* ========================= */
-main {
-    flex: 1; /* Allow content to take available space */
-    padding-top: 20px; /* Add spacing from navbar */
-    text-align: center; /* Ensure text alignment */
-}
-
-/* ========================= */
-/* ✅ FLASH MESSAGES */
-/* ========================= */
-.alert {
-    margin: 10px auto;
-    width: 80%;
-    text-align: center;
-}
-
-
-footer {
-    margin-top: auto;
-    width: 100%;
-    background: #212529;
-    color: white;
-    text-align: center;
-    padding: 10px 0;
-}
-
-.dropdown:hover .dropdown-menu {
-    display: block;
-    margin-top: 0;
-}
-
 
 .video-grid {
-    display: flex;  /* ✅ Arrange videos in a row */
-    flex-wrap: wrap;  /* ✅ Allow wrapping if the screen is small */
-    justify-content: center;  /* ✅ Center videos on the page */
-    gap: 20px;  /* ✅ Add space between videos */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 16px;
 }
 
 .video-card {
-    flex: 1 1 300px;  /* ✅ Make videos responsive */
-    max-width: 400px;  /* ✅ Prevent videos from getting too large */
-    text-align: center;  /* ✅ Center text below the video */
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    text-align: center;
 }
 
 .video-card video {
-    width: 100%;  /* ✅ Auto-size videos */
-    height: auto;  /* ✅ Maintain aspect ratio */
-    border-radius: 10px;  /* ✅ Rounded corners */
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);  /* ✅ Add a subtle shadow */
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 16px;
+}
+
+.avatar-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    text-align: center;
+}
+
+.delete-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.delete-btn:hover {
+    background-color: #c0392b;
 }

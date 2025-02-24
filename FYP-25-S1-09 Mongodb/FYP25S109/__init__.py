@@ -42,6 +42,8 @@ def create_app():
     # ✅ MongoDB Configuration (Replace MySQL)
     app.config["MONGO_URI"] = "mongodb://localhost:27017/fyps12509"
 
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+
     # Initialize MongoDB
     mongo.init_app(app)
 
