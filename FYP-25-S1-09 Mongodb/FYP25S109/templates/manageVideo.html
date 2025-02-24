@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
     <h2>Manage Videos</h2>
-
+    <form action="{{ url_for('boundary.upload_tutorial') }}" method="POST">
+        <button type="submit">Upload Video</button>
+    </form>
     <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
@@ -12,17 +14,12 @@
                     </video>
                     <h5>Name: {{ video.title }}</h5>
                     <h5>Uploaded By: {{ video.username }}</h5>
-
-                    <!-- ✅ Delete Button (Admins cannot delete other Admins' videos) -->
-                    {% if session["role"] == "Admin" %}
-                        {% set uploader = mongo.db.useraccount.find_one({"username": video.username}, {"role": 1}) %}
-                        {% if uploader and uploader.role != "Admin" or session["username"] == video.username %}
-                            <form action="{{ url_for('boundary.delete_video') }}" method="post">
-                                <input type="hidden" name="video_name" value="{{ video.video_name }}">
-                                <button type="submit" class="delete-btn">Delete</button>
-                            </form>
-                        {% endif %}
-                    {% endif %}
+                    <form action ="{{url_for('boundary.view_tutorial', video_name=video.video_name)}}" method="POST">
+                        <button type="submit" class="view_video">View Video</button>
+                    </form>
+                    <form action="{{ url_for('boundary.delete_video',  video_name=video.video_name) }}" method="POST">
+                        <button type="submit" class="delete_video">Delete Video</button>
+                    </form>
                 </div>
             {% endfor %}
         {% else %}

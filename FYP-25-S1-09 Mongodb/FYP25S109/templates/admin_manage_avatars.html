@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Manage Avatars</h2>
+    <!-- Display Avatars -->
+    <h3>Your Avatars</h3>
+    {% if avatars %}
+    <ul>
+        {% for avatar in avatars %}
+            <li>
+                <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="Avatar">
+                <p>Uploaded on: {{ avatar.upload_date }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <p>No avatars found.</p>
+    {% endif %}
+
+    <!-- Link to Add Avatar -->
+    <a href="{{ url_for('boundary.admin_create_avatar') }}" class="btn btn-primary">Add New Avatar</a>
+{% endblock %}

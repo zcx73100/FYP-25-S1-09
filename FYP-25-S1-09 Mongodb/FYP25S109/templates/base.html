@@ -25,12 +25,18 @@
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-    
-            <div class="collapse navbar-collapse" id="main-nav">
-                <form class="d-flex ms-auto">
-                    <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
-                    <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
-                </form>
+            
+            <form class="d-flex ms-auto" method="get" action="{{ url_for('boundary.search') }}">
+                <input class="form-control me-2" type="search" placeholder="Search" name="query" aria-label="Search" required>
+            
+                <!-- Search Filter Dropdown -->
+                <select class="form-control me-2" name="filter">
+                    <option value="video">Video</option>
+                    <option value="avatar">Avatar</option>
+                </select>
+            
+                <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+            </form>    
     
                 <ul class="navbar-nav ms-auto">
                     {% if session.get('username') %}
@@ -45,8 +51,8 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.create_account_admin') }}">Create Account</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.confirm_teacher_page') }}">Confirm Teacher Account</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('boundary.manage_video') }}">Manage Video</a></li>
-
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
                                 </ul>
                             </li>
                         
