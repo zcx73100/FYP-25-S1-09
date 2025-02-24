@@ -22,7 +22,7 @@ os.makedirs(UPLOAD_FOLDER_VIDEO, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_AVATAR, exist_ok=True)
 
 class UserAccount:
-    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None):
+    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active'):
         self.username = username
         self.password = password
         self.name = name
@@ -30,6 +30,7 @@ class UserAccount:
         self.email = email
         self.date_of_birth = date_of_birth
         self.role = role
+        self.status = status
 
     @staticmethod
     def create_user_acc(user_acc):
@@ -48,14 +49,13 @@ class UserAccount:
                 "surname": user_acc.surname,
                 "email": user_acc.email,
                 "date_of_birth": user_acc.date_of_birth,
-                "role": user_acc.role
+                "role": user_acc.role,
+                "status": user_acc.status
             })
-
-            logging.debug("User successfully inserted into MongoDB!")
+            logging.info("User created successfully.")
             return True
-
         except Exception as e:
-            logging.error(f"Database Insertion Error: {str(e)}")
+            logging.error(f"Error creating user: {e}")
             return False
 
     @staticmethod
@@ -98,6 +98,55 @@ class UserAccount:
         except Exception as e:
             logging.error(f"Failed to find user by username: {str(e)}")
             return None
+
+    @staticmethod
+    def search_user(query):
+        try:
+            users = list(mongo.db.useraccount.find({
+                "$or": [
+                    {"username": {"$regex": query, "$options": "i"}},
+                    {"email": {"$regex": query, "$options": "i"}}
+                ]
+            }, {"_id": 0}))  # Exclude MongoDB's _id from the result
+
+            return users
+        except Exception as e:
+            logging.error(f"Error searching users: {e}")
+            return []
+
+    @staticmethod
+    def suspend_user(username):
+        try:
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"status": "suspended"}}
+            )
+            if result.modified_count == 0:
+                logging.warning("No user found to suspend.")
+                return False
+            logging.info(f"User {username} suspended successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Error suspending user: {e}")
+            return False
+
+    @staticmethod
+    def delete_user(username):
+        try:
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"status": "deleted"}}
+            )
+            if result.modified_count == 0:
+                logging.warning("No user found to delete.")
+                return False
+            logging.info(f"User {username} marked as deleted.")
+            return True
+        except Exception as e:
+            logging.error(f"Error deleting user: {e}")
+            return False
+
+
 
 class TutorialVideo:
     def __init__(self, title=None, video_name=None ,video_file=None, username=None, user_role=None,description=None):

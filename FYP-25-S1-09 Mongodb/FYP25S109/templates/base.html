@@ -25,7 +25,7 @@
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            
+
             <form class="d-flex ms-auto" method="get" action="{{ url_for('boundary.search') }}">
                 <input class="form-control me-2" type="search" placeholder="Search" name="query" aria-label="Search" required>
             
@@ -53,6 +53,8 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.manage_users') }}">Manage Users</a></li>
+
                                 </ul>
                             </li>
                         
