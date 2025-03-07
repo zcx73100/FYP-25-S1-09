@@ -8,7 +8,9 @@ from werkzeug.utils import secure_filename
 from rembg import remove
 from PIL import Image
 import io
-
+from pymongo.errors import DuplicateKeyError
+from io import BytesIO
+from bson import ObjectId
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
 UPLOAD_FOLDER_AVATAR = 'FYP25S109/static/uploads/avatar/'
@@ -20,6 +22,12 @@ ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 # Ensure Directories Exist
 os.makedirs(UPLOAD_FOLDER_VIDEO, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_AVATAR, exist_ok=True)
+
+
+def setup_indexes():
+    #This index will prevent users to create another account with a username taken by other user 
+    mongo.db.useraccount.create_index("username", unique=True)
+    print("Unique index on 'username' field created.")
 
 class UserAccount:
     def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active'):
@@ -54,6 +62,9 @@ class UserAccount:
             })
             logging.info("User created successfully.")
             return True
+        except DuplicateKeyError:
+            logging.error("Username already exists.")
+            return False
         except Exception as e:
             logging.error(f"Error creating user: {e}")
             return False
@@ -206,10 +217,6 @@ class TutorialVideo:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
 
-
-
-
-
 class Avatar:
     def __init__(self, image_file, username=None,upload_date=None):
         self.image_file = image_file
@@ -291,3 +298,38 @@ class Avatar:
         except Exception as e:
             logging.error(f"Failed to search avatars: {str(e)}")
             return []
+    def resize_avatar(image_file, size=(150, 150)):
+        img = Image.open(image_file)
+        img = img.convert("RGB")
+        img.thumbnail(size)
+
+        img_io = BytesIO()
+        img.save(img_io, format="JPEG")
+        img_io.seek(0)
+    
+        return img_io
+
+    def find_by_id(avatar_id):
+        try:
+            avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+            return avatar
+        except Exception as e:
+            logging.error(f"Failed to find avatar by ID: {str(e)}")
+            return None
+        
+    def delete_avatar(avatar_id):
+     try:
+        avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+        if avatar:
+            # Remove the file from storage
+            file_path = os.path.join("static", avatar["file_path"])
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            # Delete the record from the database
+            mongo.db.avatar.delete_one({"_id": ObjectId(avatar_id)})
+            return True
+     except Exception as e:
+        logging.error(f"Error deleting avatar: {str(e)}")
+        return False
+

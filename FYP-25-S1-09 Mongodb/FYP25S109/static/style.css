@@ -138,6 +138,13 @@
     text-align: center;
 }
 
+.avatar-card img {
+    width: 150px;  /* Fixed width */
+    height: 150px; /* Fixed height */
+    object-fit: cover; /* Ensures image fills the area without distortion */
+    border-radius: 50%; /* Makes the avatar circular */
+}
+
 .delete-btn {
     background-color: #e74c3c;
     color: white;

@@ -70,6 +70,11 @@ class AdminAddAvatarController:
         avatar = Avatar(avatar_file, username)
         return avatar.save_image()  # Call entity method
 
+class AdminDeleteAvatarController:
+    @staticmethod
+    def delete_avatar(avatar_id):
+        return Avatar.delete_avatar(avatar_id)  # Call entity method
+
 #This is for the admin to view multiple videos at once
 class AdminViewUploadedVideosController:
     @staticmethod
