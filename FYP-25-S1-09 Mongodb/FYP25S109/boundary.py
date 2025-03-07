@@ -5,12 +5,8 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
-from FYP25S109.controller import (
-    LoginController, CreateUserAccController, DisplayUserDetailController,
-    UpdateUserRoleController, UpdateAccountDetailController, ResetPasswordController,
-    AdminAddAvatarController, AdminManageAvatarController
-)
-from FYP25S109.entity import UserAccount, TutorialVideo, Avatar
+from FYP25S109.controller import *
+from FYP25S109.entity import * 
 
 boundary = Blueprint('boundary', __name__)
 YOUR_DOMAIN = "http://localhost:5000"
@@ -89,7 +85,12 @@ class CreateAccountBoundary:
             password1 = request.form.get('password1')
             password2 = request.form.get('password2')
             role = "Student" if session.get('role') == "Teacher" else "User"
-            
+
+            # Check if the username already exists
+            existing_user = mongo.db.useraccount.find_one({"username": username})
+            if existing_user:
+                flash('Username already taken. Please choose a different one.', category='error')
+                return render_template("createAccount.html")
 
             if len(email) < 4:
                 flash('Email must be greater than 3 characters.', category='error')
@@ -104,6 +105,8 @@ class CreateAccountBoundary:
                     date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
                     formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
                     hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
+                    
+                    # Insert the new user if all checks pass
                     mongo.db.useraccount.insert_one({
                         "username": username,
                         "password": hashed_password,
@@ -118,6 +121,7 @@ class CreateAccountBoundary:
                     return redirect(url_for('boundary.login'))
                 except ValueError:
                     flash('Invalid date format. Use YYYY-MM-DD.', category='error')
+
         return render_template("createAccount.html")
 
 # User Account Details
@@ -462,6 +466,23 @@ class AddAvatarBoundary:
                 flash(f"Failed to add avatar: {result['message']}", category='error')
             return redirect(url_for('boundary.admin_create_avatar'))
         return render_template("admin_add_avatar.html")
+    
+class DeleteAvatarBoundary:
+    @staticmethod
+    @boundary.route('/admin_delete_avatar/<avatar_id>', methods=['POST'])
+    def delete_avatar(avatar_id):
+        if 'username' not in session:
+            flash("You must be logged in to delete an avatar.", category='error')
+            return redirect(url_for('boundary.login'))
+        avatar = Avatar.find_by_id(avatar_id)
+        if not avatar:
+            flash("Avatar not found.", category='error')
+            return redirect(url_for('boundary.admin_manage_avatars'))
+        if Avatar.delete_avatar(avatar_id):
+            flash("Avatar deleted successfully.", category='success')
+        else:
+            flash("Failed to delete avatar.", category='error')
+        return redirect(url_for('boundary.admin_manage_avatars'))
     
 # Admin Manage User
 class ManageUserBoundary:
