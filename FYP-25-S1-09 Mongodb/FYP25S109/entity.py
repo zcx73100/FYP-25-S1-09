@@ -333,3 +333,64 @@ class Avatar:
         logging.error(f"Error deleting avatar: {str(e)}")
         return False
 
+class Classroom:
+    def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):
+        self.classroom_name = classroom_name
+        self.teacher = teacher
+        self.description = description
+        self.student_list = student_list or []
+        self.capacity = capacity
+    
+    @staticmethod
+    def create_classroom(classroom_name, teacher, classroom_description, classroom_capacity,student_list=[]):
+        """ Inserts classroom into the database """
+        try:
+            result = mongo.db.classroom.insert_one({
+                'classroom_name': classroom_name,
+                'teacher': teacher,
+                'student_list': student_list,
+                'capacity': classroom_capacity,
+                'description': classroom_description,
+                'upload_date': datetime.now()
+            })
+            if result.inserted_id:
+                return {"success": True, "message": f"Classroom '{classroom_name}' added successfully."}
+        except Exception as e:
+            logging.error(f"Error creating classroom: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def search_classroom(search_query):
+        """ Searches for classrooms matching the query """
+        try:
+            classrooms = mongo.db.classroom.find({
+                "classroom_name": {"$regex": search_query, "$options": "i"}
+            })
+            return list(classrooms)
+        except Exception as e:
+            logging.error(f"Failed to search classrooms: {str(e)}")
+            return []
+
+    @staticmethod
+    def delete_classroom(classroom_id):
+        """ Deletes a classroom by ID """
+        try:
+            classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
+            if classroom:
+                mongo.db.classroom.delete_one({"_id": ObjectId(classroom_id)})
+                return True
+        except Exception as e:
+            logging.error(f"Error deleting classroom: {str(e)}")
+            return False
+    
+    @staticmethod
+    def find_by_teacher(teacher):
+        """ Finds classrooms by teacher """
+        try:
+            classrooms = mongo.db.classroom.find({"teacher": teacher})
+            return list(classrooms)
+        except Exception as e:
+            logging.error(f"Failed to find classrooms by teacher: {str(e)}")
+            return []
+    
+    

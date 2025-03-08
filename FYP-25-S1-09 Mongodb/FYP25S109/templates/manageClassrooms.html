@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Manage Classrooms</h2>
+    <form action="{{ url_for('boundary.add_classroom') }}" method="POST">
+        <button type="submit">Add classroom</button>
+    </form>
+    <div class="classroom-grid">
+        {% if classrooms %}
+            {% for classroom in classrooms %}
+                <div class="classroom-card">
+                    <h5>Classroom Name: {{ classroom.classroom_name }}</h5>
+                    <h5>Classroom Description: {{ classroom.description }}</h5>
+                    <h5>Classroom Capacity: {{ classroom.capacity }}</h5>
+                    <h5>Number of Students Enrolled: {{classroom.student_list |length }}</h5>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No classrooms available.</p>
+        {% endif %}
+    </div>
+{% endblock %}
