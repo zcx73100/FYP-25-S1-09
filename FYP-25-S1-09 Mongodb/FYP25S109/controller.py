@@ -90,3 +90,23 @@ class ResetPasswordController:
     @staticmethod
     def reset_password(username, new_password):
         return UserAccount.update_account_detail(username, {"password": generate_password_hash(new_password)})
+    
+class AddClassroomController:
+    @staticmethod
+    def create_classroom(classroom_name, teacher, classroom_description, classroom_capacity, student_list=[]):
+        return Classroom.create_classroom(classroom_name, teacher, classroom_description, classroom_capacity,student_list=[])
+    
+class TeacherViewClassroomController:
+    @staticmethod
+    def view_classroom(username):
+        return Classroom.find_by_teacher(username)
+    
+class StudentViewClassroomController:
+    @staticmethod
+    def view_classroom(username):
+        return Classroom.find_by_student(username)
+
+class EnrollStudentController:
+    @staticmethod
+    def enroll_student(classroom_name, student):
+        return Classroom.enroll_student(classroom_name, student)

@@ -21,9 +21,26 @@ class HomePage:
             {"username": {"$in": admin_users}},
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "username": 1,'upload_date':1}))
+        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "username": 1, 'upload_date': 1}))
         username = session.get("username", None)
-        return render_template("homepage.html", videos=admin_videos, avatars=avatars, username=username)
+        role = session.get("role", None)
+
+        classrooms = []
+
+        if role == "Teacher":
+            # Teachers should only see the classrooms they own
+            classrooms = list(mongo.db.classroom.find(
+                {"teacher": username},
+                {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
+            ))
+        elif role == "Student":
+            # Students should only see classrooms they are enrolled in
+            classrooms = list(mongo.db.classroom.find(
+                {"student_list": username},
+                {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
+            ))
+
+        return render_template("homepage.html", videos=admin_videos, avatars=avatars, username=username, classrooms=classrooms)
 
 # Log In
 class LoginBoundary:
@@ -579,3 +596,121 @@ class ManageUserBoundary:
             flash("Failed to reactivate user.", category='error')
 
         return redirect(url_for('boundary.manage_users'))
+    
+# -------------------------------------------------------------TEACHER-----------------------------------------------
+#Teacher manage classrooms
+class TeacherManageClassroomsBoundary:
+    @staticmethod
+    @boundary.route('/teacher/manageClassrooms', methods=['GET'])
+    def manage_classrooms():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+        username = session.get('username')
+        classrooms = list(mongo.db.classroom.find({"teacher": username}))
+        return render_template("manageClassrooms.html", classrooms=classrooms)
+
+class TeacherAddClassroomBoundary: 
+    @staticmethod
+    @boundary.route('/teacher/addClassroom', methods=['GET', 'POST'])
+    def add_classroom():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            teacher = session.get('username')
+            classroom_name = request.form.get('classroom_name')
+            classroom_description = request.form.get('classroom_description')
+            classroom_capacity = request.form.get('classroom_capacity')
+
+            if not classroom_name:
+                flash("Classroom name is required.", category='error')
+                return redirect(url_for('boundary.add_classroom'))
+
+            controller = AddClassroomController()
+            result = controller.create_classroom(classroom_name, teacher, classroom_description, classroom_capacity,)
+
+            if result['success']:
+                flash(result['message'], category='success')
+                return redirect(url_for('boundary.manage_classrooms'))
+            else:
+                flash(result['message'], category='error')
+
+        return render_template("addClassroom.html")
+    
+class ViewClassRoomBoundary:
+    @staticmethod
+    @boundary.route('/teacher/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
+    def view_classroom(classroom_name):
+        if 'role' not in session or (session.get('role') != 'Teacher' and session.get('role') != 'Student'):
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        if not classroom:
+            flash("Classroom not found.", category='error')
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        if session.get('role') == 'Student':
+            student_username = session.get('username')
+            if student_username.strip() not in [s.strip() for s in classroom['student_list']]:
+                flash("You are not enrolled in this classroom.", category='error')
+                return redirect(url_for('boundary.home'))
+        
+        if session.get('role') == 'Teacher':
+            teacher_username = session.get('username')
+            if teacher_username.strip() != classroom['teacher'].strip():
+                flash("You are not the teacher of this classroom.", category='error')
+                return redirect(url_for('boundary.home'))
+            return render_template("viewClassroom.html", classroom=classroom)
+
+        return render_template("viewClassroom.html", classroom=classroom)
+
+
+
+class EnrollStudentBoundary:
+    @staticmethod
+    @boundary.route('/teacher/enrollStudent', methods=['GET', 'POST'])
+    def enroll_student():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            student_username = request.form.get('student_username')
+            classroom_name = request.form.get('classroom_name')
+
+            if not student_username or not classroom_name:
+                flash("Student username and classroom name are required.", category='error')
+                return redirect(url_for('boundary.enroll_student'))
+
+            controller = EnrollStudentController()
+            result = controller.enroll_student(student_username, classroom_name)
+
+            if result['success']:
+                flash(result['message'], category='success')
+                return redirect(url_for('boundary.manage_classrooms'))
+            else:
+                flash(result['message'], category='error')
+
+        return render_template("enrollStudent.html")
+
+class TeacherDeleteClassroomBoundary:
+    @staticmethod
+    @boundary.route('/teacher/deleteClassroom/<classroom_name>', methods=['POST'])
+    def delete_classroom(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        result = mongo.db.classroom.delete_one({"classroom_name": classroom_name})
+
+        if result.deleted_count:
+            flash(f"Classroom {classroom_name} deleted successfully.", category='success')
+        else:
+            flash("Classroom not found.", category='error')
+
+        return redirect(url_for('boundary.manage_classrooms'))
+    
+# -------------------------------------------------------------STUDENT-----------------------------------------------

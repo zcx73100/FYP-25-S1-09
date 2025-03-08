@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Classroom Details</h2>
+
+<div class="classroom-grid">
+    <!-- Display existing sections here (you can loop through the sections if they are available) -->
+    <h3>Class Materials</h3>
+    {% if user_role == 'teacher' %}
+    <form action="{{ url_for('boundary.upload_material', classroom_name=classroom_name) }}" method="POST">
+        <button type="submit">Upload Material</button>
+    </form>
+    {% endif %}
+    
+    <h3>Assignments</h3>
+    {% if user_role == 'teacher' %}
+    <form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom_name) }}" method="POST">
+        <button type="submit">Upload Assignment</button>
+    </form>
+    {% endif %}
+    
+    <h3>Quizzes</h3>
+    {% if user_role == 'teacher' %}
+    <form action="{{ url_for('boundary.upload_quiz', classroom_name=classroom_name) }}" method="POST">
+        <button type="submit">Upload Quiz</button>
+    </form>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
     <h2 style="text-align:center">Welcome to the Homepage</h2>
-    <h3 style="text-align:center">Tutorial Videos</h3>
+    <h3 style="text-align:center">Getting Started to our Platform? Feel free to explore these videos to learn more!</h3>
 
-    <div class="video-grid">  <!-- ✅ Changed class to "video-grid" for flexbox layout -->
+    <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
                 <div class="video-card">
@@ -19,7 +19,8 @@
             <p style="text-align:center">No videos available.</p>
         {% endif %}
     </div>
-    <h3 style="text-align:center">Avatars</h3>
+
+    <h3 style="text-align:center">Look on how these Avatars come to life and how they help students to learn!</h3>
     <div class="avatar-grid">
         {% if avatars %}
             {% for avatar in avatars %}
@@ -36,7 +37,24 @@
         {% endif %}
     </div>
 
+    <!-- Only show classrooms if the user is a Teacher or Student -->
+    {% if session.get('role') in ['Teacher', 'Student'] %}
+        <h3 style="text-align:center">Classrooms</h3>
+        <div class="classroom-grid">
+            {% if classrooms %}
+                {% for classroom in classrooms %}
+                    <div class="classroom-card">
+                        <h5>Classroom Name: {{ classroom.classroom_name }}</h5>
+                        <h5>Classroom Description: {{ classroom.description }}</h5>
+                        <form action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" method="POST">
+                            <button type="submit">View Classroom</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="text-align:center">No classrooms available.</p>
+            {% endif %}
+        </div>
+    {% endif %}
 
-
-    </div>
 {% endblock %}
