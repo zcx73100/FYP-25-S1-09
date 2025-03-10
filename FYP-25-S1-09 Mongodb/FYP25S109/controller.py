@@ -110,3 +110,33 @@ class EnrollStudentController:
     @staticmethod
     def enroll_student(classroom_name, student):
         return Classroom.enroll_student(classroom_name, student)
+    
+class TeacherUploadAssignmentController:
+    @staticmethod
+    def upload_assignment(file, title, uploader, classroom_name):
+        pass
+        #assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
+        #return assignment.save_assignment()
+class ViewAssignmentController:
+    @staticmethod
+    def view_assignment(username):
+        pass
+        #return Assignment.find_by_student(username)
+
+class UploadMaterialController:
+    @staticmethod
+    def upload_material(title, file, uploader, classroom_name, description):
+        material = Material(title, file, uploader, session.get('role'), description)
+        return material.save_material()
+
+class UploadQuizController:
+    @staticmethod
+    def upload_quiz(file, title, uploader, classroom_name):
+        quiz = Quiz(title=title, quiz_file=file, username=uploader, classroom_name=classroom_name)
+        return quiz.save_quiz()
+
+class UploadAssignmentController:
+    @staticmethod
+    def upload_assignment(file, title, uploader, classroom_name):
+        assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
+        return assignment.save_assignment()

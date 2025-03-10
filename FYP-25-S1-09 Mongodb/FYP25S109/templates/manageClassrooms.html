@@ -12,6 +12,9 @@
                     <h5>Classroom Description: {{ classroom.description }}</h5>
                     <h5>Classroom Capacity: {{ classroom.capacity }}</h5>
                     <h5>Number of Students Enrolled: {{classroom.student_list |length }}</h5>
+                    <form action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" method="POST">
+                        <button type="submit">View Classroom</button>
+                    </form>
                 </div>
             {% endfor %}
         {% else %}

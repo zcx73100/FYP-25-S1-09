@@ -712,5 +712,154 @@ class TeacherDeleteClassroomBoundary:
             flash("Classroom not found.", category='error')
 
         return redirect(url_for('boundary.manage_classrooms'))
+
+class TeacherManageStudentsBoundary:
+    @staticmethod
+    @boundary.route('/teacher/manageStudents/<classroom_name>', methods=['GET', 'POST'])
+    def manage_students(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        # Retrieve classroom document
+        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+
+        if not classroom:
+            flash("Classroom not found.", category='error')
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        # Extract student usernames from the classroom's 'student_list' array
+        enrolled_usernames = classroom.get('student_list', [])
+
+        # Fetch all students from the useraccount collection
+        all_students = list(mongo.db.useraccount.find({}))
+
+        # Separate enrolled and unenrolled students
+        enrolled_students = []
+        unenrolled_students = []
+
+        for student in all_students:
+            student['_id'] = str(student['_id'])  # Ensure _id is a string
+            student['is_suspended'] = student.get('is_suspended', False)  # Ensure key exists
+            
+            if student['username'] in enrolled_usernames:
+                enrolled_students.append(student)
+            if student['role'] == 'Student' and student['username'] not in enrolled_usernames:
+                unenrolled_students.append(student)
+
+        # Render the template with enrolled and unenrolled students
+        return render_template(
+            "manageStudents.html",
+            classroom=classroom,
+            enrolled_students=enrolled_students,
+            unenrolled_students=unenrolled_students
+        )
+
+    
+class TeacherUploadMaterialBoundary:
+    UPLOAD_FOLDER_MATERIAL = 'FYP25S109/static/uploads/materials/'
+
+    @staticmethod
+    @boundary.route('/teacher/uploadMaterial', methods=['GET', 'POST'])
+    def upload_material():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            title = request.form.get('title')
+            description = request.form.get('description')
+            classroom_name = request.form.get('classroom_name')  
+            material_file = request.files.get('file')
+
+            # Pass all inputs to the controller
+            controller = UploadMaterialController()
+            result = controller.upload_material(title, material_file, session.get('username'), classroom_name, description)
+
+            # Show success or error messages
+            flash(result['message'], category='success' if result['success'] else 'error')
+            return redirect(url_for('boundary.upload_material'))
+
+        return render_template("uploadMaterial.html")
+
+
+class TeacherUploadQuizBoundary:
+    UPLOAD_FOLDER_QUIZ = 'FYP25S109/static/uploads/quiz/'
+
+    @staticmethod
+    @boundary.route('/teacher/uploadQuiz', methods=['GET', 'POST'])
+    def upload_quiz():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            classroom_name = request.form.get('classroom_name')
+            quiz_file = request.files.get('quiz_file')
+            if not classroom_name:
+                flash("Classroom name is required.", category='error')
+                return redirect(url_for('boundary.upload_quiz'))
+            if not quiz_file:
+                flash("Quiz file is required.", category='error')
+                return redirect(url_for('boundary.upload_quiz'))
+            if '.' in quiz_file.filename and quiz_file.filename.rsplit('.', 1)[1].lower() not in UploadTutorialBoundary.ALLOWED_EXTENSIONS:
+                flash("Invalid file type. Please upload a valid quiz file.", category='error')
+                return redirect(url_for('boundary.upload_quiz'))
+            controller = UploadQuizController()
+            result = controller.upload_quiz(classroom_name, quiz_file)
+            if result['success']:
+                flash(result['message'], category='success')
+            else:
+                flash(result['message'], category='error')
+            return redirect(url_for('boundary.upload_quiz'))
+        return render_template("uploadQuiz.html")
+
+class TeacherViewQuizBoundary:
+    @staticmethod
+    @boundary.route('/teacher/viewQuiz/<quiz_name>', methods=['GET'])
+    def view_quiz(quiz_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        quiz = mongo.db.quiz.find_one({"quiz_name": quiz_name})
+        if not quiz:
+            flash("Quiz not found.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        return render_template("viewQuiz.html", quiz=quiz)
+
+class TeacherUploadAssignment:
+    UPLOAD_FOLDER_ASSIGNMENT = 'FYP' \
+    '25S109/static/uploads/assignment/'
+
+    @staticmethod
+    @boundary.route('/teacher/uploadAssignment/<classroom_name>', methods=['GET', 'POST'])
+
+    def upload_assignment():
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            classroom_name = request.form.get('classroom_name')
+            assignment_file = request.files.get('assignment_file')
+            if not classroom_name:
+                flash("Classroom name is required.", category='error')
+                return redirect(url_for('boundary.upload_assignment'))
+            if not assignment_file:
+                flash("Assignment file is required.", category='error')
+                return redirect(url_for('boundary.upload_assignment'))
+            if '.' in assignment_file.filename and assignment_file.filename.rsplit('.', 1)[1].lower() not in UploadTutorialBoundary.ALLOWED_EXTENSIONS:
+                flash("Invalid file type. Please upload a valid assignment file.", category='error')
+                return redirect(url_for('boundary.upload_assignment'))
+            controller = UploadAssignmentController()
+            result = controller.upload_assignment(classroom_name, assignment_file)
+            if result['success']:
+                flash(result['message'], category='success')
+            else:
+                flash(result['message'], category='error')
+            return redirect(url_for('boundary.upload_assignment'))
+        return render_template("uploadAssignment.html")
     
 # -------------------------------------------------------------STUDENT-----------------------------------------------

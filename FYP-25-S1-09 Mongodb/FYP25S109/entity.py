@@ -393,4 +393,188 @@ class Classroom:
             logging.error(f"Failed to find classrooms by teacher: {str(e)}")
             return []
     
-    
+class Material:
+    UPLOAD_FOLDER_MATERIAL = 'FYP25S109/static/uploads/materials/'
+    ALLOWED_MATERIAL_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'}
+
+    def __init__(self, title, file, username, user_role, description):
+        self.title = title
+        self.file = file
+        self.username = username
+        self.user_role = user_role
+        self.description = description
+
+    def save_material(self): 
+        try:
+            if not self.file or '.' not in self.file.filename:
+                raise ValueError("Invalid file or missing filename.")
+
+            # Validate file extension
+            file_extension = self.file.filename.rsplit('.', 1)[1].lower()
+            if file_extension not in self.ALLOWED_MATERIAL_EXTENSIONS:
+                raise ValueError("Invalid material format.")
+
+            filename = secure_filename(self.file.filename)
+            file_path = os.path.join(self.UPLOAD_FOLDER_MATERIAL, filename)
+
+            # Save file to disk
+            self.file.save(file_path)
+
+            # Set status based on user role
+            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
+
+            # Save to database
+            mongo.db.material.insert_one({
+                'title': self.title,
+                'file_name': filename,
+                'file_path': file_path,
+                'username': self.username,
+                'status': status,
+                'upload_date': datetime.now(),
+                'description': self.description
+            })
+            return {"success": True, "message": "Material uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+
+        except Exception as e:
+            logging.error(f"Error saving material: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+class Assignment:
+    def __init__(self, title=None, file=None, username=None, user_role=None, description=None, due_date=None):
+        self.title = title
+        self.file = file
+        self.username = username
+        self.user_role = user_role
+        self.description = description
+        self.due_date = due_date
+
+    def save_assignment(self):
+        UPLOAD_FOLDER_ASSIGNMENT = 'FYP25S109/static/uploads/materials/'
+        ALLOWED_ASSIGNMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt','zip'}
+        try:
+            if not self.file:
+                raise ValueError("No file selected for upload.")
+
+            filename = secure_filename(self.file.filename)
+            file_path = os.path.join(UPLOAD_FOLDER_ASSIGNMENT, filename)
+
+            # Validate file extension
+            if filename.split('.')[-1].lower() not in ALLOWED_ASSIGNMENT_EXTENSIONS:
+                raise ValueError("Invalid assignment format.")
+
+            self.file.save(file_path)
+            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
+
+            mongo.db.assignment.insert_one({
+                'title': self.title,
+                'file_name': filename,
+                'file_path': file_path,
+                'username': self.username,
+                'status': status,
+                'upload_date': datetime.now(),
+                'description': self.description,
+                'due_date': self.due_date
+            })
+            return {"success": True, "message": "Assignment uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+
+        except Exception as e:
+            logging.error(f"Error saving assignment: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def search_assignment(search_query):
+        try:
+            # Use case-insensitive and partial matching
+            assignments = mongo.db.assignment.find({
+                "title": {"$regex": search_query, "$options": "i"}
+            })
+            return list(assignments)
+        except Exception as e:
+            logging.error(f"Failed to search assignments: {str(e)}")
+            return []
+
+    @staticmethod
+    def delete_assignment(assignment_id):
+        try:
+            assignment = mongo.db.assignment.find_one({"_id": assignment_id})
+            if assignment:
+                os.remove(assignment['file_path'])
+        except Exception as e:
+            logging.error(f"Error deleting assignment: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def find_by_id(assignment_id):
+        try:
+            assignment = mongo.db.assignment.find_one({"_id": assignment_id})
+            return assignment
+        except Exception as e:
+            logging.error(f"Failed to find assignment by ID: {str(e)}")
+            return None
+        
+class Quiz:
+    def __init__(self, title=None, questions=None, username=None, user_role=None, description=None):
+        self.title = title
+        self.questions = questions
+        self.username = username
+        self.user_role = user_role
+        self.description = description
+
+    def save_quiz(self):
+        try:
+            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
+
+            mongo.db.quiz.insert_one({
+                'title': self.title,
+                'questions': self.questions,
+                'username': self.username,
+                'status': status,
+                'upload_date': datetime.now(),
+                'description': self.description
+            })
+            return {"success": True, "message": "Quiz uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+
+        except Exception as e:
+            logging.error(f"Error saving quiz: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def search_quiz(search_query):
+        try:
+            # Use case-insensitive and partial matching
+            quizzes = mongo.db.quiz.find({
+                "title": {"$regex": search_query, "$options": "i"}
+            })
+            return list(quizzes)
+        except Exception as e:
+            logging.error(f"Failed to search quizzes: {str(e)}")
+            return []
+
+    @staticmethod
+    def delete_quiz(quiz_id):
+        try:
+            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
+            if quiz:
+                os.remove(quiz['file_path'])
+        except Exception as e:
+            logging.error(f"Error deleting quiz: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def find_by_id(quiz_id):
+        try:
+            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
+            return quiz
+        except Exception as e:
+            logging.error(f"Failed to find quiz by ID: {str(e)}")
+            return None
+
+    @staticmethod
+    def delete_quiz(quiz_id):
+        try:
+            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
+            if quiz:
+                os.remove(quiz['file_path'])
+        except Exception as e:
+            logging.error(f"Error deleting quiz: {str(e)}")
+            return {"success": False, "message": str(e)}
