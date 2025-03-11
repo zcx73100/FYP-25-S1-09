@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session
-from . import mysql
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, current_app
+#from . import mysql
 
+import os
+import subprocess
 import stripe
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 
 from FYP25S109.controller import LoginController, CreateUserAccController, DisplayUserDetailController, UpdateUserRoleController
@@ -18,6 +21,89 @@ def home():
     username = session.get('username')
     return render_template("homepage.html", user_name=username)
 
+# SadTalker Form Route
+@boundary.route('/sadtalker_form', methods=['GET'])
+def sadtalker_form():
+    return render_template("sadtalker_form.html")
+
+# Run SadTalker
+@boundary.route('/run_sadtalker', methods=['POST'])
+def run_sadtalker():
+    """
+    Receives uploaded image and audio, runs SadTalker, and displays the generated video.
+    """
+    image_file = request.files.get('image_file')
+    audio_file = request.files.get('audio_file')
+    if not image_file or not audio_file:
+        flash("Both image and audio files are required!", "error")
+        return redirect(url_for('boundary.sadtalker_form'))
+    
+    # Save uploaded files to <static_folder>/temp_uploads/input/
+    input_folder = os.path.join(current_app.static_folder, "temp_uploads", "input")
+    os.makedirs(input_folder, exist_ok=True)
+    image_filename = secure_filename(image_file.filename)
+    audio_filename = secure_filename(audio_file.filename)
+    image_path = os.path.join(input_folder, image_filename)
+    audio_path = os.path.join(input_folder, audio_filename)
+    image_file.save(image_path)
+    audio_file.save(audio_path)
+    
+    # Define result_dir as <static_folder>/uploads/results/
+    result_dir = os.path.join(current_app.static_folder, "uploads", "results")
+    os.makedirs(result_dir, exist_ok=True)
+    
+    # Determine the absolute path to SadTalker/inference.py.
+    # __init__.py is in FYP-25-S1-09/FYP25S109; its parent is FYP-25-S1-09.
+    # Assume SadTalker folder is at the same level as FYP-25-S1-09.
+    current_file_dir = os.path.dirname(os.path.abspath(__file__))  # FYP25S109 folder
+    project_root = os.path.dirname(os.path.dirname(current_file_dir))  # Goes up two levels: FYP-25-S1-09, then project root
+    sadtalker_script = os.path.join(project_root, "SadTalker", "inference.py")
+    sadtalker_script = os.path.abspath(sadtalker_script)
+    
+    command = [
+        "python", sadtalker_script,
+        "--driven_audio", audio_path,
+        "--source_image", image_path,
+        "--result_dir", result_dir,
+        "--still",
+        "--preprocess", "full",
+        "--enhancer", "gfpgan"
+    ]
+    
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+        flash("SadTalker generation successful!", "success")
+    except subprocess.CalledProcessError as e:
+        flash(f"SadTalker failed: {e.stderr}", "error")
+        return redirect(url_for('boundary.sadtalker_form'))
+    
+    final_video = None
+    for line in result.stdout.splitlines():
+        if line.startswith("FINAL_OUTPUT:"):
+            final_video = line.split("FINAL_OUTPUT:")[1].strip()
+            break
+    
+    if not final_video or not os.path.exists(final_video):
+        flash("Final video not found. Please try again.", "error")
+        return redirect(url_for('boundary.sadtalker_form'))
+    
+    # Convert final_video absolute path to a URL.
+    relative_path = os.path.relpath(final_video, current_app.static_folder)
+    video_url = "/static/" + relative_path.replace(os.path.sep, "/")
+    
+    return render_template("sadtalker_result.html", video_url=video_url, video_path=final_video)
+
+# Clear Route (simply redirect back to the form)
+@boundary.route('/clear_sadtalker', methods=['POST'])
+def clear_sadtalker():
+    flash("Clearing results. Starting fresh.", "info")
+    return redirect(url_for('boundary.sadtalker_form'))
 # Log In
 @boundary.route('/login', methods=['GET', 'POST'])
 def login():

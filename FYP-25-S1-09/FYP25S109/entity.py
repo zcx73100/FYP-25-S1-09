@@ -1,5 +1,5 @@
 from flask import session
-from . import mysql
+#from . import mysql
 from werkzeug.security import check_password_hash
 
 class UserAccount:
