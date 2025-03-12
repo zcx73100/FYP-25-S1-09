@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify
 from . import mongo
 import os
 from werkzeug.utils import secure_filename
@@ -10,6 +10,7 @@ from FYP25S109.entity import *
 
 boundary = Blueprint('boundary', __name__)
 YOUR_DOMAIN = "http://localhost:5000"
+OPENSHOT_API_URL = "https://cloud.openshot.org/api/projects/"
 
 # Homepage
 class HomePage:
@@ -21,7 +22,7 @@ class HomePage:
             {"username": {"$in": admin_users}},
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "username": 1, 'upload_date': 1}))
+        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1, 'upload_date': 1}))
         username = session.get("username", None)
         role = session.get("role", None)
 
@@ -42,6 +43,106 @@ class HomePage:
 
         return render_template("homepage.html", videos=admin_videos, avatars=avatars, username=username, classrooms=classrooms)
 
+
+# Generate Video 
+class GenerateVideoBoundary:
+    @staticmethod
+    @boundary.route('/generate_video', methods=['POST'])
+    def generate_video():
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "User not logged in"}), 401
+
+        data = request.get_json()
+        text = data.get("text")
+        selected_avatar = data.get("selected_avatar")
+
+        if not text or not selected_avatar:
+            return jsonify({"success": False, "error": "Text or avatar not provided"}), 400
+
+        username = session.get("username", "Guest")
+
+        print(f"Generating video for user: {username} with text: {text} and avatar: {selected_avatar}")
+
+        headers = {
+            "Authorization": f"Token 9054f7aa9305e012b3c2300408c3dfdf390fcddf",
+            "Content-Type": "application/json"
+        }
+
+        # Step 1: Create a new project in OpenShot
+        payload = {
+            "name": f"Generated Video - {username}",
+            "description": text,
+            "fps_num": 30,
+            "fps_den": 1,
+            "width": 1920,
+            "height": 1080,
+            "video_length": 10
+        }
+
+        try:
+            response = requests.post(OPENSHOT_API_URL, json=payload, headers=headers)
+            response_data = response.json()
+
+            if response.status_code != 201:
+                return jsonify({"success": False, "error": "Failed to create OpenShot project"}), 500
+
+            project_id = response_data.get("id")  # ✅ Get project ID
+
+            # Step 2: Upload the avatar as a media file
+            UPLOAD_URL = "https://cloud.openshot.org/api/files/"
+            with open(f"FYP25S109/static/{selected_avatar}", "rb") as avatar_file:
+                files = {"file": avatar_file}
+                upload_response = requests.post(UPLOAD_URL, files=files, headers=headers)
+
+            if upload_response.status_code != 201:
+                return jsonify({"success": False, "error": "Failed to upload avatar file"}), 500
+
+            file_id = upload_response.json().get("id")  # ✅ Get uploaded file ID
+
+            # Step 3: Add the uploaded avatar file as a clip
+            ADD_CLIP_URL = "https://cloud.openshot.org/api/clips/"
+            clip_payload = {
+                "project": project_id,
+                "file_id": file_id,
+                "start": 0,
+                "end": 10,  # Adjust duration as needed
+                "layer": 1
+            }
+            clip_response = requests.post(ADD_CLIP_URL, json=clip_payload, headers=headers)
+
+            if clip_response.status_code != 201:
+                return jsonify({"success": False, "error": "Failed to add clip to project"}), 500
+
+            # Step 4: Export the project
+            EXPORT_URL = "https://cloud.openshot.org/api/exports/"
+            export_payload = {
+                "project": project_id,
+                "video_format": "mp4"
+            }
+            export_response = requests.post(EXPORT_URL, json=export_payload, headers=headers)
+
+            if export_response.status_code == 201:
+                export_id = export_response.json().get("id")
+                return jsonify({"success": True, "export_id": export_id, "message": "Video generation started!"})
+            else:
+                return jsonify({"success": False, "error": "Failed to start video export"}), 500
+
+        except Exception as e:
+            return jsonify({"success": False, "error": f"OpenShot API request failed: {str(e)}"}), 500
+
+
+    @staticmethod
+    @boundary.route('/generate_video', methods=['GET'])
+    def generate_video_page():
+        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1}))  # Retrieve only file_path
+
+        # Extract avatar paths
+        available_avatars = [avatar["file_path"] for avatar in avatars]
+
+        print("Available Avatars:", available_avatars)  # ✅ Debugging
+
+        return render_template("generateVideo.html", available_avatars=available_avatars)
+    
 # Log In
 class LoginBoundary:
     @staticmethod
@@ -470,18 +571,25 @@ class AddAvatarBoundary:
         if 'username' not in session:
             flash("You must be logged in to create an avatar.", category='error')
             return redirect(url_for('boundary.login'))
+
         if request.method == 'POST':
             username = session.get('username')
             avatar_file = request.files.get('avatar')
-            if not username or not avatar_file:
-                flash("Username and avatar file are required.", category='error')
+            avatarname = request.form.get('avatarname')  # ✅ Capture avatar name
+
+            if not username or not avatar_file or not avatarname:
+                flash("Username, avatar name, and avatar file are required.", category='error')
                 return redirect(url_for('boundary.admin_create_avatar'))
-            result = AdminAddAvatarController.add_avatar(username, avatar_file)
+
+            result = AdminAddAvatarController.add_avatar(username, avatarname, avatar_file)
+
             if result['success']:
                 flash("Avatar added successfully.", category='success')
             else:
                 flash(f"Failed to add avatar: {result['message']}", category='error')
+
             return redirect(url_for('boundary.admin_create_avatar'))
+
         return render_template("admin_add_avatar.html")
     
 class DeleteAvatarBoundary:

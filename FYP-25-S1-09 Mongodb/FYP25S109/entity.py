@@ -157,8 +157,6 @@ class UserAccount:
             logging.error(f"Error deleting user: {e}")
             return False
 
-
-
 class TutorialVideo:
     def __init__(self, title=None, video_name=None ,video_file=None, username=None, user_role=None,description=None):
         self.title = title
@@ -218,8 +216,9 @@ class TutorialVideo:
             return []
 
 class Avatar:
-    def __init__(self, image_file, username=None,upload_date=None):
+    def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
         self.image_file = image_file
+        self.avatarname = avatarname
         self.username = username
         self.upload_date = upload_date
 
@@ -264,7 +263,7 @@ class Avatar:
                 return {"success": False, "message": f"Error deleting original file: {str(e)}"}
 
             # Add avatar to DB
-            add_result = self.add_avatar(self.username, processed_file_path)
+            add_result = self.add_avatar(self.avatarname, self.username, processed_file_path)
             if not add_result:
                 return {"success": False, "message": "Failed to add avatar to database."}
 
@@ -274,11 +273,12 @@ class Avatar:
             logging.error(f"Error processing avatar: {str(e)}")
             return {"success": False, "message": f"Error processing avatar: {str(e)}"}
 
-    def add_avatar(self, username, file_path):
+    def add_avatar(self, avatarname, username, file_path):
         try:
-            relative_path = file_path.split('static/')[1]  # Get relative path for Flask
+            relative_path = file_path.split('static/')[-1]  # Ensure proper relative path handling
 
             mongo.db.avatar.insert_one({
+                'avatarname': avatarname,
                 'username': username,
                 'file_path': relative_path,
                 'upload_date': datetime.now()
@@ -287,28 +287,38 @@ class Avatar:
         except Exception as e:
             logging.error(f"Error adding avatar to database: {str(e)}")
             return False
-   
+        
+    @staticmethod
     def search_avatar(search_query):
         try:
-            # Use regex for partial and case-insensitive matching
+            # Search by both username and avatarname
             avatars = mongo.db.avatar.find({
-                "username": {"$regex": search_query, "$options": "i"}
+                "$or": [
+                    {"avatarname": {"$regex": search_query, "$options": "i"}}
+                ]
             })
             return list(avatars)  # Convert cursor to list
         except Exception as e:
             logging.error(f"Failed to search avatars: {str(e)}")
             return []
-    def resize_avatar(image_file, size=(150, 150)):
-        img = Image.open(image_file)
-        img = img.convert("RGB")
-        img.thumbnail(size)
 
-        img_io = BytesIO()
-        img.save(img_io, format="JPEG")
-        img_io.seek(0)
-    
-        return img_io
+    @staticmethod
+    def resize_avatar(image_path, size=(150, 150)):
+        try:
+            img = Image.open(image_path)
+            img = img.convert("RGB")
+            img.thumbnail(size)
 
+            img_io = BytesIO()
+            img.save(img_io, format="JPEG")
+            img_io.seek(0)
+
+            return img_io
+        except Exception as e:
+            logging.error(f"Failed to resize avatar: {str(e)}")
+            return None
+
+    @staticmethod
     def find_by_id(avatar_id):
         try:
             avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
@@ -316,21 +326,22 @@ class Avatar:
         except Exception as e:
             logging.error(f"Failed to find avatar by ID: {str(e)}")
             return None
-        
-    def delete_avatar(avatar_id):
-     try:
-        avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
-        if avatar:
-            # Remove the file from storage
-            file_path = os.path.join("static", avatar["file_path"])
-            if os.path.exists(file_path):
-                os.remove(file_path)
 
-            # Delete the record from the database
-            mongo.db.avatar.delete_one({"_id": ObjectId(avatar_id)})
-            return True
-     except Exception as e:
-        logging.error(f"Error deleting avatar: {str(e)}")
+    @staticmethod
+    def delete_avatar(avatar_id):
+        try:
+            avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+            if avatar:
+                # Remove the file from storage
+                file_path = os.path.join("static", avatar["file_path"])
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+
+                # Delete the record from the database
+                mongo.db.avatar.delete_one({"_id": ObjectId(avatar_id)})
+                return True
+        except Exception as e:
+            logging.error(f"Error deleting avatar: {str(e)}")
         return False
 
 class Classroom:
@@ -578,3 +589,6 @@ class Quiz:
         except Exception as e:
             logging.error(f"Error deleting quiz: {str(e)}")
             return {"success": False, "message": str(e)}
+        
+        
+        
