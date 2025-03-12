@@ -3,9 +3,14 @@
     <h2>Add Avatar</h2>
 
     <!-- Avatar Upload Form -->
-    <form action="{{ url_for('boundary.admin_create_avatar') }}" method="post" enctype="multipart/form-data">
+    <form id="avatarForm" action="{{ url_for('boundary.admin_create_avatar') }}" method="post" enctype="multipart/form-data">
         <label for="avatar_file">Upload a portrait image:</label>
         <input type="file" name="avatar" id="avatar_file" accept="image/png, image/jpeg, image/jpg" required>
+
+        <div class="mb-3">
+            <label for="avatarname" class="form-label">Avatar Name</label>
+            <input type="text" id="avatarname" name="avatarname" class="form-control" required>
+        </div>
 
         <button type="submit" class="upload-btn">Upload</button>
     </form>
@@ -16,20 +21,48 @@
         <img id="image-preview" src="" alt="Avatar Preview" style="max-width: 200px; border-radius: 8px;">
     </div>
 
-    <!-- JavaScript to Preview Image Before Upload -->
+    <!-- JavaScript to Validate & Preview Image -->
     <script>
         document.getElementById("avatar_file").addEventListener("change", function(event) {
             const previewContainer = document.getElementById("preview-container");
             const imagePreview = document.getElementById("image-preview");
             const file = event.target.files[0];
 
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    imagePreview.src = e.target.result;
-                    previewContainer.style.display = "block";
-                };
-                reader.readAsDataURL(file);
+            // Allowed extensions
+            const validExtensions = ["image/png", "image/jpeg", "image/jpg"];
+
+            if (!file) {
+                alert("No file selected!");
+                return;
+            }
+
+            if (!validExtensions.includes(file.type)) {
+                alert("Invalid file type! Please upload PNG, JPEG, or JPG.");
+                event.target.value = ""; // Reset file input
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                previewContainer.style.display = "block";
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Validate before submission
+        document.getElementById("avatarForm").addEventListener("submit", function(event) {
+            const avatarFile = document.getElementById("avatar_file").files[0];
+            const avatarName = document.getElementById("avatarname").value.trim();
+
+            if (!avatarFile) {
+                alert("Please select an avatar image.");
+                event.preventDefault();
+            }
+
+            if (!avatarName) {
+                alert("Please enter an avatar name.");
+                event.preventDefault();
             }
         });
     </script>

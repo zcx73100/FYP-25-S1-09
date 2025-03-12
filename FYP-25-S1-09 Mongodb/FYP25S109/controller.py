@@ -1,5 +1,10 @@
 from .entity import *
 from .boundary import *
+import requests
+
+
+OPENSHOT_API_URL = "https://cloud.openshot.org/api"
+API_KEY = "123"
 
 class LoginController:
     @staticmethod
@@ -44,6 +49,7 @@ class UploadTutorialController:
     def upload_video(file, title, uploader, user_role):
         video = TutorialVideo(title=title, video_file=file, username=uploader, user_role=user_role)
         return video.save_video()  # Call entity method
+    
 class AdminDeleteVideoController:
     @staticmethod
     def delete_video(video_id):
@@ -66,9 +72,9 @@ class AdminManageAvatarController:
 
 class AdminAddAvatarController:
     @staticmethod
-    def add_avatar(username, avatar_file):
-        avatar = Avatar(avatar_file, username)
-        return avatar.save_image()  # Call entity method
+    def add_avatar(username, avatarname, avatar_file):
+        avatar = Avatar(avatar_file, avatarname, username)
+        return avatar.save_image()  
 
 class AdminDeleteAvatarController:
     @staticmethod
@@ -140,3 +146,4 @@ class UploadAssignmentController:
     def upload_assignment(file, title, uploader, classroom_name):
         assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
         return assignment.save_assignment()
+    
