@@ -114,8 +114,13 @@ class StudentViewClassroomController:
 
 class EnrollStudentController:
     @staticmethod
-    def enroll_student(classroom_name, student):
-        return Classroom.enroll_student(classroom_name, student)
+    def enroll_student(classroom_name, student_username):
+        return Classroom.enroll_student(classroom_name, student_username)
+
+class RemoveStudentController:
+    @staticmethod
+    def remove_student(classroom_name, student_username):
+        return Classroom.remove_student(classroom_name, student_username)
     
 class TeacherUploadAssignmentController:
     @staticmethod
@@ -147,3 +152,7 @@ class UploadAssignmentController:
         assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
         return assignment.save_assignment()
     
+class ViewUserDetailsController:
+    @staticmethod
+    def view_user_details(username):
+        return UserAccount.find_by_username(username)   
