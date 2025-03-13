@@ -37,10 +37,13 @@
                     <button type="submit">Suspend</button>
                 {% endif %}
             </form>
-            <form method="post" action="{{ url_for('boundary.delete_user', username=student.username) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this student?');">
-                <button type="submit">Delete</button>
+            <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
+                <button type="submit">View Student Details</button>
             </form>
-            <button type="submit">Remove student from classroom</button>
+            <form method="post" action="{{ url_for('boundary.remove_student', classroom_name=classroom.classroom_name) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
+                <input type="hidden" name="username" value="{{ student.username }}">
+                <button type="submit">Remove from Classroom</button>
+            </form>
         </td>
     </tr>
     {% endfor %}
@@ -58,12 +61,21 @@
         <td>{{ student.username }}</td>
         <td>{{ student.email }}</td>
         <td>
-            <form method="post" action="{{ url_for('boundary.enroll_student', username=student.username) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.enroll_student', classroom_name=classroom.classroom_name) }}" style="display:inline;">
+                <input type="hidden" name="username" value="{{ student.username }}">
                 <button type="submit">Enroll</button>
+            </form>
+            <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
+                <button type="submit">View Student Details</button>
             </form>
         </td>
     </tr>
     {% endfor %}
 </table>
-<button type="button" onclick="window.history.back();">Return to previous screen</button>
+
+<form method="post" action = "{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">
+    <button type="submit">Back to Classroom</button>
+</form>
+
+
 {% endblock %}

@@ -404,6 +404,74 @@ class Classroom:
             logging.error(f"Failed to find classrooms by teacher: {str(e)}")
             return []
     
+    @staticmethod
+    def find_by_student(student):
+        """ Finds classrooms by student """
+        try:
+            student = mongo.db.useraccount.find({"username": student, "role": "Student"})
+            return student
+        except Exception as e:
+            logging.error(f"Failed to find classrooms by student: {str(e)}")
+            return []
+    
+    @staticmethod
+    def enroll_student(classroom_name, student_username):
+        """Enrolls a student into a classroom, avoiding duplicates."""
+        try:
+            # Check if the student exists and has the "Student" role
+            student_info = mongo.db.useraccount.find_one({"username": student_username, "role": "Student"})
+            if not student_info:
+                return {"success": False, "message": f"Student '{student_username}' not found or not a student."}
+
+            # Check if the classroom exists
+            classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+            if not classroom:
+                return {"success": False, "message": "Classroom not found."}
+
+            # Check for duplicate enrollment
+            if student_username in classroom.get("student_list", []):
+                return {"success": False, "message": "Student is already enrolled in this classroom."}
+
+            # Enroll the student using $addToSet to avoid duplicates
+            result = mongo.db.classroom.update_one(
+                {"classroom_name": classroom_name},
+                {"$addToSet": {"student_list": student_username}}
+            )
+            if result.modified_count > 0:
+                return {"success": True, "message": f"Successfully enrolled {student_username}."}
+            else:
+                return {"success": False, "message": "Failed to enroll the student."}
+        except Exception as e:
+            logging.error(f"Error enrolling student: {str(e)}")
+            return {"success": False, "message": str(e)}
+    
+    @staticmethod
+    def remove_student(classroom_name, student_username):
+        """Removes a student from a classroom."""
+        try:
+            result = mongo.db.classroom.update_one(
+                {"classroom_name": classroom_name},
+                {"$pull": {"student_list": student_username}}
+            )
+            if result.modified_count > 0:
+                return {"success": True, "message": f"Successfully removed {student_username}."}
+            else:
+                return {"success": False, "message": "Failed to remove the student."}
+        except Exception as e:
+            logging.error(f"Error removing student: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    
+    @staticmethod
+    def find_by_name(classroom_name):
+        """Finds a classroom by name and returns its details."""
+        try:
+            return mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        except Exception as e:
+            logging.error(f"Error finding classroom by name: {str(e)}")
+            return None
+
+    
 class Material:
     UPLOAD_FOLDER_MATERIAL = 'FYP25S109/static/uploads/materials/'
     ALLOWED_MATERIAL_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'}
