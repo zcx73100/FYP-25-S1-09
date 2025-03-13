@@ -28,13 +28,18 @@
         <td>{{ student.username }}</td>
         <td>{{ student.email }}</td>
         <td>{{ student.role }}</td>
-        <td>{{ 'Suspended' if student.is_suspended else 'Active' }}</td>
+        <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
         <td>
-            <form method="post" action="{{ url_for('boundary.suspend_user', username=student.username) }}" style="display:inline;">
-                {% if student.is_suspended %}
-                    <button type="submit">Unsuspend</button>
-                {% else %}
+            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username,classroom_name=classroom.classroom_name) }}" style="display:inline;">
+                {% if student.status != "suspended" %}
+                    <input type="hidden" name="username" value="{{ student.username }}">
                     <button type="submit">Suspend</button>
+                {% endif %}
+            </form>
+            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username,classroom_name=classroom.classroom_name) }}" style="display:inline;">
+                {% if student.status == "suspended" %}
+                    <input type="hidden" name="username" value="{{ student.username }}">
+                    <button type="submit">Activate</button>
                 {% endif %}
             </form>
             <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">

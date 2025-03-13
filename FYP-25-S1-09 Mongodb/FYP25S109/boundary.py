@@ -822,7 +822,7 @@ class TeacherManageStudentsBoundary:
 
         for student in all_students:
             student['_id'] = str(student['_id'])  # Ensure _id is a string
-            student['is_suspended'] = student.get('is_suspended', False)  # Ensure key exists
+            student['status'] = student.get('status', False)  # Ensure key exists
             
             if student['username'] in enrolled_usernames:
                 enrolled_students.append(student)
@@ -878,6 +878,40 @@ class TeacherManageStudentsBoundary:
             else:
                 flash(result["message"], category='error')
 
+        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+    @staticmethod
+    @boundary.route('/teacher/suspendStudent/<classroom_name>', methods=['POST'])
+    def suspend_student(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        student_username = request.form.get('username')
+        if not student_username:
+            flash("Username cannot be empty.", category='error')
+            return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+
+        # Call the Controller to handle suspension
+        result = SuspendStudentController.suspend_student(classroom_name, student_username)
+
+        flash(result['message'], category='success' if result['success'] else 'error')
+        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+    @staticmethod
+    @boundary.route('/teacher/unsuspendStudent/<classroom_name>', methods=['POST'])
+    def unsuspend_student(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        student_username = request.form.get('username')
+        if not student_username:
+            flash("Username cannot be empty.", category='error')
+            return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+
+        # Call the Controller to handle unsuspension
+        result = UnsuspendStudentController.unsuspend_student(classroom_name, student_username)
+
+        flash(result['message'], category='success' if result['success'] else 'error')
         return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
 
     
