@@ -156,3 +156,23 @@ class ViewUserDetailsController:
     @staticmethod
     def view_user_details(username):
         return UserAccount.find_by_username(username)   
+
+class SuspendStudentController:
+    @staticmethod
+    def suspend_student(classroom_name, student_username):
+        # Call the Entity to perform the suspension
+        success = Classroom.suspend_student(student_username)
+        if success:
+            return {"success": True, "message": f"Student '{student_username}' has been suspended."}
+        else:
+            return {"success": False, "message": "Failed to suspend the student."}
+        
+class UnsuspendStudentController:
+    @staticmethod
+    def unsuspend_student(classroom_name, student_username):
+        # Call the Entity to perform the suspension
+        success = Classroom.unsuspend_student(student_username)
+        if success:
+            return {"success": True, "message": f"Student '{student_username}' has been unsuspended."}
+        else:
+            return {"success": False, "message": "Failed to unsuspend the student."}

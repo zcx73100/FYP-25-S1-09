@@ -470,6 +470,38 @@ class Classroom:
         except Exception as e:
             logging.error(f"Error finding classroom by name: {str(e)}")
             return None
+    @staticmethod
+    def suspend_student(username):
+        """Suspend a student by updating their status to 'suspended'."""
+        try:
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"status": "suspended"}}
+            )
+            if result.modified_count > 0:
+                logging.info(f"User {username} suspended successfully.")
+                return True
+            logging.warning(f"User {username} not found or already suspended.")
+            return False
+        except Exception as e:
+            logging.error(f"Error suspending user: {e}")
+            return False
+    def unsuspend_student(username):
+        """Unsuspend a student by updating their status to 'active'."""
+        try:
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"status": "active"}}
+            )
+            if result.modified_count > 0:
+                logging.info(f"User {username} unsuspended successfully.")
+                return True
+            logging.warning(f"User {username} not found or already active.")
+            return False
+        except Exception as e:
+            logging.error(f"Error unsuspending user: {e}")
+            return False
+
 
     
 class Material:
