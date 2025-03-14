@@ -501,6 +501,19 @@ class Classroom:
         except Exception as e:
             logging.error(f"Error unsuspending user: {e}")
             return False
+    def search_student(search_query):
+        """Search for students by username or email."""
+        try:
+            students = mongo.db.useraccount.find({
+                "$or": [
+                    {"username": {"$regex": search_query, "$options": "i"}},
+                    {"email": {"$regex": search_query, "$options": "i"}}
+                ]
+            })
+            return list(students)
+        except Exception as e:
+            logging.error(f"Error searching students: {e}")
+            return []
 
 
     

@@ -176,3 +176,8 @@ class UnsuspendStudentController:
             return {"success": True, "message": f"Student '{student_username}' has been unsuspended."}
         else:
             return {"success": False, "message": "Failed to unsuspend the student."}
+
+class SearchStudentController:
+    @staticmethod
+    def search_student(search_query):
+        return Classroom.search_student(search_query)
