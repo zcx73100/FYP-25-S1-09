@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-center mt-4">Create Animated Video</h2>
+
+    <div id="error-message" class="alert alert-danger text-center" style="display: none;"></div>
+
+    <form id="videoForm" class="card p-4 shadow mt-4">
+        <div class="mb-3">
+            <label for="text" class="form-label">Enter Text for Animation:</label>
+            <textarea id="text" name="text" class="form-control" required></textarea>
+        </div>
+
+        <!-- Generate Voice Button -->
+        <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">Generate Voice</button>
+
+        <!-- Audio Preview -->
+        <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
+
+        <!-- Hidden input to store generated audio path -->
+        <input type="hidden" id="audioPath" name="audioPath">
+
+        <div class="mb-3">
+            <label class="form-label">Select an Avatar:</label>
+            <div class="avatar-grid">
+                {% if avatars %}
+                    {% for avatar in avatars %}
+                    <label class="avatar-option me-2">
+                        <input type="radio" name="selected_avatar" value="{{ avatar.file_path }}">
+                        <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}" width="150" height="150">
+                        <p>Avatar Name: {{ avatar.avatarname }}</p>
+                    </label>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-danger">No avatars available.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Generate Video</button>
+    </form>
+
+    <script>
+        document.getElementById("generateVoice").addEventListener("click", function() {
+            let enteredText = document.getElementById("text").value.trim();
+            let errorMsg = document.getElementById("error-message");
+            let audioPreview = document.getElementById("audioPreview");
+        
+            if (!enteredText) {
+                errorMsg.innerText = "❌ Error: Please enter text before generating voice.";
+                errorMsg.style.display = "block";
+                return;
+            }
+        
+            errorMsg.style.display = "none";
+        
+            fetch("/generate_voice", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ text: enteredText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.audio_url) {
+                    let audioFilePath = data.audio_url;
+        
+                    // Ensure the file exists before setting src
+                    fetch(audioFilePath, { method: "HEAD" })
+                    .then(response => {
+                        if (response.ok) {
+                            audioPreview.src = audioFilePath;
+                            audioPreview.style.display = "block";
+                        } else {
+                            errorMsg.innerText = "❌ Error: Audio file not found.";
+                            errorMsg.style.display = "block";
+                        }
+                    });
+        
+                } else {
+                    errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate voice.");
+                    errorMsg.style.display = "block";
+                }
+            })
+            .catch(error => {
+                errorMsg.innerText = "❌ Fetch Error: " + error.message;
+                errorMsg.style.display = "block";
+            });
+        });
+        
+    </script>
+
+{% endblock %}
