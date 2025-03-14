@@ -804,6 +804,8 @@ class TeacherUpdateClassroomBoundary:
             return redirect(url_for('boundary.home'))
 
         classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        print(f"Classroom: {classroom}")  # Debugging line to check the classroom object
+
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
@@ -817,12 +819,18 @@ class TeacherUpdateClassroomBoundary:
                 flash("Classroom name is required.", category='error')
                 return redirect(url_for('boundary.update_classroom', classroom_name=classroom_name))
 
-            result = UpdateClassroomController.update_classroom(classroom_name, new_classroom_name, new_description, new_capacity)
+            result = UpdateClassroomController.update_classroom(classroom_name, new_details={
+                "classroom_name": new_classroom_name,
+                "description": new_description,
+                "capacity": new_capacity
+            })
 
-            flash(result['message'], category='success' if result['success'] else 'error')
+            print(f"Update result: {result}")  # Debugging line to check result
+
             return redirect(url_for('boundary.manage_classrooms'))
 
         return render_template("updateClassroom.html", classroom=classroom)
+
 
 class TeacherManageStudentsBoundary:
     @staticmethod
