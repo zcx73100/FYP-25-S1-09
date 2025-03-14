@@ -794,6 +794,35 @@ class TeacherDeleteClassroomBoundary:
             flash("Classroom not found.", category='error')
 
         return redirect(url_for('boundary.manage_classrooms'))
+    
+class TeacherUpdateClassroomBoundary:
+    @staticmethod
+    @boundary.route('/teacher/updateClassroom/<classroom_name>', methods=['GET', 'POST'])
+    def update_classroom(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        if not classroom:
+            flash("Classroom not found.", category='error')
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        if request.method == 'POST':
+            new_classroom_name = request.form.get('classroom_name')
+            new_description = request.form.get('classroom_description')
+            new_capacity = request.form.get('classroom_capacity')
+
+            if not new_classroom_name:
+                flash("Classroom name is required.", category='error')
+                return redirect(url_for('boundary.update_classroom', classroom_name=classroom_name))
+
+            result = UpdateClassroomController.update_classroom(classroom_name, new_classroom_name, new_description, new_capacity)
+
+            flash(result['message'], category='success' if result['success'] else 'error')
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        return render_template("updateClassroom.html", classroom=classroom)
 
 class TeacherManageStudentsBoundary:
     @staticmethod
