@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Search Results for "{{ query }}" in {{ classroom.classroom_name }}</h2>
+
+<!-- Enrolled Students Section -->
+<h3>Enrolled Students</h3>
+{% if enrolled_students %}
+<table border="1">
+    <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+    {% for student in enrolled_students %}
+    <tr>
+        <td>{{ student.username }}</td>
+        <td>{{ student.email }}</td>
+        <td>
+            {% if student.status %}
+                Active
+            {% else %}
+                Suspended
+            {% endif %}
+        </td>
+        <td>
+            <!-- Suspend button -->
+            {% if student.status %}
+                <form action="{{ url_for('boundary.suspend_student', classroom_name=classroom.classroom_name) }}" method="POST" style="display:inline;">
+                    <input type="hidden" name="username" value="{{ student.username }}">
+                    <button type="submit">Suspend</button>
+                </form>
+            {% else %}
+                <!-- Unsuspend button -->
+                <form action="{{ url_for('boundary.unsuspend_student', classroom_name=classroom.classroom_name) }}" method="POST" style="display:inline;">
+                    <input type="hidden" name="username" value="{{ student.username }}">
+                    <button type="submit">Unsuspend</button>
+                </form>
+            {% endif %}
+            
+            <!-- Unenroll button -->
+            <form action="{{ url_for('boundary.remove_student', classroom_name=classroom.classroom_name) }}" method="POST" style="display:inline;">
+                <input type="hidden" name="username" value="{{ student.username }}">
+                <button type="submit">Unenroll</button>
+            </form>
+
+            <!-- View details button -->
+            <a href="{{ url_for('boundary.view_user_details', username=student.username) }}">
+                <button>View Details</button>
+            </a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>No enrolled students found.</p>
+{% endif %}
+
+<!-- Unenrolled Students Section -->
+<h3>Unenrolled Students</h3>
+{% if unenrolled_students %}
+<table border="1">
+    <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Actions</th>
+    </tr>
+    {% for student in unenrolled_students %}
+    <tr>
+        <td>{{ student.username }}</td>
+        <td>{{ student.email }}</td>
+        <td>
+            <!-- Enroll button -->
+            <form action="{{ url_for('boundary.enroll_student', classroom_name=classroom.classroom_name) }}" method="POST" style="display:inline;">
+                <input type="hidden" name="username" value="{{ student.username }}">
+                <button type="submit">Enroll</button>
+            </form>
+
+            <!-- View details button -->
+            <a href="{{ url_for('boundary.view_user_details', username=student.username) }}">
+                <button>View Details</button>
+            </a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>No unenrolled students found.</p>
+{% endif %}
+
+<!-- Back button -->
+<a href="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}">
+    <button>Back to Manage Students</button>
+</a>
+
+{% endblock %}
