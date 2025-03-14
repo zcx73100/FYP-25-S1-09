@@ -186,3 +186,8 @@ class UpdateClassroomController:
     @staticmethod
     def update_classroom(classroom_name, new_details):
         return Classroom.update_classroom(classroom_name, new_details)
+    
+class SearchClassroomController:
+    @staticmethod
+    def search_classroom(search_query):
+        return Classroom.search_classroom(search_query)

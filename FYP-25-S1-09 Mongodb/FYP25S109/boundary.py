@@ -830,7 +830,22 @@ class TeacherUpdateClassroomBoundary:
             return redirect(url_for('boundary.manage_classrooms'))
 
         return render_template("updateClassroom.html", classroom=classroom)
+class TeacherSearchClassroomBoundary:
+    @staticmethod
+    @boundary.route('/teacher/searchClassroom', methods=['GET','POST'])
+    def search_classroom():
 
+        query = request.args.get('query', '').strip() if request.method == 'GET' else request.form.get('query', '').strip()
+        classrooms = list(mongo.db.classroom.find(
+            {"$or": [
+                {"classroom_name": {"$regex": query, "$options": "i"}},
+                {"description": {"$regex": query, "$options": "i"}},
+                {"teacher": {"$regex": query, "$options": "i"}}
+            ]},
+            {"_id": 0, "classroom_name": 1, "description": 1, "teacher": 1, "capacity": 1}
+        ))
+
+        return render_template("ClassroomSearchResult.html", classrooms=classrooms, query=query)
 
 class TeacherManageStudentsBoundary:
     @staticmethod
