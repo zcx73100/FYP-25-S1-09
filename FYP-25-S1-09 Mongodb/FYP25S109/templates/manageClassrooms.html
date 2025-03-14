@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
     <h2>Manage Classrooms</h2>
+    <form action="{{ url_for('boundary.search_classroom')}}" method="[GET,POST]">
+        <input type="text" name="query" placeholder="Search Classroom">
+        <button type="submit">Search</button>
+    </form>
     <form action="{{ url_for('boundary.add_classroom') }}" method="POST">
         <button type="submit">Add classroom</button>
     </form>
