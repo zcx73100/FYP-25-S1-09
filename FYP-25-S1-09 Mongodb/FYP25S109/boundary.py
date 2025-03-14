@@ -794,7 +794,7 @@ class TeacherDeleteClassroomBoundary:
             flash("Classroom not found.", category='error')
 
         return redirect(url_for('boundary.manage_classrooms'))
-    
+    #update classroom
 class TeacherUpdateClassroomBoundary:
     @staticmethod
     @boundary.route('/teacher/updateClassroom/<classroom_name>', methods=['GET', 'POST'])
