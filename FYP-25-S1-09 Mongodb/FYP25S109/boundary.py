@@ -913,6 +913,57 @@ class TeacherManageStudentsBoundary:
 
         flash(result['message'], category='success' if result['success'] else 'error')
         return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+    @staticmethod
+    @boundary.route('/teacher/searchStudent/<classroom_name>', methods=['GET'])
+    def search_student(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        query = request.args.get('query', '').strip()  # Get query from request parameters
+
+        # Retrieve classroom document
+        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        if not classroom:
+            flash("Classroom not found.", category='error')
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        # Get enrolled usernames from the classroom
+        enrolled_usernames = set(classroom.get('student_list', []))
+        unenrolled_usernames = set(user['username'] for user in mongo.db.useraccount.find({"role": "Student"})) - enrolled_usernames
+
+        # Fetch students that match the search query
+        search_results = list(mongo.db.useraccount.find({
+            "role": "Student",
+            "$or": [
+                {"username": {"$regex": query, "$options": "i"}},
+                {"email": {"$regex": query, "$options": "i"}}
+            ]
+        }))
+
+        # Separate enrolled and unenrolled students
+        enrolled_students = []
+        unenrolled_students = []
+        for student in search_results:
+            student['_id'] = str(student['_id'])
+            student['status'] = student.get('status', False)
+            if student['username'] in enrolled_usernames:
+                enrolled_students.append(student)
+            elif student['username'] in unenrolled_usernames:
+                unenrolled_students.append(student)
+
+        # Render the search results page
+        return render_template(
+            "searchResultsStudents.html",
+            classroom=classroom,
+            enrolled_students=enrolled_students,
+            unenrolled_students=unenrolled_students,
+            query=query
+        )
+
+
+
+    
 
     
 class TeacherUploadMaterialBoundary:
@@ -987,7 +1038,7 @@ class TeacherViewQuizBoundary:
             return redirect(url_for('boundary.home'))
 
         return render_template("viewQuiz.html", quiz=quiz)
-
+        
 class TeacherUploadAssignment:
     UPLOAD_FOLDER_ASSIGNMENT = 'FYP' \
     '25S109/static/uploads/assignment/'

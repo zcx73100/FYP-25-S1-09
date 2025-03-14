@@ -14,6 +14,56 @@
     {% endif %}
 {% endwith %}
 
+<!-- Search Form -->
+<h2>Search Students</h2>
+<form method="get" action="{{ url_for('boundary.search_student', classroom_name=classroom.classroom_name, query=query) }}">
+    <input type="hidden" name="classroom" value="{{ classroom.classroom_name }}">
+    <input type="text" name="query" placeholder="Search by username or email" required>
+    <button type="submit">Search</button>
+</form>
+
+
+<!-- Search Results -->
+{% if search_results %}
+<h2>Search Results</h2>
+<table border="1">
+    <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+    {% for student in search_results %}
+    <tr>
+        <td>{{ student.username }}</td>
+        <td>{{ student.email }}</td>
+        <td>{{ student.role }}</td>
+        <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
+        <td>
+            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
+                {% if student.status != "suspended" %}
+                    <button type="submit">Suspend</button>
+                {% endif %}
+            </form>
+            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
+                {% if student.status == "suspended" %}
+                    <button type="submit">Activate</button>
+                {% endif %}
+            </form>
+            <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
+                <button type="submit">View Details</button>
+            </form>
+            <form method="post" action="{{ url_for('boundary.remove_student', classroom_name=classroom.classroom_name) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
+                <input type="hidden" name="username" value="{{ student.username }}">
+                <button type="submit">Remove from Classroom</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
 <h2>Enrolled Students</h2>
 <table border="1">
     <tr>
@@ -30,20 +80,18 @@
         <td>{{ student.role }}</td>
         <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
         <td>
-            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username,classroom_name=classroom.classroom_name) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
                 {% if student.status != "suspended" %}
-                    <input type="hidden" name="username" value="{{ student.username }}">
                     <button type="submit">Suspend</button>
                 {% endif %}
             </form>
-            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username,classroom_name=classroom.classroom_name) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
                 {% if student.status == "suspended" %}
-                    <input type="hidden" name="username" value="{{ student.username }}">
                     <button type="submit">Activate</button>
                 {% endif %}
             </form>
             <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
-                <button type="submit">View Student Details</button>
+                <button type="submit">View Details</button>
             </form>
             <form method="post" action="{{ url_for('boundary.remove_student', classroom_name=classroom.classroom_name) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
                 <input type="hidden" name="username" value="{{ student.username }}">
@@ -71,16 +119,16 @@
                 <button type="submit">Enroll</button>
             </form>
             <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
-                <button type="submit">View Student Details</button>
+                <button type="submit">View Details</button>
             </form>
         </td>
     </tr>
     {% endfor %}
 </table>
 
-<form method="post" action = "{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">
+<!-- Back to Classroom Button -->
+<form method="post" action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">
     <button type="submit">Back to Classroom</button>
 </form>
-
 
 {% endblock %}
