@@ -394,18 +394,18 @@ class Classroom:
             logging.error(f"Error deleting classroom: {str(e)}")
             return False
     @staticmethod
-    def update_classroom(classroom_id, updated_data):
+    def update_classroom(classroom_name, updated_data):
         """ Updates a classroom by ID """
         try:
             result = mongo.db.classroom.update_one(
-                {"_id": ObjectId(classroom_id)},
+                {"classroom_name": classroom_name},
                 {"$set": updated_data}
             )
             if result.modified_count > 0:
                 return True
         except Exception as e:
             logging.error(f"Error updating classroom: {str(e)}")
-            return False
+            return
     
     @staticmethod
     def find_by_teacher(teacher):
