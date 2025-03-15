@@ -12,3 +12,5 @@ Weights - (C:\Users\YOURNAME\Documents\GitHub\FYP-25-S1-09\SadTalker\gfpgan\weig
 3)CREATE folders for checkpoints and weights.
 
 4)Run main.py as per usual and the demo should be on the main page
+
+5)Please ignore this file: (FYP25S109_sadtalker) it's not in use
