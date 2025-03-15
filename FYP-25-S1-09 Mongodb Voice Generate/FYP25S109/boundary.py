@@ -1312,4 +1312,3 @@ class TeacherManageQuizBoundary:
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
 
-class RetrieveMaterial
