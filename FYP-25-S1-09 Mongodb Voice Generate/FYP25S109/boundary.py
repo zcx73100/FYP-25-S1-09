@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, Response
+from datetime import datetime
 from . import mongo
 import os
 from werkzeug.utils import secure_filename
@@ -32,11 +33,13 @@ class HomePage:
             {"username": {"$in": teacher_users}},
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
+
         admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find(
             {"username": {"$in": admin_users}},
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
+
         avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1, 'upload_date': 1}))
         username = session.get("username", None)
         role = session.get("role", None)
@@ -47,21 +50,43 @@ class HomePage:
         elif role == "Student":
             classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 0, "classroom_name": 1, "description": 1}))
 
-        # Fetch quizzes, assignments, and materials per classroom
-        quizzes = {c["classroom_name"]: list(mongo.db.quizzes.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
-        assignments = {c["classroom_name"]: list(mongo.db.assignments.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
-        materials = {c["classroom_name"]: list(mongo.db.materials.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
+        # ✅ Fetch Classroom-Specific Announcements
+        announcements = {c["classroom_name"]: list(mongo.db.announcements.find(
+            {"classroom_name": c["classroom_name"]},
+            {"_id": 0, "title": 1, "content": 1, "created_at": 1}
+        )) for c in classrooms}
+
+        # ✅ Fetch Materials, Assignments, and Quizzes Per Classroom
+        materials = {c["classroom_name"]: list(mongo.db.materials.find(
+            {"classroom_name": c["classroom_name"]},
+            {"_id": 1, "title": 1}
+        )) for c in classrooms}
+
+        assignments = {c["classroom_name"]: list(mongo.db.assignments.find(
+            {"classroom_name": c["classroom_name"]},
+            {"_id": 1, "title": 1}
+        )) for c in classrooms}
+
+        quizzes = {c["classroom_name"]: list(mongo.db.quizzes.find(
+            {"classroom_name": c["classroom_name"]},
+            {"_id": 1, "title": 1}
+        )) for c in classrooms}
 
         return render_template(
             "homepage.html",
-            videos=admin_videos + teacher_videos,
-            avatars=avatars,
+            videos=admin_videos + teacher_videos,  # ✅ Videos Restored
+            avatars=avatars,  # ✅ Avatars Restored
             username=username,
             classrooms=classrooms,
-            quizzes=quizzes,
-            assignments=assignments,
-            materials=materials
+            announcements=announcements,  # ✅ Announcements Moved Inside Classroom Box
+            materials=materials,  # ✅ Materials first
+            assignments=assignments,  # ✅ Assignments second
+            quizzes=quizzes  # ✅ Quizzes last
         )
+
+
+
+
 
 
 
@@ -159,8 +184,6 @@ class GenerateVideoBoundary:
 
         # Extract avatar paths
         available_avatars = [avatar["file_path"] for avatar in avatars]
-
-        print("Available Avatars:", available_avatars)  # ✅ Debugging
 
         return render_template("generateVideo.html", available_avatars=available_avatars)
     
@@ -764,34 +787,62 @@ class TeacherAddClassroomBoundary:
 
         return render_template("addClassroom.html")
     
+from datetime import datetime
+
 class ViewClassRoomBoundary:
     @staticmethod
     @boundary.route('/teacher/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
     def view_classroom(classroom_name):
-        if 'role' not in session or (session.get('role') != 'Teacher' and session.get('role') != 'Student'):
+        if 'role' not in session or session.get('role') not in ['Teacher', 'Student']:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
+        # Fetch the classroom details
         classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
 
+        # Role-based access control
+        username = session.get('username')
         if session.get('role') == 'Student':
-            student_username = session.get('username')
-            if student_username.strip() not in [s.strip() for s in classroom['student_list']]:
+            student_list = classroom.get('student_list', [])
+            if username.strip() not in [s.strip() for s in student_list]:
                 flash("You are not enrolled in this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
-        
-        if session.get('role') == 'Teacher':
-            teacher_username = session.get('username')
-            if teacher_username.strip() != classroom['teacher'].strip():
+
+        elif session.get('role') == 'Teacher':
+            if username.strip() != classroom.get('teacher', '').strip():
                 flash("You are not the teacher of this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
-            return render_template("viewClassroom.html", classroom=classroom, classroom_name=classroom_name)
 
-        return render_template("viewClassroom.html", classroom=classroom, classroom_name=classroom_name)
+        # Fetch classroom data
+        materials = list(mongo.db.materials.find({"classroom_name": classroom_name}))
+        assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name}))
+        quizzes = list(mongo.db.quizzes.find({"classroom_name": classroom_name}))
 
+        # ✅ Fetch announcements for this classroom
+        announcements = list(mongo.db.announcements.find(
+            {"classroom_name": classroom_name},
+            {"_id": 0, "title": 1, "content": 1, "created_at": 1}
+        ))
+
+        # Convert due_date to readable format
+        for assignment in assignments:
+            if "due_date" in assignment and assignment["due_date"]:
+                try:
+                    assignment["due_date"] = datetime.strptime(assignment["due_date"], "%Y-%m-%dT%H:%M").strftime("%d %b %Y, %I:%M %p")
+                except ValueError:
+                    pass  # Keep as-is if conversion fails
+
+        return render_template(
+            "viewClassroom.html",
+            classroom=classroom,
+            materials=materials,
+            assignments=assignments,
+            quizzes=quizzes,
+            announcements=announcements  # ✅ Pass announcements to the template
+        )
 
 
 class TeacherDeleteClassroomBoundary:
@@ -820,7 +871,6 @@ class TeacherUpdateClassroomBoundary:
             return redirect(url_for('boundary.home'))
 
         classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
-        print(f"Classroom: {classroom}")  # Debugging line to check the classroom object
 
         if not classroom:
             flash("Classroom not found.", category='error')
@@ -840,8 +890,6 @@ class TeacherUpdateClassroomBoundary:
                 "description": new_description,
                 "capacity": new_capacity
             })
-
-            print(f"Update result: {result}")  # Debugging line to check result
 
             return redirect(url_for('boundary.manage_classrooms'))
 
@@ -1312,3 +1360,41 @@ class TeacherManageQuizBoundary:
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
 
+@boundary.route('/teacher/view_assignment/<assignment_id>', methods=['GET'])
+def view_assignment(assignment_id):
+    try:
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+        if not assignment:
+            flash("Assignment not found!", "danger")
+            return redirect(url_for('boundary.manage_assignments'))
+        return render_template("viewAssignment.html", assignment=assignment)
+    except Exception as e:
+        flash("Invalid Assignment ID!", "danger")
+        return redirect(url_for('boundary.manage_assignments'))
+
+class TeacherAnnouncementBoundary:
+    @boundary.route('/teacher/add_announcement/<classroom_name>', methods=['GET', 'POST'])
+    def add_announcement(classroom_name):
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        if request.method == 'POST':
+            title = request.form.get('title')
+            content = request.form.get('content')
+
+            if not title or not content:
+                flash("Title and content cannot be empty.", category='error')
+                return redirect(url_for('boundary.add_announcement', classroom_name=classroom_name))
+
+            mongo.db.announcements.insert_one({
+                "classroom_name": classroom_name.strip(),
+                "title": title.strip(),
+                "content": content.strip(),
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+            flash("Announcement added successfully!", category='success')
+            return redirect(url_for('boundary.view_classroom', classroom_name=classroom_name))
+
+        return render_template("addAnnouncement.html", classroom_name=classroom_name)

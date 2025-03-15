@@ -1,9 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
     <h2 class="section-title">Welcome to the Homepage</h2>
-    <h3 class="section-subtitle">Getting Started on our Platform? Feel free to explore these videos to learn more!</h3>
 
-    <!-- Video Section -->
+    <!-- ✅ Video Section Restored -->
     <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
@@ -21,15 +20,14 @@
         {% endif %}
     </div>
 
-    <!-- Avatars Section -->
+    <!-- ✅ Avatars Section Restored -->
     <h3 class="section-subtitle">Avatars</h3>
     <div class="avatar-grid">
         {% if avatars %}
             {% for avatar in avatars %}
                 <div class="avatar-card">
-                    <img src="{{ url_for('static', filename='uploads/avatars/' + avatar.avatarname) }}" alt="{{ avatar.avatar_name }}">
-                    <h5>Uploaded by: {{ avatar.username }}</h5>  
-                    <h5>Avatar name: {{ avatar.avatarname }}</h5>
+                    <img src="{{ url_for('static', filename='uploads/avatars/' + avatar.avatarname) }}" alt="{{ avatar.avatarname }}">
+                    <h5>Uploaded by: {{ avatar.username }}</h5>
                 </div>
             {% endfor %}
         {% else %}
@@ -37,7 +35,7 @@
         {% endif %}
     </div>
 
-    <!-- Classrooms Section -->
+    <!-- ✅ Classroom Section -->
     <h3 class="section-subtitle">Classrooms</h3>
     <div class="classroom-container">
         {% for classroom in classrooms %}
@@ -50,182 +48,242 @@
                 <p class="classroom-description">{{ classroom.description }}</p>
                 <hr class="separator">
 
-                <div class="classroom-content">
-                    <!-- Quizzes -->
-                    <div class="classroom-section">
-                        <h5>📝 Recent Quizzes:</h5>
-                        <ul>
-                            {% for quiz in quizzes.get(classroom.classroom_name, [])[:2] %}
-                                <li><a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}">{{ quiz.title }}</a></li>
-                            {% else %}
-                                <li>No quizzes available.</li>
+                <!-- ✅ Classroom-Specific Announcements -->
+                <div class="classroom-section">
+                    <h5>📢 Announcements:</h5>
+                    <ul>
+                        {% if announcements.get(classroom.classroom_name) %}
+                            {% for announcement in announcements[classroom.classroom_name] %}
+                                <li><strong>{{ announcement.title }}</strong>: {{ announcement.content }}</li>
                             {% endfor %}
-                        </ul>
-                        <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">📚 View More</a>
-                    </div>
-                    <hr class="separator">
+                        {% else %}
+                            <li>No announcements available.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <hr class="separator">
 
-                    <!-- Assignments -->
-                    <div class="classroom-section">
-                        <h5>📄 Recent Assignments:</h5>
-                        <ul>
-                            {% for assignment in assignments.get(classroom.classroom_name, [])[:2] %}
-                                <li>{{ assignment.title }}</li>
-                            {% else %}
-                                <li>No assignments available.</li>
-                            {% endfor %}
-                        </ul>
-                        <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">📑 View More</a>
-                    </div>
-                    <hr class="separator">
+                <!-- Materials -->
+                <div class="classroom-section">
+                    <h5>📂 Recent Materials:</h5>
+                    <ul>
+                        {% for material in materials.get(classroom.classroom_name, [])[:2] %}
+                            <li>{{ material.title }}</li>
+                        {% else %}
+                            <li>No materials available.</li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-success">📂 View More</a>
+                </div>
+                <hr class="separator">
 
-                    <!-- Materials -->
-                    <div class="classroom-section">
-                        <h5>📂 Recent Materials:</h5>
-                        <ul>
-                            {% for material in materials.get(classroom.classroom_name, [])[:2] %}
-                                <li>{{ material.filename }}</li>
-                            {% else %}
-                                <li>No materials available.</li>
-                            {% endfor %}
-                        </ul>
-                        <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-success">📂 View More</a>
-                    </div>
+                <!-- Assignments -->
+                <div class="classroom-section">
+                    <h5>📄 Recent Assignments:</h5>
+                    <ul>
+                        {% for assignment in assignments.get(classroom.classroom_name, [])[:2] %}
+                            <li>{{ assignment.title }}</li>
+                        {% else %}
+                            <li>No assignments available.</li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">📑 View More</a>
+                </div>
+                <hr class="separator">
+
+                <!-- Quizzes -->
+                <div class="classroom-section">
+                    <h5>📝 Recent Quizzes:</h5>
+                    <ul>
+                        {% for quiz in quizzes.get(classroom.classroom_name, [])[:2] %}
+                            <li>{{ quiz.title }}</li>
+                        {% else %}
+                            <li>No quizzes available.</li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">📚 View More</a>
                 </div>
             </div>
         {% endfor %}
     </div>
 
-<style>
-    body {
-        font-family: 'Arial', sans-serif;
-        background-color: #f5f7fa;
-        margin: 0;
-        padding: 0;
-    }
-
-    .section-title, .section-subtitle {
-        text-align: center;
-    }
-
-    .section-title {
-        font-size: 24px;
-        margin-bottom: 10px;
-    }
-
-    .section-subtitle {
-        font-size: 18px;
-        color: #666;
-        margin-bottom: 20px;
-    }
-
-    .video-grid, .avatar-grid, .classroom-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 15px;
-        padding: 20px;
-        justify-content: center;
-    }
-
-    .video-card, .avatar-card, .classroom-card {
-        background: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: transform 0.3s;
-        text-align: center;
-    }
-
-    .video-card:hover, .avatar-card:hover, .classroom-card:hover {
-        transform: scale(1.05);
-    }
-
-    .video-card video {
-        width: 100%;
-        border-radius: 5px;
-    }
-
-    .avatar-card img {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-bottom: 10px;
-    }
-
-    .no-content {
-        text-align: center;
-        font-size: 16px;
-        color: gray;
-        margin: 20px;
-    }
-
-    .classroom-container {
-        padding: 10px;
-    }
-
-    .classroom-card {
-        width: 320px;
-        background: linear-gradient(to bottom, #ffffff, #f1f1f1);
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        text-align: left;
-    }
-
-    .classroom-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
-    }
-
-    .classroom-header h4 {
-        font-size: 18px;
-    }
-
-    .classroom-content {
-        margin-top: 10px;
-    }
-
-    .classroom-section {
-        margin-bottom: 10px;
-    }
-
-    .classroom-section ul {
-        list-style-type: none;
-        padding: 0;
-    }
-
-    .classroom-section ul li {
-        font-size: 14px;
-        padding: 5px 0;
-    }
-
-    .btn {
-        display: inline-block;
-        padding: 8px 12px;
-        text-align: center;
-        border-radius: 5px;
-        font-size: 14px;
-        text-decoration: none;
-        transition: background 0.3s ease-in-out;
-    }
-
-    .view-btn {
-        background-color: #007bff;
-        color: white;
-    }
-
-    .view-btn:hover {
-        background-color: #0056b3;
-    }
-
-    .separator {
-        height: 1px;
-        background: #ccc;
-        margin: 10px 0;
-    }
-</style>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+    
+        .section-title, .section-subtitle {
+            text-align: center;
+        }
+    
+        .section-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+    
+        .section-subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+    
+        /* ✅ Video & Avatar Grid Styles */
+        .video-grid, .avatar-grid, .classroom-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            padding: 20px;
+            justify-content: center;
+        }
+    
+        .video-card, .avatar-card, .classroom-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            text-align: center;
+        }
+    
+        .video-card:hover, .avatar-card:hover, .classroom-card:hover {
+            transform: scale(1.05);
+        }
+    
+        .video-card video {
+            width: 100%;
+            border-radius: 5px;
+        }
+    
+        .avatar-card img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+    
+        .no-content {
+            text-align: center;
+            font-size: 16px;
+            color: gray;
+            margin: 20px;
+        }
+    
+        /* ✅ Classroom Styles */
+        .classroom-container {
+            padding: 10px;
+        }
+    
+        .classroom-card {
+            width: 350px;
+            background: linear-gradient(to bottom, #ffffff, #f1f1f1);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: left;
+        }
+    
+        .classroom-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+    
+        .classroom-header h4 {
+            font-size: 18px;
+        }
+    
+        .classroom-content {
+            margin-top: 10px;
+        }
+    
+        .classroom-section {
+            margin-bottom: 10px;
+        }
+    
+        .classroom-section ul {
+            list-style-type: none;
+            padding: 0;
+        }
+    
+        .classroom-section ul li {
+            font-size: 14px;
+            padding: 5px 0;
+        }
+    
+        /* ✅ Announcement Box */
+        .announcement-box {
+            background: #ffefc3;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            color: #805300;
+            font-size: 14px;
+        }
+    
+        .announcement-box h5 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    
+        /* ✅ Buttons */
+        .btn {
+            display: inline-block;
+            padding: 8px 12px;
+            text-align: center;
+            border-radius: 5px;
+            font-size: 14px;
+            text-decoration: none;
+            transition: background 0.3s ease-in-out;
+        }
+    
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+    
+        .btn-success:hover {
+            background-color: #218838;
+        }
+    
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+    
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+    
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+    
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+    
+        .view-btn {
+            background-color: #007bff;
+            color: white;
+        }
+    
+        .view-btn:hover {
+            background-color: #0056b3;
+        }
+    
+        .separator {
+            height: 1px;
+            background: #ccc;
+            margin: 10px 0;
+        }
+    </style>    
 
 {% endblock %}
