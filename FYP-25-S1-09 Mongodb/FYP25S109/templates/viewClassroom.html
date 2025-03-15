@@ -3,23 +3,37 @@
 {% block content %}
 <h2>{{ classroom.classroom_name }}</h2>
 
-
 <div class="classroom-grid">
     <!-- Display existing sections here (you can loop through the sections if they are available) -->
     <h3>Class Materials</h3>
-    <form action="{{ url_for('boundary.upload_material', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Material</button>
-    </form>
+
+    <!-- Redirect to Upload Material Page -->
+    <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+        Upload Material
+    </a>
+
+    <!-- Manage Materials Button -->
+    <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Materials</a>
     
     <h3>Assignments</h3>
-    <form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Assignment</button>
-    </form>
+    <!-- Link to Upload Assignment Page -->
+    <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" 
+    class="btn btn-primary">
+    Upload Assignment
+    </a>
+
+    <!-- Link to Manage Assignments -->
+    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" 
+    class="btn btn-secondary">
+    Manage Assignments
+    </a>
     
     <h3>Quizzes</h3>
-    <form action="{{ url_for('boundary.upload_quiz', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Quiz</button>
-    </form>
+    <!-- ✅ Create Quiz Button -->
+    <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Create Quiz</a>
+
+    <!-- ✅ Manage Quizzes Button -->
+    <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Quizzes</a>
 
     <h3>Manage Students</h3>
     <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
