@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SadTalker - Generate Video</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* Spinner CSS */
+    #loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+    function showSpinner() {
+      document.getElementById("sadtalkerForm").style.display = "none";
+      document.getElementById("loading").style.display = "block";
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h2>Generate Video with SadTalker</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="list-unstyled">
+          {% for category, message in messages %}
+            <li class="alert alert-{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    
+    <form id="sadtalkerForm" method="POST" action="{{ url_for('boundary_sadtalker.run_sadtalker') }}" enctype="multipart/form-data" onsubmit="showSpinner();">
+      <div>
+        <label for="image_file">Upload Image/Video:</label>
+        <input type="file" id="image_file" name="image_file" required>
+      </div>
+      <div>
+        <label for="audio_file">Upload Audio:</label>
+        <input type="file" id="audio_file" name="audio_file" required>
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary">Generate Video</button>
+      </div>
+    </form>
+    
+    <div id="loading">
+      <p>Processing... Please wait.</p>
+      <div class="spinner"></div>
+    </div>
+  </div>
+</body>
+</html>

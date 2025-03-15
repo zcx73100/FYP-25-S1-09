@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}SadTalker Result{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>SadTalker Output</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="list-unstyled">
+          {% for category, message in messages %}
+            <li class="alert alert-{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    
+    <!-- Display the generated video -->
+    <video width="640" height="480" controls>
+        <source src="{{ video_url }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    
+    <br><br>
+    <!-- Button to go back to the form -->
+    <a href="{{ url_for('boundary_sadtalker.sadtalker_form') }}" class="btn btn-primary">Start Over</a>
+</div>
+{% endblock %}
