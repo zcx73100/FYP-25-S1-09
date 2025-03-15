@@ -2,7 +2,7 @@
 {% block content %}
     <h2 style="text-align:center">Welcome to the Homepage</h2>
     <h3 style="text-align:center">Getting Started to our Platform? Feel free to explore these videos to learn more!</h3>
-
+    <h3>Total Videos: {{ videos|length }}</h3>
     <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
