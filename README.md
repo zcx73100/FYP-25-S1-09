@@ -7,6 +7,7 @@ PYTHON 3.10
 2) GOTO: https://github.com/OpenTalker/SadTalker
 Scroll down and DOWNLOAD:
 Checkpoints - (C:\Users\YOURNAME\Documents\GitHub\FYP-25-S1-09\SadTalker\checkpoints)
+
 Weights - (C:\Users\YOURNAME\Documents\GitHub\FYP-25-S1-09\SadTalker\gfpgan\weights)
 
 3)CREATE folders for checkpoints and weights.
