@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Upload Assignment for {{ classroom_name }}</h2>
+
+<form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom_name) }}" 
+      method="POST" enctype="multipart/form-data">
+    <input type="text" name="title" placeholder="Assignment Title">
+    <input type="text" name="description" placeholder="Assignment Description">
+    <input type="datetime-local" name="deadline">
+    <input type="file" name="file">
+    <button type="submit">Upload Assignment</button>
+</form>
+
+{% endblock %}
