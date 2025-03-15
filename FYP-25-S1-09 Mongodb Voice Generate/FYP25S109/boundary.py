@@ -25,30 +25,39 @@ class HomePage:
     @boundary.route('/')
     def home():
         admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
-        admin_videos = list(mongo.db.tutorialvideo.find(
-            {"username": {"$in": admin_users}},
+        teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
+        
+        # Combine admin and teacher users for video query
+        admin_and_teacher_users = admin_users + teacher_users
+        
+        # Fetch videos uploaded by admins and teachers
+        admin_and_teacher_videos = list(mongo.db.tutorialvideo.find(
+            {"username": {"$in": admin_and_teacher_users}},
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
+        
+        # Fetch avatars
         avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1, 'upload_date': 1}))
+        
+        # Get current user's session details
         username = session.get("username", None)
         role = session.get("role", None)
 
+        # Fetch classrooms based on user role
         classrooms = []
-
         if role == "Teacher":
-            # Teachers should only see the classrooms they own
             classrooms = list(mongo.db.classroom.find(
                 {"teacher": username},
                 {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
             ))
         elif role == "Student":
-            # Students should only see classrooms they are enrolled in
             classrooms = list(mongo.db.classroom.find(
                 {"student_list": username},
                 {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
             ))
 
-        return render_template("homepage.html", videos=admin_videos, avatars=avatars, username=username, classrooms=classrooms)
+        return render_template("homepage.html", videos=admin_and_teacher_videos, avatars=avatars, username=username, classrooms=classrooms)
+
 
 
 # Generate Video 
@@ -448,7 +457,6 @@ class UploadTutorialBoundary:
             file = request.files.get('file')
             title = request.form.get("title")
             username = session.get("username")
-            user_role = session.get("role", "User")
             description = request.form.get("description")
             if not title:
                 flash("Please provide a title for the video.", category='error')
@@ -464,7 +472,6 @@ class UploadTutorialBoundary:
                 video_name=file.filename,
                 video_file=file,
                 username=username,
-                user_role=user_role,
                 description = description
             )
             result = video.save_video()
@@ -473,22 +480,22 @@ class UploadTutorialBoundary:
         return render_template("uploadTutorial.html")
 
 # View Uploaded Videos (Multiple Videos at one time)
-class AdminViewUploadedVideosBoundary:
+class ViewUploadedVideosBoundary:
     @staticmethod
     @boundary.route('/uploadedVideos', methods=['GET'])
     def view_uploaded_videos():
         if 'username' not in session:
             flash("You must be logged in to view uploaded videos.", category='error')
             return redirect(url_for('boundary.login'))
-        admin_videos = list(mongo.db.tutorialvideo.find(
+        videos = list(mongo.db.tutorialvideo.find(
             {"username": session['username']},
             {"_id": 0, "title": 1, "file_path": 1, "status": 1, "upload_date": 1, "description": 1, "username": 1, "video_name": 1}
         ))
-        return render_template("manageVideo.html", videos=admin_videos)
+        return render_template("manageVideo.html", videos=videos)
     
     
 # View Uploaded Videos (Single Video)
-class AdminViewSingleTutorialBoundary:
+class ViewSingleTutorialBoundary:
     @staticmethod
     @boundary.route('/viewTutorial/<video_name>', methods=['GET'])
     def view_tutorial(video_name):
@@ -531,7 +538,7 @@ class ManageAvatarBoundary:
             return redirect(url_for('boundary.login'))
         username = session.get('username')
         user_role = session.get('role')
-        avatars = AdminManageAvatarController.get_avatars_by_username(username)
+        avatars = ManageAvatarController.get_avatars_by_username(username)
         if not avatars:
             flash("No avatars found for your account.", category='info')
         return render_template(
@@ -560,8 +567,8 @@ class AddAvatarBoundary:
             if not username or not avatar_file or not avatarname:
                 flash("Username, avatar name, and avatar file are required.", category='error')
                 return redirect(url_for('boundary.admin_create_avatar'))
-
-            result = AdminAddAvatarController.add_avatar(username, avatarname, avatar_file)
+            
+            result = AddAvatarController.add_avatar(username, avatarname, avatar_file)
 
             if result['success']:
                 flash("Avatar added successfully.", category='success')

@@ -581,7 +581,7 @@ class AddAvatarBoundary:
             if not username or not avatar_file or not avatarname:
                 flash("Username, avatar name, and avatar file are required.", category='error')
                 return redirect(url_for('boundary.admin_create_avatar'))
-
+            
             result = AdminAddAvatarController.add_avatar(username, avatarname, avatar_file)
 
             if result['success']:

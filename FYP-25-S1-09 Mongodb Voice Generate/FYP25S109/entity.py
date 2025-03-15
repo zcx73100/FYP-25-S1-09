@@ -164,12 +164,11 @@ class UserAccount:
             return False
 
 class TutorialVideo:
-    def __init__(self, title=None, video_name=None ,video_file=None, username=None, user_role=None,description=None):
+    def __init__(self, title=None, video_name=None, video_file=None, username=None, description=None):
         self.title = title
         self.video_name = video_name
         self.video_file = video_file
         self.username = username
-        self.user_role = user_role
         self.description = description
 
     def save_video(self):
@@ -177,39 +176,47 @@ class TutorialVideo:
             if not self.video_file:
                 raise ValueError("No file selected for upload.")
 
-            filename = secure_filename(self.video_file.filename)
+            # Generate a unique filename by adding a timestamp
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            filename = secure_filename(f"{timestamp}_{self.video_file.filename}")
             file_path = os.path.join(UPLOAD_FOLDER_VIDEO, filename)
 
             # Validate file extension
             if filename.split('.')[-1].lower() not in ALLOWED_VIDEO_EXTENSIONS:
                 raise ValueError("Invalid video format.")
 
+            # Save the video file
             self.video_file.save(file_path)
-            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
-
+            # Insert video information into MongoDB
             mongo.db.tutorialvideo.insert_one({
                 'title': self.title,
                 'video_name': filename,
                 'file_path': file_path,
                 'username': self.username,
-                'status': status,
                 'upload_date': datetime.now(),
                 'description': self.description
             })
-            return {"success": True, "message": "Video uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+            return {"success": True, "message": "Video uploaded successfully."}
 
         except Exception as e:
             logging.error(f"Error saving video: {str(e)}")
             return {"success": False, "message": str(e)}
+
+    @staticmethod
     def delete_video(video_id):
         try:
             video = mongo.db.tutorialvideo.find_one({"_id": video_id})
             if video:
                 os.remove(video['file_path'])
+                mongo.db.tutorialvideo.delete_one({"_id": video_id})
+                return {"success": True, "message": "Video deleted successfully."}
+            return {"success": False, "message": "Video not found."}
+
         except Exception as e:
             logging.error(f"Error deleting video: {str(e)}")
             return {"success": False, "message": str(e)}
-        
+
+    @staticmethod
     def search_video(search_query):
         try:
             # Use case-insensitive and partial matching
@@ -220,6 +227,7 @@ class TutorialVideo:
         except Exception as e:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
+
 
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
@@ -620,20 +628,16 @@ class Material:
             # Save file to disk
             self.file.save(file_path)
 
-            # Set status based on user role
-            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
-
             # Save to database
             mongo.db.material.insert_one({
                 'title': self.title,
                 'file_name': filename,
                 'file_path': file_path,
                 'username': self.username,
-                'status': status,
                 'upload_date': datetime.now(),
                 'description': self.description
             })
-            return {"success": True, "message": "Material uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+            return {"success": True, "message": "Material uploaded successfully."}
 
         except Exception as e:
             logging.error(f"Error saving material: {str(e)}")
@@ -663,19 +667,17 @@ class Assignment:
                 raise ValueError("Invalid assignment format.")
 
             self.file.save(file_path)
-            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
 
             mongo.db.assignment.insert_one({
                 'title': self.title,
                 'file_name': filename,
                 'file_path': file_path,
                 'username': self.username,
-                'status': status,
                 'upload_date': datetime.now(),
                 'description': self.description,
                 'due_date': self.due_date
             })
-            return {"success": True, "message": "Assignment uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+            return {"success": True, "message": "Assignment uploaded successfully."}
 
         except Exception as e:
             logging.error(f"Error saving assignment: {str(e)}")
@@ -722,17 +724,15 @@ class Quiz:
 
     def save_quiz(self):
         try:
-            status = 'Approved' if self.user_role == 'Admin' else 'Pending'
 
             mongo.db.quiz.insert_one({
                 'title': self.title,
                 'questions': self.questions,
                 'username': self.username,
-                'status': status,
                 'upload_date': datetime.now(),
                 'description': self.description
             })
-            return {"success": True, "message": "Quiz uploaded successfully." if self.user_role == "Admin" else "Awaiting approval."}
+            return {"success": True, "message": "Quiz uploaded successfully."}
 
         except Exception as e:
             logging.error(f"Error saving quiz: {str(e)}")
