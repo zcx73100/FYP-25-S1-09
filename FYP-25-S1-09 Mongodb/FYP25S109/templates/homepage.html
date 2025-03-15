@@ -11,8 +11,8 @@
                         <source src="{{ url_for('static', filename='uploads/videos/' + video.video_name) }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
-                    <h5>Name: {{ video.title }}</h5>  
-                    <h5>Uploaded By: {{ video.username }}</h5>  
+                    <h5>{{ video.title }}</h5>  
+                    <p>Uploaded By: {{ video.username }}</p>  
                 </div>
             {% endfor %}
         {% else %}
@@ -20,41 +20,126 @@
         {% endif %}
     </div>
 
-    <h3 style="text-align:center">Look on how these Avatars come to life and how they help students to learn!</h3>
-    <div class="avatar-grid">
-        {% if avatars %}
-            {% for avatar in avatars %}
-                <div class="avatar-card">
-                    <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="Avatar of {{ avatar.avatarname }}" width="150" height="150">
-                    <br/>
-                    <button>View Avatar Video</button>
-                    <p>Avatar Name: {{ avatar.avatarname}}</p>
-                    <p>Uploaded on: {{ avatar.upload_date.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+    <h3 style="text-align:center">Classrooms</h3>
+    <div class="classroom-container">
+        {% for classroom in classrooms %}
+            <div class="classroom-card">
+                <div class="classroom-header">
+                    <h4>🏫 {{ classroom.classroom_name }}</h4>
+                    <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" class="btn btn-info btn-sm">⭐ View Classroom</a>
                 </div>
-            {% endfor %}
-        {% else %}
-            <p style="text-align:center">No avatars available.</p>
-        {% endif %}
+
+                <p class="classroom-description">{{ classroom.description }}</p>
+                <hr class="separator"> <!-- 🔥 Separator below description -->
+
+                <div class="classroom-content">
+                    <!-- Quizzes -->
+                    <div class="classroom-section">
+                        <h5>📝 Recent Quizzes:</h5>
+                        <ul>
+                            {% for quiz in quizzes.get(classroom.classroom_name, [])[:2] %}
+                                <li><a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}">{{ quiz.title }}</a></li>
+                            {% else %}
+                                <li>No quizzes available.</li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-primary btn-sm">📚 View More</a>
+                    </div>
+
+                    <hr class="separator"> <!-- 🔥 Separator -->
+
+                    <!-- Assignments -->
+                    <div class="classroom-section">
+                        <h5>📄 Recent Assignments:</h5>
+                        <ul>
+                            {% for assignment in assignments.get(classroom.classroom_name, [])[:2] %}
+                                <li>{{ assignment.title }}</li>
+                            {% else %}
+                                <li>No assignments available.</li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary btn-sm">📑 View More</a>
+                    </div>
+
+                    <hr class="separator"> <!-- 🔥 Separator -->
+
+                    <!-- Materials -->
+                    <div class="classroom-section">
+                        <h5>📂 Recent Materials:</h5>
+                        <ul>
+                            {% for material in materials.get(classroom.classroom_name, [])[:2] %}
+                                <li>{{ material.filename }}</li>
+                            {% else %}
+                                <li>No materials available.</li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-success btn-sm">📂 View More</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
     </div>
 
-    <!-- Only show classrooms if the user is a Teacher or Student -->
-    {% if session.get('role') in ['Teacher', 'Student'] %}
-        <h3 style="text-align:center">Classrooms</h3>
-        <div class="classroom-grid">
-            {% if classrooms %}
-                {% for classroom in classrooms %}
-                    <div class="classroom-card">
-                        <h5>Classroom Name: {{ classroom.classroom_name }}</h5>
-                        <h5>Classroom Description: {{ classroom.description }}</h5>
-                        <form action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" method="POST">
-                            <button type="submit">View Classroom</button>
-                        </form>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p style="text-align:center">No classrooms available.</p>
-            {% endif %}
-        </div>
-    {% endif %}
+<style>
+    .classroom-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .classroom-card {
+        width: 320px;
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .classroom-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 5px;
+    }
+
+    .classroom-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .classroom-section {
+        margin-bottom: 5px;
+        width: 100%;
+    }
+
+    .classroom-section ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 5px 0;
+    }
+
+    .classroom-section ul li {
+        font-size: 14px;
+    }
+
+    .btn-sm {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+
+    /* 🔥 Separator Styling */
+    .separator {
+        border: 0;
+        height: 1px;
+        background: #ccc;
+        margin: 8px 0;
+    }
+</style>
 
 {% endblock %}
