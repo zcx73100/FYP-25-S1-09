@@ -3,24 +3,77 @@
 {% block content %}
 <h2>{{ classroom.classroom_name }}</h2>
 
-
 <div class="classroom-grid">
-    <!-- Display existing sections here (you can loop through the sections if they are available) -->
+    <!-- Class Materials Section -->
     <h3>Class Materials</h3>
-    <form action="{{ url_for('boundary.upload_material', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Material</button>
-    </form>
-    
-    <h3>Assignments</h3>
-    <form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Assignment</button>
-    </form>
-    
-    <h3>Quizzes</h3>
-    <form action="{{ url_for('boundary.upload_quiz', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Upload Quiz</button>
-    </form>
+    <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+        Upload Material
+    </a>
+    <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+        Manage Materials
+    </a>
 
+    {% if materials %}
+        <ul>
+            {% for material in materials %}
+                <li>
+                    <a href="{{ url_for('boundary.view_material', material_id=material._id) }}">
+                        {{ material.filename }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No materials uploaded yet.</p>
+    {% endif %}
+
+    <!-- Assignments Section -->
+    <h3>Assignments</h3>
+    <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+        Upload Assignment
+    </a>
+    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+        Manage Assignments
+    </a>
+
+    {% if assignments %}
+        <ul>
+            {% for assignment in assignments %}
+                <li>
+                    <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id) }}">
+                        {{ assignment.title }}
+                    </a> - Due: {{ assignment.due_date }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No assignments uploaded yet.</p>
+    {% endif %}
+
+    <!-- Quizzes Section -->
+    <h3>Quizzes</h3>
+    <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+        Create Quiz
+    </a>
+    <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+        Manage Quizzes
+    </a>
+
+    {% if quizzes %}
+        <ul>
+            {% for quiz in quizzes %}
+                <li>
+                    <a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}">
+                        {{ quiz.title }}
+                    </a> - {{ quiz.total_questions }} Questions
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No quizzes available yet.</p>
+    {% endif %}
+
+    <!-- Manage Students Section -->
     <h3>Manage Students</h3>
     <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
         <button type="submit">Manage Students in this Classroom</button>
