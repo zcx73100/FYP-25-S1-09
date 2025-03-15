@@ -37,21 +37,26 @@ class HomePage:
         role = session.get("role", None)
 
         classrooms = []
-
         if role == "Teacher":
-            # Teachers should only see the classrooms they own
-            classrooms = list(mongo.db.classroom.find(
-                {"teacher": username},
-                {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 0, "classroom_name": 1, "description": 1}))
         elif role == "Student":
-            # Students should only see classrooms they are enrolled in
-            classrooms = list(mongo.db.classroom.find(
-                {"student_list": username},
-                {"_id": 0, "classroom_name": 1, "teacher": 1, "description": 1, "capacity": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 0, "classroom_name": 1, "description": 1}))
 
-        return render_template("homepage.html", videos=admin_videos, avatars=avatars, username=username, classrooms=classrooms)
+        # Fetch quizzes, assignments, and materials per classroom
+        quizzes = {c["classroom_name"]: list(mongo.db.quizzes.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
+        assignments = {c["classroom_name"]: list(mongo.db.assignments.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
+        materials = {c["classroom_name"]: list(mongo.db.materials.find({"classroom_name": c["classroom_name"]})) for c in classrooms}
+
+        return render_template(
+            "homepage.html",
+            videos=admin_videos,
+            avatars=avatars,
+            username=username,
+            classrooms=classrooms,
+            quizzes=quizzes,
+            assignments=assignments,
+            materials=materials
+        )
 
 
 
