@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Material{% endblock %}
-
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4">Upload Class Materials</h2>
+    <h2>Upload Material</h2>
 
-    <!-- ✅ Flash Messages -->
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -18,7 +16,9 @@
         {% endif %}
     {% endwith %}
 
-    <form action="{{ url_for('boundary.upload_material') }}" method="post" enctype="multipart/form-data" class="mt-4">
+    <form action="{{ url_for('boundary.upload_material') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="classroom_name" value="{{ classroom_name }}">
+
         <div class="mb-3">
             <label for="title" class="form-label">Material Title:</label>
             <input type="text" class="form-control" name="title" required>
@@ -31,10 +31,11 @@
 
         <div class="mb-3">
             <label for="file" class="form-label">Choose a File:</label>
-            <input type="file" class="form-control" name="file" accept="file/*" required>
+            <input type="file" class="form-control" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" required>
         </div>
 
         <button type="submit" class="btn btn-primary">Upload Material</button>
+        <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom_name) }}" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
 {% endblock %}
