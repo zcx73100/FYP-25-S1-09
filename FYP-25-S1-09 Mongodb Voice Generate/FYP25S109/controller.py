@@ -47,10 +47,10 @@ class ResetPasswordController:
 class UploadTutorialController:
     @staticmethod
     def upload_video(file, title, uploader, user_role):
-        video = TutorialVideo(title=title, video_file=file, username=uploader)
+        video = TutorialVideo(title=title, video_file=file, username=uploader, user_role=user_role)
         return video.save_video()  # Call entity method
     
-class DeleteVideoController:
+class AdminDeleteVideoController:
     @staticmethod
     def delete_video(video_id):
         return TutorialVideo.delete_video(video_id)  # Call entity method
@@ -76,17 +76,18 @@ class AddAvatarController:
         avatar = Avatar(avatar_file, avatarname, username)
         return avatar.save_image()  
 
-class DeleteAvatarController:
+class AdminDeleteAvatarController:
     @staticmethod
     def delete_avatar(avatar_id):
         return Avatar.delete_avatar(avatar_id)  # Call entity method
-    
-class ViewUploadedVideosController:
+
+#This is for the admin to view multiple videos at once
+class AdminViewUploadedVideosController:
     @staticmethod
     def view_uploaded_videos():
         return list(mongo.db.tutorialvideo.find({}))
 
-class ViewSingleTutorialController:
+class AdminViewSingleTutorialController:
     @staticmethod
     def view_tutorial(video_id):
         return TutorialVideo.find_by_id(video_id)
@@ -190,17 +191,3 @@ class SearchClassroomController:
     @staticmethod
     def search_classroom(search_query):
         return Classroom.search_classroom(search_query)
-    
-class GenerateVideoController:
-    @staticmethod
-    def generate_voice(text):
-        entity = GenerateVideoEntity(text=text, avatar_path=None)
-        audio_path = entity.generate_voice()
-        return audio_path
-
-    @staticmethod
-    def generate_video(text, avatar_path):
-        entity = GenerateVideoEntity(text, avatar_path)
-        entity.generate_voice()  # Make sure audio is generated first
-        video_path = entity.generate_video()
-        return video_path
