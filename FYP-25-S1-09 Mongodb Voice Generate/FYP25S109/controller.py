@@ -47,10 +47,10 @@ class ResetPasswordController:
 class UploadTutorialController:
     @staticmethod
     def upload_video(file, title, uploader, user_role):
-        video = TutorialVideo(title=title, video_file=file, username=uploader, user_role=user_role)
+        video = TutorialVideo(title=title, video_file=file, username=uploader)
         return video.save_video()  # Call entity method
     
-class AdminDeleteVideoController:
+class DeleteVideoController:
     @staticmethod
     def delete_video(video_id):
         return TutorialVideo.delete_video(video_id)  # Call entity method
@@ -65,29 +65,28 @@ class SearchAvatarController:
     def search_avatar(search_query):
         return Avatar.search_avatar(search_query)  # Call entity method
 
-class AdminManageAvatarController:
+class ManageAvatarController:
     @staticmethod
     def get_avatars_by_username(username):
         return list(mongo.db.avatar.find({"username": username}))
 
-class AdminAddAvatarController:
+class AddAvatarController:
     @staticmethod
     def add_avatar(username, avatarname, avatar_file):
         avatar = Avatar(avatar_file, avatarname, username)
         return avatar.save_image()  
 
-class AdminDeleteAvatarController:
+class DeleteAvatarController:
     @staticmethod
     def delete_avatar(avatar_id):
         return Avatar.delete_avatar(avatar_id)  # Call entity method
-
-#This is for the admin to view multiple videos at once
-class AdminViewUploadedVideosController:
+    
+class ViewUploadedVideosController:
     @staticmethod
     def view_uploaded_videos():
         return list(mongo.db.tutorialvideo.find({}))
 
-class AdminViewSingleTutorialController:
+class ViewSingleTutorialController:
     @staticmethod
     def view_tutorial(video_id):
         return TutorialVideo.find_by_id(video_id)
