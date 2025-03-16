@@ -8,7 +8,7 @@
             {% if filename.endswith('.pdf') %}
                 <iframe src="{{ url_for('static', filename='uploads/materials/' + filename) }}" 
                         width="100%" height="600px" frameborder="0"></iframe>
-            {% elif filename.endswith('.ppt') or filename.endswith('.pptx') %}
+            {% elif filename.endswith('.ppt') or filename.endswith('.pptx') or filename.endswith('.docx') or filename.endswith('.doc') %}
                 <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/materials/' + filename, _external=True) }}&embedded=true"
                         width="100%" height="600px" frameborder="0"></iframe>
             {% elif filename.endswith('.txt') or filename.endswith('.md') %}

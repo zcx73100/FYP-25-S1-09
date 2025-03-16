@@ -118,7 +118,7 @@ class UserAccount:
             return None
 
     @staticmethod
-    def search_user(query):
+    def search_account(query):
         try:
             users = list(mongo.db.useraccount.find({
                 "$or": [
