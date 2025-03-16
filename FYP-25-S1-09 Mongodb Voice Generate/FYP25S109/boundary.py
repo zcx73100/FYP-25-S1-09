@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from bson import ObjectId
+from markupsafe import Markup
 
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
@@ -1407,3 +1408,38 @@ class TeacherAnnouncementBoundary:
         flash("Announcement deleted successfully!", category='success')
         return redirect(request.referrer)
     
+class StudentAssignmentBoundary:
+    @staticmethod
+    @boundary.route('/student/submit_assignment/<classroom_name>/<assignment_id>', methods=['POST'])
+    def submit_assignment(classroom_name, assignment_id):
+        if 'role' not in session or session.get('role') != 'Student':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id), "classroom_name": classroom_name})
+        if not assignment:
+            flash("Assignment not found!", "danger")
+            return render_template('viewAssignment.html', classroom_name=classroom_name, assignment_id=assignment_id)
+
+        submission = {
+            "student_username": session.get('username'),
+            "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "file_path": assignment.get('file_path'),
+            "grade": None,
+            "feedback": None
+        }
+
+        try:
+            result = mongo.db.assignments.update_one(
+                {"_id": ObjectId(assignment_id)},
+                {"$push": {"submissions": submission}}
+            )
+            if result.modified_count > 0:
+                flash("Assignment submitted successfully!", "success")
+            else:
+                flash("Submission failed. Please try again.", "danger")
+        except Exception as e:
+            flash(f"An error occurred: {str(e)}", "danger")
+
+        return render_template('submitAssignment.html', classroom_name=classroom_name, assignment_id=assignment_id)
+ 
