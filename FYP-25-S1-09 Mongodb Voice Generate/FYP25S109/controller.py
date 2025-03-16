@@ -179,6 +179,10 @@ class UnsuspendStudentController:
         else:
             return {"success": False, "message": "Failed to unsuspend the student."}
 
+class AdminSearchAccountController:
+    @staticmethod
+    def search_account(search_query):
+        return UserAccount.search_account(search_query)
 class SearchStudentController:
     @staticmethod
     def search_student(search_query):
@@ -197,9 +201,9 @@ class SearchClassroomController:
 class ViewAssignmentDetailsController:
     @staticmethod
     def view_assignment_details(assignment_id):
-        assn_id = assignment_id
-        print("assignment id from controller", assn_id)
-        return Assignment.get_assignment(assn_id)
+        print("assignment id from controller", assignment_id)
+        assignment = Assignment.get_assignment(assignment_id)
+        return assignment
 
 class SubmitAssignmentController:
     @staticmethod
