@@ -5,12 +5,9 @@
 
     <div class="classroom-section">
         <h3>📢 Announcements</h3>
-    
-        <!-- Only show Add Announcement button if user is a Teacher -->
         {% if session['role'] == 'Teacher' %}
             <a href="{{ url_for('boundary.add_announcement', classroom_name=classroom.classroom_name) }}" class="btn btn-warning">📢 Add Announcement</a>
         {% endif %}
-    
         <ul>
             {% if announcements %}
                 {% for announcement in announcements %}
@@ -26,11 +23,12 @@
         </ul>
     </div>
 
-        <!-- Materials -->
     <div class="classroom-section">
         <h3>📂 Materials</h3>
-        <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Material</a>
-        <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Materials</a>
+        {% if session['role'] == 'Teacher' %}
+            <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Material</a>
+            <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Materials</a>
+        {% endif %}
         <ul>
             {% if materials %}
                 {% for material in materials %}
@@ -46,11 +44,12 @@
         </ul>
     </div>
 
-    <!-- Assignments -->
     <div class="classroom-section">
         <h3>📄 Assignments</h3>
-        <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Assignment</a>
-        <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Assignments</a>
+        {% if session['role'] == 'Teacher' %}
+            <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Assignment</a>
+            <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Assignments</a>
+        {% endif %}
         <ul>
             {% if assignments %}
                 {% for assignment in assignments %}
@@ -59,7 +58,10 @@
                         <br>
                         <span>📅 Due: {{ assignment.deadline | default("Not specified") }}</span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id|string) }}" class="file-button">📄 View</a>
+                        <form action="{{ url_for('boundary.view_assignment_details', assignment_filename=assignment.filename) }}" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="assignment_filename" value="{{ assignment.filename}}">
+                            <button type="submit" class="btn btn-success">📄 View Assignment</button>
+                        </form>
                     </li>
                 {% endfor %}
             {% else %}
@@ -68,11 +70,12 @@
         </ul>
     </div>
 
-    <!-- Quizzes -->
     <div class="classroom-section">
         <h3>📝 Quizzes</h3>
-        <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Create Quiz</a>
-        <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Quizzes</a>
+        {% if session['role'] == 'Teacher' %}
+            <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Create Quiz</a>
+            <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Quizzes</a>
+        {% endif %}
         <ul>
             {% if quizzes %}
                 {% for quiz in quizzes %}
@@ -89,7 +92,6 @@
     </div>
 
     <style>
-        /* Style for View Button */
         .file-button {
             display: inline-block;
             padding: 5px 12px;
@@ -111,16 +113,7 @@
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             color: white;
-            margin-bottom: 20px; /* Add space between sections */
-        }
-
-        /* Keep Existing Dark Theme */
-        .classroom-section {
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            color: white;
+            margin-bottom: 20px;
         }
 
         .classroom-section h3 {
@@ -139,3 +132,6 @@
         }
     </style>
 {% endblock %}
+
+
+

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="material-view-container">
+        <h2>Viewing Material: {{ filename }}</h2>
+
+        <!-- View Material -->
+        <div class="material-frame">
+            {% if filename.endswith('.pdf') %}
+                <!-- Embed PDF -->
+                <iframe src="{{ url_for('static', filename='uploads/materials/' + filename) }}" 
+                        width="100%" height="600px" frameborder="0"></iframe>
+            {% elif filename.endswith('.ppt') or filename.endswith('.pptx') %}
+                <!-- Embed PPT using Google Docs Viewer -->
+                <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/materials/' + filename, _external=True) }}&embedded=true"
+                        width="100%" height="600px" frameborder="0"></iframe>
+            {% else %}
+                <p>Unsupported file format.</p>
+            {% endif %}
+        </div>
+
+        <!-- Buttons -->
+        <div class="buttons">
+            <a href="{{ url_for('static', filename='uploads/materials/' + filename) }}" class="btn btn-primary" download>⬇️ Download</a>
+            <!-- Back Button -->
+            <button class="btn btn-secondary" onclick="window.history.back();">Return to Previous Classroom</button>
+        </div>
+    </div>
+
+    <style>
+        .material-view-container {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .material-frame {
+            margin: 20px auto;
+            width: 80%;
+            height: 600px;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .buttons {
+            margin-top: 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+{% endblock %}
