@@ -791,7 +791,7 @@ from datetime import datetime
 
 class ViewClassRoomBoundary:
     @staticmethod
-    @boundary.route('/teacher/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
+    @boundary.route('/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
     def view_classroom(classroom_name):
         if 'role' not in session or session.get('role') not in ['Teacher', 'Student']:
             flash("Unauthorized access.", category='error')
@@ -1079,7 +1079,7 @@ class TeacherManageStudentsBoundary:
 
 #---------------------------------------------------------------------------------------
 
-class TeacherUploadMaterialBoundary:
+class TeacherManageMaterialBoundary:
     @boundary.route('/upload_material', methods=['POST'])
     def upload_material():
         classroom_name = request.form.get('classroom_name')
@@ -1131,15 +1131,14 @@ class TeacherUploadMaterialBoundary:
     def view_material(filename):
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         if os.path.exists(file_path):
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
-            return Response(file_content, mimetype='application/octet-stream')
+            return render_template('viewMaterial.html', filename=filename)
         else:
             flash('File not found!', 'danger')
             return redirect(url_for('boundary.manage_materials'))
 
 
-class TeacherUploadQuizBoundary:
+
+class TeacherManageQuizBoundary:
     UPLOAD_FOLDER_QUIZ = 'FYP25S109/static/uploads/quiz/'
 
     @staticmethod
@@ -1298,6 +1297,21 @@ class TeacherAssignmentBoundary:
 
         return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
     
+    
+    @staticmethod
+    @boundary.route('/view_assignment_details/<assignment_filename>/', methods=['GET', 'POST'])
+    def view_assignment_details(assignment_filename):
+        assignment = mongo.db.assignments.find_one({"filename": assignment_filename})
+        if not assignment:
+            flash("Assignment not found.", "danger")
+            return redirect(url_for('boundary.manage_assignments'))
+
+        return render_template('viewAssignment.html', assignment_filename=assignment_filename)
+    
+
+
+
+    
 # ------------------------------------------------------------- Quiz
 class TeacherCreateQuizBoundary:
     @boundary.route('/teacher/create_quiz/<classroom_name>', methods=['GET', 'POST'])
@@ -1360,17 +1374,6 @@ class TeacherManageQuizBoundary:
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
 
-@boundary.route('/teacher/view_assignment/<assignment_id>', methods=['GET'])
-def view_assignment(assignment_id):
-    try:
-        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
-        if not assignment:
-            flash("Assignment not found!", "danger")
-            return redirect(url_for('boundary.manage_assignments'))
-        return render_template("viewAssignment.html", assignment=assignment)
-    except Exception as e:
-        flash("Invalid Assignment ID!", "danger")
-        return redirect(url_for('boundary.manage_assignments'))
 
 class TeacherAnnouncementBoundary:
     @boundary.route('/teacher/add_announcement/<classroom_name>', methods=['GET', 'POST'])
@@ -1398,3 +1401,9 @@ class TeacherAnnouncementBoundary:
             return redirect(url_for('boundary.view_classroom', classroom_name=classroom_name))
 
         return render_template("addAnnouncement.html", classroom_name=classroom_name)
+    
+    def delete_announcement(announcement_id):
+        mongo.db.announcements.delete_one({"_id": ObjectId(announcement_id)})
+        flash("Announcement deleted successfully!", category='success')
+        return redirect(request.referrer)
+    

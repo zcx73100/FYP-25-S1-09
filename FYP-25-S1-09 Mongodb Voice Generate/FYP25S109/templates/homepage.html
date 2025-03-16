@@ -2,7 +2,7 @@
 {% block content %}
     <h2 class="section-title">Welcome to the Homepage</h2>
 
-    <!-- ✅ Video Section Restored -->
+    <!-- ✅ Video Section -->
     <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
@@ -20,7 +20,7 @@
         {% endif %}
     </div>
 
-    <!-- ✅ Avatars Section Restored -->
+    <!-- ✅ Avatars Section -->
     <h3 class="section-subtitle">Avatars</h3>
     <div class="avatar-grid">
         {% if avatars %}
@@ -63,7 +63,7 @@
                 </div>
                 <hr class="separator">
 
-                <!-- Materials -->
+                <!-- ✅ Materials -->
                 <div class="classroom-section">
                     <h5>📂 Recent Materials:</h5>
                     <ul>
@@ -73,11 +73,11 @@
                             <li>No materials available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-success">📂 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-success">📂 View More</a>
                 </div>
                 <hr class="separator">
 
-                <!-- Assignments -->
+                <!-- ✅ Assignments -->
                 <div class="classroom-section">
                     <h5>📄 Recent Assignments:</h5>
                     <ul>
@@ -87,11 +87,11 @@
                             <li>No assignments available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">📑 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-secondary">📑 View More</a>
                 </div>
                 <hr class="separator">
 
-                <!-- Quizzes -->
+                <!-- ✅ Quizzes -->
                 <div class="classroom-section">
                     <h5>📝 Recent Quizzes:</h5>
                     <ul>
@@ -101,7 +101,7 @@
                             <li>No quizzes available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">📚 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-primary">📚 View More</a>
                 </div>
             </div>
         {% endfor %}
