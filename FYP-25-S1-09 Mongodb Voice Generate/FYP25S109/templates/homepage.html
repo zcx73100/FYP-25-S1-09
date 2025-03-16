@@ -26,7 +26,7 @@
         {% if avatars %}
             {% for avatar in avatars %}
                 <div class="avatar-card">
-                    <img src="{{ url_for('static', filename='uploads/avatars/' + avatar.avatarname) }}" alt="{{ avatar.avatarname }}">
+                    <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}">
                     <h5>Uploaded by: {{ avatar.username }}</h5>
                 </div>
             {% endfor %}
@@ -36,6 +36,7 @@
     </div>
 
     <!-- ✅ Classroom Section -->
+    {% if session['username'] %}
     <h3 class="section-subtitle">Classrooms</h3>
     <div class="classroom-container">
         {% for classroom in classrooms %}
@@ -106,6 +107,8 @@
             </div>
         {% endfor %}
     </div>
+</div>
+{% endif %}
 
     <style>
         /* General Styles */
