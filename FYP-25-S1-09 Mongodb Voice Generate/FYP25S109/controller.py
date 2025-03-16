@@ -200,3 +200,8 @@ class ViewAssignmentDetailsController:
         assn_id = assignment_id
         print("assignment id from controller", assn_id)
         return Assignment.get_assignment(assn_id)
+
+class SubmitAssignmentController:
+    @staticmethod
+    def submit_assignment(assignment_id, username, file):
+        return Assignment.submit_assignment(assignment_id, username, file)

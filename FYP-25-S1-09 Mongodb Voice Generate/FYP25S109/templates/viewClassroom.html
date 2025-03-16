@@ -58,8 +58,9 @@
                         <br>
                         <span>📅 Due: {{ assignment.deadline | default("Not specified") }}</span>
                         <br>
-                        <form action="{{ url_for('boundary.view_assignment_details', assignment_filename=assignment.filename) }}" method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="assignment_filename" value="{{ assignment.filename}}">
+                        <form action="{{ url_for('boundary.view_assignment_details') }}" method="POST">
+                            <input type="hidden" name="classroom_name" value="{{ classroom.classroom_name }}">
+                            <input type="hidden" name="assignment_id" value="{{ assignment.assignment_id }}">
                             <button type="submit" class="btn btn-success">📄 View Assignment</button>
                         </form>
                     </li>

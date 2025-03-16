@@ -12,6 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from io import BytesIO
 from bson import ObjectId
 import pyttsx3
+from flask import flash, session, redirect, url_for
 
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
@@ -714,6 +715,16 @@ class Assignment:
         except Exception as e:
             logging.error(f"Failed to find assignment by ID: {str(e)}")
             return None
+        
+    @staticmethod
+    def submit_assignment(assignment_id, username, file):
+        # Example: Save file to the database or storage
+        if not file.filename.endswith(('.pdf', '.docx', '.txt')):  
+            return {"success": False, "message": "Invalid file type."}
+
+        # Assume we save the file and update DB here
+        return {"success": True, "message": "Assignment submitted successfully!"}
+
 
         
 class Quiz:
