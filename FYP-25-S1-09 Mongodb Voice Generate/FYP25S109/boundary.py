@@ -12,9 +12,9 @@ from FYP25S109.controller import *
 from FYP25S109.entity import * 
 
 boundary = Blueprint('boundary', __name__)
-UPLOAD_FOLDER = 'static/uploads/materials'
+UPLOAD_FOLDER = 'FYP25S109/static/uploads/materials'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-ASSIGNMENT_UPLOAD_FOLDER = 'static/uploads/assignments'
+ASSIGNMENT_UPLOAD_FOLDER = 'FYP25S109/static/uploads/assignments'
 os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
@@ -1131,11 +1131,18 @@ class TeacherManageMaterialBoundary:
     @boundary.route('/view_material/<filename>')
     def view_material(filename):
         file_path = os.path.join(UPLOAD_FOLDER, filename)
-        if os.path.exists(file_path):
-            return render_template('viewMaterial.html', filename=filename)
-        else:
+        
+        if not os.path.exists(file_path):
             flash('File not found!', 'danger')
             return redirect(url_for('boundary.manage_materials'))
+
+        text_content = None
+        if filename.endswith('.txt') or filename.endswith('.md'):
+            with open(file_path, 'r', encoding='utf-8') as file:
+                text_content = file.read()
+
+        return render_template('viewMaterial.html', filename=filename, text_content=text_content)
+
 
 
 
