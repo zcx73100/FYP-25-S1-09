@@ -672,15 +672,8 @@ class ManageUserBoundary:
             return redirect(url_for('boundary.home'))
 
         query = request.args.get('query', '')
-        users = list(mongo.db.useraccount.find(
-            {"$or": [
-                {"username": {"$regex": query, "$options": "i"}},
-                {"email": {"$regex": query, "$options": "i"}},
-                {"role": {"$regex": query, "$options": "i"}}
-            ]},
-            {"_id": 0, "username": 1, "email": 1, "role": 1, "status": 1}
-        ))
-
+        users = AdminSearchAccountController.search_account(query)
+        
         return render_template("manageUsers.html", users=users)
 
     @staticmethod
@@ -1307,16 +1300,10 @@ class TeacherAssignmentBoundary:
     
     
     @staticmethod
-    @boundary.route('/view_assignment_details/<assignment_filename>/', methods=['GET', 'POST'])
-    def view_assignment_details(assignment_filename):
-        assignment = mongo.db.assignments.find_one({"filename": assignment_filename})
-        if not assignment:
-            flash("Assignment not found.", "danger")
-            return redirect(url_for('boundary.manage_assignments'))
-
-        return render_template('viewAssignment.html', assignment_filename=assignment_filename)
-    
-
+    @boundary.route('/view_assignment_details/<classroom_name>/<assignment_filename>/', methods=['GET'])
+    def view_assignment_details(classroom_name, assignment_filename):
+        assignment = ViewAssignmentDetailsController.view_assignment_details(assignment_filename)
+        return render_template('viewAssignment.html', assignment=assignment,classroom_name=classroom_name)
 
 
     
