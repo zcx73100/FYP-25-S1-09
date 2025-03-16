@@ -19,14 +19,15 @@
 
         <!-- Submission Form (Only for Students) -->
         {% if session['role'] == 'Student' %}
-            <div class="submission-section">
-                <h3>Submit Your Work</h3>
-                <form action="{{ url_for('boundary.submit_assignment', assignment_id=assignment_id) }}" method="POST" enctype="multipart/form-data">
-                    <input type="file" name="submission_file" required>
-                    <button type="submit" class="btn btn-success">📤 Submit</button>
-                </form>
-            </div>
-        {% endif %}
+        <div class="submission-section">
+            <h3>Submit Your Work</h3>
+            <form action="{{ url_for('boundary.submit_assignment', classroom_name = classroom_name, assignment_id = assignment_id) }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="classroom_name" value="{{ classroom_name }}">
+                <input type="hidden" name="assignment_id" value="{{ assignment_id }}">
+                <button type="submit" class="btn btn-success">📤 Submit</button>
+            </form>
+        </div>
+    {% endif %}
 
         <!-- View Previous Submissions -->
         <div class="submissions">
