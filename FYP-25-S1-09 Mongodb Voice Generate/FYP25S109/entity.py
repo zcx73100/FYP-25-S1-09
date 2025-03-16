@@ -668,7 +668,7 @@ class Assignment:
 
             self.file.save(file_path)
 
-            mongo.db.assignment.insert_one({
+            mongo.db.assignments.insert_one({
                 'title': self.title,
                 'file_name': filename,
                 'file_path': file_path,
@@ -687,7 +687,7 @@ class Assignment:
     def search_assignment(search_query):
         try:
             # Use case-insensitive and partial matching
-            assignments = mongo.db.assignment.find({
+            assignments = mongo.db.assignments.find({
                 "title": {"$regex": search_query, "$options": "i"}
             })
             return list(assignments)
@@ -698,21 +698,23 @@ class Assignment:
     @staticmethod
     def delete_assignment(assignment_id):
         try:
-            assignment = mongo.db.assignment.find_one({"_id": assignment_id})
+            assignment = mongo.db.assignments.find_one({"_id": assignment_id})
             if assignment:
                 os.remove(assignment['file_path'])
         except Exception as e:
             logging.error(f"Error deleting assignment: {str(e)}")
             return {"success": False, "message": str(e)}
-
+    
     @staticmethod
-    def find_by_id(assignment_id):
+    def get_assignment(assignment_id):
         try:
-            assignment = mongo.db.assignment.find_one({"_id": assignment_id})
+            print(assignment_id)
+            assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
             return assignment
         except Exception as e:
             logging.error(f"Failed to find assignment by ID: {str(e)}")
             return None
+
         
 class Quiz:
     def __init__(self, title=None, questions=None, username=None, user_role=None, description=None):

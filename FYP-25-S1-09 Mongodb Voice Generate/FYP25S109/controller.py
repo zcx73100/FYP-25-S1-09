@@ -1,6 +1,8 @@
 from .entity import *
 from .boundary import *
 import requests
+import json
+from bson import ObjectId
 
 
 OPENSHOT_API_URL = "https://cloud.openshot.org/api"
@@ -191,3 +193,10 @@ class SearchClassroomController:
     @staticmethod
     def search_classroom(search_query):
         return Classroom.search_classroom(search_query)
+
+class ViewAssignmentDetailsController:
+    @staticmethod
+    def view_assignment_details(assignment_id):
+        assn_id = assignment_id
+        print("assignment id from controller", assn_id)
+        return Assignment.get_assignment(assn_id)
