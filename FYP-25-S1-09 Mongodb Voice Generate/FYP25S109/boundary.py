@@ -41,15 +41,29 @@ class HomePage:
             {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
         ))
 
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1, 'upload_date': 1}))
+        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1,  "username": 1, 'upload_date': 1}))
         username = session.get("username", None)
         role = session.get("role", None)
 
         classrooms = []
+
         if role == "Teacher":
-            classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 0, "classroom_name": 1, "description": 1}))
+            classrooms = list(mongo.db.classroom.find(
+                {"teacher": username},
+                {"_id": 0, "classroom_name": 1, "description": 1}
+            ))
+
         elif role == "Student":
-            classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 0, "classroom_name": 1, "description": 1}))
+            classrooms = list(mongo.db.classroom.find(
+                {"student_list": username},
+                {"_id": 0, "classroom_name": 1, "description": 1}
+            ))
+
+        elif role == "Admin":
+            classrooms = list(mongo.db.classroom.find(
+                {},  # ✅ No filter, Admins see all classrooms
+                {"_id": 0, "classroom_name": 1, "description": 1}
+            ))
 
         # ✅ Fetch Classroom-Specific Announcements
         announcements = {c["classroom_name"]: list(mongo.db.announcements.find(
