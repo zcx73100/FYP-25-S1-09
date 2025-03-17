@@ -12,7 +12,6 @@
                 <th>Title</th>
                 <th>Description</th>
                 <th>Deadline</th>
-                <th>Submissions</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -23,25 +22,20 @@
                 <td>{{ assignment.description }}</td>
                 <td>{{ assignment.deadline }}</td>
                 <td>
-                    {% for submission in assignment.submissions %}
-                        <p>{{ submission.student_username }}: 
-                            {% if submission.grade %}
-                                Graded ({{ submission.grade }})
-                            {% else %}
-                                Pending
-                            {% endif %}
-                        </p>
-                    {% endfor %}
-                </td>
-                <td>
-                    <form action="{{ url_for('boundary.delete_assignment', classroom_name=classroom_name, assignment_id=assignment._id) }}" method="POST">
-                        <button type="submit" class="btn btn-danger">Delete</button>
+                    <!-- Button to view submissions -->
+                    <a href="{{ url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
+                       class="btn btn-info btn-sm">View Submissions</a>
+
+                    <!-- Delete button -->
+                    <form action="{{ url_for('boundary.delete_assignment', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
+                          method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                     </form>
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="5" class="text-center">No assignments uploaded yet.</td>
+                <td colspan="4" class="text-center">No assignments uploaded yet.</td>
             </tr>
             {% endfor %}
         </tbody>

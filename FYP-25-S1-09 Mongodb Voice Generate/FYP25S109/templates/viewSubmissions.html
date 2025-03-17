@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}View Submissions{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Submissions for Assignment: {{ assignment.title }}</h2>
+    <p class="text-muted">Classroom: {{ classroom_name }}</p>
+
+    <!-- Display flash messages (if any) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Submissions Table -->
+    {% if submissions %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Submission Date</th>
+                    <th>File</th>
+                    <th>Grade</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for submission in submissions %}
+                    <tr>
+                        <td>{{ submission.student_username }}</td>
+                        <td>{{ submission.submission_date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            <a href="{{ url_for('static', filename='uploads/submissions/' + submission.filename) }}" 
+                               download="{{ submission.filename }}" class="btn btn-outline-primary btn-sm">
+                                📄 Download
+                            </a>
+                        </td>
+                        <td>
+                            {% if submission.grade %}
+                                {{ submission.grade }}
+                            {% else %}
+                                <span class="text-muted">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <!-- Grade Submission Button -->
+                            <a href="{{ url_for('boundary.grade_submission', classroom_name=classroom_name, assignment_id=assignment._id, submission_id=submission._id) }}" 
+                               class="btn btn-warning btn-sm">
+                                ✏️ Grade
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info">
+            No submissions have been made for this assignment yet.
+        </div>
+    {% endif %}
+
+    <!-- Back Button -->
+    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom_name) }}" class="btn btn-secondary mt-3">
+        ↩️ Back to Assignments
+    </a>
+</div>
+{% endblock %}
