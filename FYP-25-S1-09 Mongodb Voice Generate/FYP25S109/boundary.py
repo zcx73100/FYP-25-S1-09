@@ -1266,6 +1266,7 @@ class TeacherAssignmentBoundary:
         if not assignment:
             flash("Assignment not found!", "danger")
             return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+        
 
         return render_template('viewSubmissions.html', assignment=assignment, classroom_name=classroom_name)
 
