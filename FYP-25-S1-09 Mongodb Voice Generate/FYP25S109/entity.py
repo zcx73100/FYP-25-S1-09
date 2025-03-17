@@ -229,7 +229,6 @@ class TutorialVideo:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
 
-
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
         self.image_file = image_file
@@ -360,13 +359,11 @@ class Avatar:
         return False
 
 class GenerateVideoEntity:
-    def __init__(self, text, avatar_path):
+    def __init__(self, text, avatar_path=None):
         self.text = text
         self.avatar_path = avatar_path
         self.audio_filename = f"{hash(self.text)}.wav"
         self.audio_path = os.path.join(GENERATE_FOLDER_AUDIOS, self.audio_filename)
-        self.video_filename = f"generated_{hash(self.text)}.mp4"
-        self.video_path = os.path.join(GENERATE_FOLDER_VIDEOS, self.video_filename)
 
     def generate_voice(self):
         """Converts text to speech and saves it as an audio file."""
@@ -377,28 +374,37 @@ class GenerateVideoEntity:
             engine.setProperty("rate", 150)
             engine.setProperty("volume", 1.0)
 
+            print(f"🔊 Generating audio for: {self.text}")
             engine.save_to_file(self.text, self.audio_path)
             engine.runAndWait()
 
             if os.path.exists(self.audio_path):
-                return os.path.join("static", "generated_audios", self.audio_filename)           
+                print(f"✅ Audio generated successfully: {self.audio_path}")
+                return self.audio_path  
             else:
                 raise Exception("❌ Failed to generate audio file.")
 
         except Exception as e:
-            print(f"❌ Error generating voice: {str(e)}")
+            print(f"❌ Error generating voice: {str(e)}")  
             raise e
 
     def generate_video(self):
-        """Generates a video using SadTalker and the selected avatar with generated voice."""
+        """Generates a video using SadTalker API with the selected avatar & generated voice."""
         try:
             os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 
-            # Ensure voice has been generated
+            # ✅ Ensure required files exist
             if not os.path.exists(self.audio_path):
-                raise Exception("❌ Audio file not found. Generate voice first.")
+                raise Exception(f"❌ Audio file not found: {self.audio_path}")
 
-            # SadTalker API call
+            if not os.path.exists(self.avatar_path):
+                raise Exception(f"❌ Avatar file not found: {self.avatar_path}")
+
+            print(f"🎬 Sending files to SadTalker API:")
+            print(f"🖼️ Avatar: {self.avatar_path}")
+            print(f"🔊 Audio: {self.audio_path}")
+
+            # 🎯 **SadTalker API Call**
             response = requests.post(
                 "https://kevinwang676-sadtalker.hf.space/run/predict",
                 files={
@@ -407,17 +413,22 @@ class GenerateVideoEntity:
                 }
             )
 
+            # ✅ Check API Response
             if response.status_code == 200:
                 with open(self.video_path, "wb") as f:
                     f.write(response.content)
-                return os.path.join("static", "generated_videos", self.video_filename)
+
+                print(f"✅ Video generated successfully: {self.video_path}")
+
+                # Return the relative URL for frontend display
+                return f"/static/generated_videos/{self.video_filename}"
             else:
                 raise Exception(f"❌ SadTalker failed with status {response.status_code}.")
 
         except Exception as e:
             print(f"❌ Error generating video: {str(e)}")
             raise e
-        
+
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):
         self.classroom_name = classroom_name
@@ -716,9 +727,6 @@ class Assignment:
             logging.error(f"Failed to find assignment by ID: {str(e)}")
             return None
         
-
-
-        
 class Quiz:
     def __init__(self, title=None, questions=None, username=None, user_role=None, description=None):
         self.title = title
@@ -783,7 +791,6 @@ class Quiz:
         except Exception as e:
             logging.error(f"Error deleting quiz: {str(e)}")
             return {"success": False, "message": str(e)}
-        
         
 class Submission:
     def __init__(self, assignment_id, student, file, submission_date=None):

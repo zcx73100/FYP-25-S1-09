@@ -12,13 +12,9 @@
             <textarea id="text" name="text" class="form-control" required></textarea>
         </div>
 
-        <!-- Generate Voice Button -->
         <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">Generate Voice</button>
 
-        <!-- Audio Preview -->
         <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
-
-        <!-- Hidden input to store generated audio path -->
         <input type="hidden" id="audioPath" name="audioPath">
 
         <div class="mb-3">
@@ -39,57 +35,79 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100">Generate Video</button>
-    </form>
 
-    <script>
-        document.getElementById("generateVoice").addEventListener("click", function() {
-            let enteredText = document.getElementById("text").value.trim();
-            let errorMsg = document.getElementById("error-message");
-            let audioPreview = document.getElementById("audioPreview");
-        
-            if (!enteredText) {
+        <div id="progress-container" style="display: none; margin-top: 20px;">
+            <label class="form-label">Video Generation Progress:</label>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" 
+                    style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    0%
+                </div>
+            </div>
+            <p id="time-left" class="text-center mt-2"></p>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("✅ JavaScript Loaded");  // ✅ Confirm JavaScript is running
+    
+        let errorMsg = document.getElementById("error-message");
+        let audioPathInput = document.getElementById("audioPath");
+        let generateVoiceBtn = document.getElementById("generateVoice");
+        let audioPreview = document.getElementById("audioPreview");
+    
+        if (!generateVoiceBtn) {
+            console.log("❌ ERROR: Generate Voice button not found!");
+            return;
+        }
+    
+        generateVoiceBtn.addEventListener("click", function() {
+            console.log("🎤 Generate Voice button clicked!");
+    
+            let textInput = document.getElementById("text").value.trim();
+            if (!textInput) {
                 errorMsg.innerText = "❌ Error: Please enter text before generating voice.";
                 errorMsg.style.display = "block";
+                console.log("❌ No text entered!");
                 return;
             }
-        
+    
             errorMsg.style.display = "none";
-        
+            console.log("📤 Sending request to generate voice...");
+    
             fetch("/generate_voice", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ text: enteredText })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: textInput })
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("📥 Response received:", response);
+                return response.json();
+            })
             .then(data => {
-                if (data.success && data.audio_url) {
-                    let audioFilePath = data.audio_url;
-        
-                    // Ensure the file exists before setting src
-                    fetch(audioFilePath, { method: "HEAD" })
-                    .then(response => {
-                        if (response.ok) {
-                            audioPreview.src = audioFilePath;
-                            audioPreview.style.display = "block";
-                        } else {
-                            errorMsg.innerText = "❌ Error: Audio file not found.";
-                            errorMsg.style.display = "block";
-                        }
-                    });
-        
+                console.log("📥 Received Voice Response:", data);
+                if (data.success) {
+                    console.log("✅ Voice generated:", data.audio_url);
+                    audioPathInput.value = data.audio_url;
+                    audioPreview.src = data.audio_url;
+                    audioPreview.style.display = "block";
+                    audioPreview.play();
                 } else {
+                    console.log("❌ Server Error:", data.error);
                     errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate voice.");
                     errorMsg.style.display = "block";
                 }
             })
             .catch(error => {
+                console.log("❌ Fetch Error:", error);
                 errorMsg.innerText = "❌ Fetch Error: " + error.message;
                 errorMsg.style.display = "block";
             });
         });
-        
-    </script>
+    });
+    
+</script>
 
 {% endblock %}
