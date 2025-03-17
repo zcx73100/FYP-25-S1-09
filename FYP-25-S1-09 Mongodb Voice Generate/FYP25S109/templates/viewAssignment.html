@@ -1,16 +1,28 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Display Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+    <div class="flash-messages">
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endwith %}
     <div class="assignment-view-container">
-        <h2>Viewing Assignment: {{ assignment.filename }}</h2>
+        <h2>Viewing Assignment: {{ filename }}</h2>
 
         <!-- Display Assignment File -->
         <div class="assignment-frame">
-            {% if assignment.filename.endswith('.pdf') %}
-                <iframe src="{{ url_for('static', filename='uploads/assignments/' + assignment_filename) }}" 
+            {% if filename.endswith('.pdf') %}
+                <iframe src="{{ url_for('static', filename='uploads/assignments/' + filename) }}" 
                         width="100%" height="600px" frameborder="0"></iframe>
-            {% elif assignment.filename.endswith('.doc') or filename.endswith('.docx') %}
-                <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/assignments/' + assignment_filename, _external=True) }}&embedded=true"
+            {% elif filename.endswith('.doc') or filename.endswith('.docx') %}
+                <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/assignments/' + filename, _external=True) }}&embedded=true"
                         width="100%" height="600px" frameborder="0"></iframe>
             {% else %}
                 <p>Unsupported file format.</p>
@@ -21,43 +33,46 @@
         {% if session['role'] == 'Student' %}
         <div class="submission-section">
             <h3>Submit Your Work</h3>
-            <form action="{{ url_for('boundary.submit_assignment', classroom_name = classroom_name, assignment_id = assignment_id) }}" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="classroom_name" value="{{ classroom_name }}">
-                <input type="hidden" name="assignment_id" value="{{ assignment_id }}">
-                <button type="submit" class="btn btn-success">📤 Submit</button>
-            </form>
+            <form action="{{ url_for('boundary.submit_assignment', assignment_id = assignment._id, filename=filename) }}" 
+                  method="POST" enctype="multipart/form-data">
+                <input type="file" name="file">
+                <input type="hidden" name="assignment_filename" value="{{ filename }}">
+                <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
+                <input type="hidden" name="student_name" value="{{ session['username'] }}">
+                <button type="submit">Submit</button>
+            <p id="submission-status"></p>
         </div>
-    {% endif %}
+        {% endif %}
 
-        <!-- View Previous Submissions -->
+
+        <!-- View Student Submissions-->
+        {% if session['role'] == 'Teacher' %}
         <div class="submissions">
-            <h3>Previous Submissions</h3>
+            <h3>Student Submissions</h3>
             <ul>
                 {% if submissions %}
                     {% for submission in submissions %}
                         <li>
-                            <strong>{{ submission.student_name }}</strong>: 
-                            <a href="{{ url_for('static', filename='uploads/submissions/' + submission._filename) }}" class="file-button" download>
-                                📄 Download Submission
-                            </a>
+                            <strong>{{ submission.student_name }}</strong>: {{ submission.submission_date }}
+                            <br>
+                            <a href="{{ url_for('boundary.view_submission', filename=submission.filename) }}" class="file-button">📄 View</a>
                         </li>
                     {% endfor %}
                 {% else %}
-                    <li>No submissions yet.</li>
+                    <li>No submissions available.</li>
                 {% endif %}
             </ul>
-        </div>
-
+            {% endif %}
+            
         <!-- Buttons -->
         <div class="buttons">
-            <a href="{{ url_for('static', filename='uploads/assignments/' + assignment_filename) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
-            <button class="btn btn-secondary" onclick="window.history.back();">Return to Classroom</button>
+            <a href="{{ url_for('static', filename='uploads/assignments/' + filename) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
+            <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">Return Home</a>
         </div>
     </div>
-
     <style>
         .assignment-view-container {
-            text-align: center;
+            text-align: center
             padding: 20px;
         }
 

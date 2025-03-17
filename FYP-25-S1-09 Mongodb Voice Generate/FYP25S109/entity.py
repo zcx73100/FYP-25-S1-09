@@ -716,14 +716,6 @@ class Assignment:
             logging.error(f"Failed to find assignment by ID: {str(e)}")
             return None
         
-    @staticmethod
-    def submit_assignment(assignment_id, username, file):
-        # Example: Save file to the database or storage
-        if not file.filename.endswith(('.pdf', '.docx', '.txt')):  
-            return {"success": False, "message": "Invalid file type."}
-
-        # Assume we save the file and update DB here
-        return {"success": True, "message": "Assignment submitted successfully!"}
 
 
         
@@ -793,4 +785,49 @@ class Quiz:
             return {"success": False, "message": str(e)}
         
         
-        
+class Submission:
+    def __init__(self, assignment_id, student, file, submission_date=None):
+        self.assignment_id = assignment_id
+        self.student = student
+        self.file = file
+        self.submission_date = submission_date or datetime.now()
+
+    def save_submission(self):
+        """
+        Saves the submission to the database.
+        """
+        try:
+            if not self.file:
+                raise ValueError("No file selected for upload.")
+
+            # Secure the filename and define the file path
+            filename = secure_filename(self.file.filename)
+            file_path = os.path.join("FYP25S109/static/uploads/submissions/", filename)
+            student = self.student
+            print(student)
+
+            # Ensure the upload directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # Save the file to the server
+            self.file.save(file_path)
+            submission= {
+                'assignment_id': ObjectId(self.assignment_id),
+                'student': student,
+                'file_name': filename,
+                'file_path': file_path,
+                'submission_date': self.submission_date
+            }
+            # Insert submission into MongoDB
+            mongo.db.submissions.insert_one(submission)
+
+            mongo.db.assignments.update_one(
+                {"_id": ObjectId(self.assignment_id)},
+                {"$push": {"submissions": submission}}
+            )
+
+            return {"success": True, "message": "Submission uploaded successfully."}
+
+        except Exception as e:
+            logging.error(f"Error saving submission: {str(e)}")
+            return {"success": False, "message": str(e)}
