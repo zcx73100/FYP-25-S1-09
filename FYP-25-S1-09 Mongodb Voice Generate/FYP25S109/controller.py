@@ -52,7 +52,7 @@ class UploadTutorialController:
         video = TutorialVideo(title=title, video_file=file, username=uploader, user_role=user_role)
         return video.save_video()  # Call entity method
     
-class AdminDeleteVideoController:
+class DeleteVideoController:
     @staticmethod
     def delete_video(video_id):
         return TutorialVideo.delete_video(video_id)  # Call entity method
