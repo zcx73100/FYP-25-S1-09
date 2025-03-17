@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, Response
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory
 from datetime import datetime
 from . import mongo
 import os
@@ -8,9 +8,12 @@ from datetime import datetime
 from bson import ObjectId
 from markupsafe import Markup
 import base64
-
+import threading
+import time
+from gradio_client import Client
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
+
 
 boundary = Blueprint('boundary', __name__)
 UPLOAD_FOLDER = 'FYP25S109/static/uploads/materials'
@@ -20,7 +23,13 @@ os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
-OPENSHOT_API_URL = "https://cloud.openshot.org/api/projects/"
+API_URL = "https://kevinwang676-sadtalker.hf.space/"
+client = Client(API_URL)
+
+GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
+GENERATE_FOLDER_VIDEOS = 'FYP25S109/static/generated_videos'
+os.makedirs(GENERATE_FOLDER_AUDIOS, exist_ok=True)
+os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 
 def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -101,108 +110,120 @@ class HomePage:
         )
 
 
-
-
-
-
-
 # Generate Video 
-class GenerateVideoBoundary:
-    @staticmethod
-    @boundary.route('/generate_video', methods=['POST'])
-    def generate_video():
-        if 'username' not in session:
-            return jsonify({"success": False, "error": "User not logged in"}), 401
+video_progress = {}
 
+@boundary.route("/generate_voice", methods=["POST"])
+def generate_voice():
+    """Handles text-to-speech voice generation."""
+    try:
         data = request.get_json()
         text = data.get("text")
-        selected_avatar = data.get("selected_avatar")
 
-        if not text or not selected_avatar:
-            return jsonify({"success": False, "error": "Text or avatar not provided"}), 400
+        if not text:
+            print("❌ Error: No text received!")
+            return jsonify({"success": False, "error": "Text is required"}), 400
 
-        username = session.get("username", "Guest")
+        print(f"📝 Received text for voice generation: {text}")
 
-        print(f"Generating video for user: {username} with text: {text} and avatar: {selected_avatar}")
+        # ✅ Generate voice
+        voice_entity = GenerateVideoEntity(text)
+        audio_url = voice_entity.generate_voice()
 
-        headers = {
-            "Authorization": f"Token 9054f7aa9305e012b3c2300408c3dfdf390fcddf",
-            "Content-Type": "application/json"
-        }
+        # ✅ Debugging: Ensure file exists
+        audio_path = os.path.join(GENERATE_FOLDER_AUDIOS, os.path.basename(audio_url))
+        if not os.path.exists(audio_path):
+            print(f"❌ Error: File not saved at {audio_path}")
+            return jsonify({"success": False, "error": "Failed to save audio file"}), 500
 
-        # Step 1: Create a new project in OpenShot
-        payload = {
-            "name": f"Generated Video - {username}",
-            "description": text,
-            "fps_num": 30,
-            "fps_den": 1,
-            "width": 1920,
-            "height": 1080,
-            "video_length": 10
-        }
+        print(f"✅ Audio file saved: {audio_path}")
+        return jsonify({"success": True, "audio_url": f"/static/generated_audios/{os.path.basename(audio_url)}"})
 
-        try:
-            response = requests.post(OPENSHOT_API_URL, json=payload, headers=headers)
-            response_data = response.json()
-
-            if response.status_code != 201:
-                return jsonify({"success": False, "error": "Failed to create OpenShot project"}), 500
-
-            project_id = response_data.get("id")  # ✅ Get project ID
-
-            # Step 2: Upload the avatar as a media file
-            UPLOAD_URL = "https://cloud.openshot.org/api/files/"
-            with open(f"FYP25S109/static/{selected_avatar}", "rb") as avatar_file:
-                files = {"file": avatar_file}
-                upload_response = requests.post(UPLOAD_URL, files=files, headers=headers)
-
-            if upload_response.status_code != 201:
-                return jsonify({"success": False, "error": "Failed to upload avatar file"}), 500
-
-            file_id = upload_response.json().get("id")  # ✅ Get uploaded file ID
-
-            # Step 3: Add the uploaded avatar file as a clip
-            ADD_CLIP_URL = "https://cloud.openshot.org/api/clips/"
-            clip_payload = {
-                "project": project_id,
-                "file_id": file_id,
-                "start": 0,
-                "end": 10,  # Adjust duration as needed
-                "layer": 1
-            }
-            clip_response = requests.post(ADD_CLIP_URL, json=clip_payload, headers=headers)
-
-            if clip_response.status_code != 201:
-                return jsonify({"success": False, "error": "Failed to add clip to project"}), 500
-
-            # Step 4: Export the project
-            EXPORT_URL = "https://cloud.openshot.org/api/exports/"
-            export_payload = {
-                "project": project_id,
-                "video_format": "mp4"
-            }
-            export_response = requests.post(EXPORT_URL, json=export_payload, headers=headers)
-
-            if export_response.status_code == 201:
-                export_id = export_response.json().get("id")
-                return jsonify({"success": True, "export_id": export_id, "message": "Video generation started!"})
-            else:
-                return jsonify({"success": False, "error": "Failed to start video export"}), 500
-
-        except Exception as e:
-            return jsonify({"success": False, "error": f"OpenShot API request failed: {str(e)}"}), 500
-
-
-    @staticmethod
-    @boundary.route('/generate_video', methods=['GET'])
-    def generate_video_page():
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1}))  # Retrieve only file_path
-
-        # Extract avatar paths
-        available_avatars = [avatar["file_path"] for avatar in avatars]
-
-        return render_template("generateVideo.html", available_avatars=available_avatars)
+    except Exception as e:
+        print(f"❌ Server error: {e}")
+        return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
     
+@boundary.route("/generate_video", methods=["GET"])
+def generate_video_page():
+    """Loads the Generate Video Page with available avatars."""
+    try:
+        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
+        return render_template("generateVideo.html", avatars=avatars)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to load avatars: {str(e)}"}), 500
+
+@boundary.route("/generate_video", methods=["POST"])
+def generate_video():
+    """Handles video generation requests via SadTalker API."""
+    try:
+        print("📥 Received video generation request")  
+        data = request.get_json()
+
+        if not data:
+            print("❌ Error: No data received!")
+            return jsonify({"success": False, "error": "No data received"}), 400
+
+        print(f"🔹 Request Data: {data}")
+
+        text = data.get("text")
+        avatar_path = data.get("selected_avatar")
+        audio_path = data.get("audio_path")
+
+        if not text or not avatar_path or not audio_path:
+            print("❌ Missing required parameters!")
+            return jsonify({"success": False, "error": "Text, avatar, and audio are required!"}), 400
+
+        print(f"🖼️ Avatar URL: {avatar_path}")
+        print(f"🔊 Audio URL: {audio_path}")
+
+        # ✅ Call the entity to generate video
+        video_entity = GenerateVideoEntity(text, avatar_path)
+        video_url = video_entity.generate_video(audio_path)
+
+        if not video_url:
+            print("❌ Video generation failed!")
+            return jsonify({"success": False, "error": "Failed to generate video"}), 500
+
+        print(f"✅ Video generated: {video_url}")
+        return jsonify({"success": True, "video_url": video_url})
+
+    except Exception as e:
+        print(f"❌ Server error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def process_video(video_id, text, avatar_path, audio_path):
+    try:
+        for i in range(0, 101, 10):
+            video_progress[video_id] = i
+            time.sleep(3)
+
+        result = client.predict(avatar_path, audio_path, "crop", True, True, 0, "256", 0, fn_index=0)
+
+        if not result:
+            video_progress[video_id] = -1
+            return
+
+        video_filename = os.path.basename(result)
+        video_path = f"/static/generated_videos/{video_filename}"
+        video_progress[video_id] = 100
+
+    except Exception as e:
+        video_progress[video_id] = -1
+
+@boundary.route("/video_status", methods=["GET"])
+def video_status():
+    video_id = request.args.get("video_id")
+
+    if video_id not in video_progress:
+        return jsonify({"success": False, "error": "Invalid video ID"}), 400
+
+    progress = video_progress[video_id]
+    time_left = (100 - progress) // 10 * 3
+
+    return jsonify({"success": True, "progress": progress, "time_left": time_left})    
+
+
 # Log In
 class LoginBoundary:
     @staticmethod
