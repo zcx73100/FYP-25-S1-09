@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from bson import ObjectId
 from markupsafe import Markup
+import base64
 
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
@@ -686,7 +687,7 @@ class ManageUserBoundary:
             return redirect(url_for('boundary.home'))
 
         query = request.args.get('query', '')
-        users = AdminSearchAccountController.search_account(query)
+        users = SearchAccountController.search_account(query)
         
         return render_template("manageUsers.html", users=users)
 
@@ -1265,6 +1266,7 @@ class TeacherAssignmentBoundary:
         if not assignment:
             flash("Assignment not found!", "danger")
             return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+        
 
         return render_template('viewSubmissions.html', assignment=assignment, classroom_name=classroom_name)
 
@@ -1314,10 +1316,18 @@ class TeacherAssignmentBoundary:
     
     
     @staticmethod
-    @boundary.route('/view_assignment_details/<classroom_name>/<assignment_filename>/', methods=['GET'])
-    def view_assignment_details(classroom_name, assignment_filename):
-        assignment = ViewAssignmentDetailsController.view_assignment_details(assignment_filename)
-        return render_template('viewAssignment.html', assignment=assignment,classroom_name=classroom_name)
+    @boundary.route('/view_assignment/<assignment_id>/<filename>')
+    def view_assignment(assignment_id, filename):
+        # Fetch the assignment from the database using assignment_id (if needed)
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+
+
+        file_path = os.path.join(ASSIGNMENT_UPLOAD_FOLDER, filename)
+        
+        flash("Assignment submitted successfully!", "success")
+        return render_template('viewAssignment.html', assignment=assignment, filename=filename)
+    
+
 
 
     
@@ -1416,38 +1426,46 @@ class TeacherAnnouncementBoundary:
         flash("Announcement deleted successfully!", category='success')
         return redirect(request.referrer)
     
+
 class StudentAssignmentBoundary:
+    UPLOAD_FOLDER = "FYP25S109/static/uploads/submissions/"
+    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
+
     @staticmethod
-    @boundary.route('/student/submit_assignment/<classroom_name>/<assignment_id>', methods=['POST'])
-    def submit_assignment(classroom_name, assignment_id):
-        if 'role' not in session or session.get('role') != 'Student':
-            flash("Unauthorized access.", category='error')
-            return redirect(url_for('boundary.home'))
+    def allowed_file(filename):
+        """
+        Checks if the file has an allowed extension.
+        """
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in StudentAssignmentBoundary.ALLOWED_EXTENSIONS
 
-        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id), "classroom_name": classroom_name})
-        if not assignment:
-            flash("Assignment not found!", "danger")
-            return render_template('viewAssignment.html', classroom_name=classroom_name, assignment_id=assignment_id)
-
-        submission = {
-            "student_username": session.get('username'),
-            "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "file_path": assignment.get('file_path'),
-            "grade": None,
-            "feedback": None
-        }
-
+    @boundary.route('/view_assignment/<assignment_id>/<filename>', methods=['GET', 'POST'])
+    def submit_assignment(assignment_id, filename):
         try:
-            result = mongo.db.assignments.update_one(
-                {"_id": ObjectId(assignment_id)},
-                {"$push": {"submissions": submission}}
-            )
-            if result.modified_count > 0:
-                flash("Assignment submitted successfully!", "success")
-            else:
-                flash("Submission failed. Please try again.", "danger")
-        except Exception as e:
-            flash(f"An error occurred: {str(e)}", "danger")
+            if request.method == 'POST':
+                # Get form data
+                student_username = request.form.get('student_name')
+                file = request.files.get('file')
 
-        return render_template('submitAssignment.html', classroom_name=classroom_name, assignment_id=assignment_id)
- 
+                # Validate the file
+                if not file or not StudentAssignmentBoundary.allowed_file(file.filename):
+                    flash('Invalid file type!', 'danger')
+                    return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+
+                # Call the controller to process the submission
+                result = StudentSendSubmissionController.submit_assignment_logic(assignment_id, student_username, file)
+
+                if result['success']:
+                    flash('Assignment submitted successfully!', 'success')
+                else:
+                    flash(f"Submission failed: {result['message']}", 'danger')
+
+                # Stay on the same page after submission
+                return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+
+            # Handle GET request (display the form)
+            return render_template('view_assignment.html', assignment_id=assignment_id, filename=filename)
+
+        except Exception as e:
+            logging.error(f"Error in submit_assignment: {str(e)}")
+            flash('An error occurred while submitting the assignment.', 'danger')
+            return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))

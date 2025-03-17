@@ -18,31 +18,30 @@
     <button id="createVideoBtn" class="btn btn-primary m-3" onclick="location.href='{{ url_for('boundary.generate_video_page') }}'">
         <i class="fas fa-video"></i> Generate Video
     </button>
-    
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="40">
             </a>
-    
+
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-    
+
             <div class="collapse navbar-collapse" id="main-nav">
                 <form class="d-flex ms-auto" method="get" action="{{ url_for('boundary.search') }}">
                     <input class="form-control me-2" type="search" placeholder="Search" name="query" aria-label="Search" required>
-                
+
                     <!-- ✅ Fixed Select Styling -->
                     <select class="form-select me-2" name="filter">
                         <option value="video">Video</option>
                         <option value="avatar">Avatar</option>
                     </select>
-                
+
                     <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
-                </form>    
-    
+                </form>
+
                 <ul class="navbar-nav ms-auto">
                     {% if session.get('username') %}
                         {% if session.get('role') == "Admin" %}
@@ -60,6 +59,7 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_users') }}">Manage Users</a></li>
                                 </ul>
                             </li>
+
                         {% elif session.get('role') == "Teacher" %}
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="teacherDropdown" role="button" data-bs-toggle="dropdown">
@@ -74,7 +74,8 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_classrooms') }}">Manage Classrooms</a></li>
                                 </ul>
                             </li>
-                        {% elif session.get('role') in ["Student", "User"] %}
+
+                        {% elif session.get('role') in ["User"] %}
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                                     My Profile
@@ -83,7 +84,19 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
                                 </ul>
                             </li>
+
+                        {% elif session.get('role') in ["Student"] %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                                    My Profile
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
+                                </ul>
+                            </li>
                         {% endif %}
+
                         <li class="nav-item">
                             <a class="nav-link text-danger fw-bold" href="{{ url_for('boundary.logout') }}">Logout</a>
                         </li>

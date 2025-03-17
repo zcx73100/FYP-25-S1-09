@@ -58,7 +58,7 @@
                         <br>
                         <span>📅 Due: {{ assignment.deadline | default("Not specified") }}</span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment_details',classroom_name=classroom.classroom_name, assignment_filename=assignment.filename ) }}" class="btn btn-success">📄 View Assignment</a>                   
+                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.filename, classroom_name =classroom.classroom_name) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}
@@ -86,6 +86,13 @@
                 <li>No quizzes available.</li>
             {% endif %}
         </ul>
+    </div>
+
+    <div class="classroom-section">
+        <h3>Manage Students</h3>
+        <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
+            <button type="submit" class="btn btn-primary">Manage Students in this Classroom</button>
+        </form>
     </div>
 
     <style>
@@ -127,8 +134,41 @@
         .classroom-section ul li {
             padding: 5px 0;
         }
+
+        .btn {
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
     </style>
 {% endblock %}
-
-
-
