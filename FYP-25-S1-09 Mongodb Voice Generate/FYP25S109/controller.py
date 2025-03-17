@@ -179,7 +179,7 @@ class UnsuspendStudentController:
         else:
             return {"success": False, "message": "Failed to unsuspend the student."}
 
-class AdminSearchAccountController:
+class SearchAccountController:
     @staticmethod
     def search_account(search_query):
         return UserAccount.search_account(search_query)
@@ -205,7 +205,24 @@ class ViewAssignmentDetailsController:
         assignment = Assignment.get_assignment(assignment_id)
         return assignment
 
-class SubmitAssignmentController:
+class StudentSendSubmissionController:
     @staticmethod
-    def submit_assignment(assignment_id, username, file):
-        return Assignment.submit_assignment(assignment_id, username, file)
+    def submit_assignment_logic(assignment_id, student_username, file):
+        """
+        Processes the assignment submission.
+        """
+        try:
+            # Validate the file
+            if not file or file.filename == '':
+                return {"success": False, "message": "No file selected for upload."}
+
+            # Create a Submission entity
+            submission = Submission(assignment_id, student_username, file)
+
+            # Save the submission
+            result = submission.save_submission()
+            return result
+
+        except Exception as e:
+            logging.error(f"Error in submit_assignment_logic: {str(e)}")
+            return {"success": False, "message": str(e)}

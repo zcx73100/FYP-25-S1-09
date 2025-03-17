@@ -58,7 +58,7 @@
                         <br>
                         <span>📅 Due: {{ assignment.deadline | default("Not specified") }}</span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment_details',classroom_name=classroom.classroom_name, assignment_filename=assignment.filename ) }}" class="btn btn-success">📄 View Assignment</a>                   
+                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.filename, classroom_name =classroom.classroom_name) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}
