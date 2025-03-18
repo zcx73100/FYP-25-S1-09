@@ -838,3 +838,160 @@ class Submission:
         except Exception as e:
             logging.error(f"Error saving submission: {str(e)}")
             return {"success": False, "message": str(e)}
+        
+
+
+class DiscussionRoom:
+    def __init__(self, classroom_name=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
+        self.classroom_name = classroom_name
+        self.discussion_room_name = discussion_room_name
+        self.discussion_room_description = discussion_room_description
+        self.created_by = created_by
+
+    @staticmethod
+    def create_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by):
+        try:
+            room_data = {
+                "classroom_name": classroom_name,
+                "discussion_room_name": discussion_room_name,
+                "discussion_room_description": discussion_room_description,
+                "created_at": datetime.now(),
+                "created_by": created_by
+
+            }
+            mongo.db.discussion_rooms.insert_one(room_data)
+            return True
+        except Exception as e:
+            print(f"Error creating discussion room: {e}")
+            return False
+
+    @staticmethod
+    def delete_discussion_room(discussion_room_id):
+        try:
+            mongo.db.discussion_rooms.delete_one({"_id": ObjectId(discussion_room_id)})
+            return True
+        except Exception as e:
+            print(f"Error deleting discussion room: {e}")
+            return False
+
+    @staticmethod
+    def update_discussion_room(discussion_room_id, new_details):
+        try:
+            mongo.db.discussion_rooms.update_one(
+                {"_id": ObjectId(discussion_room_id)},
+                {"$set": new_details}
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating discussion room: {e}")
+            return False
+
+    @staticmethod
+    def search_discussion_room(search_query):
+        try:
+            query = {"discussion_room_name": {"$regex": search_query, "$options": "i"}}
+            rooms = list(mongo.db.discussion_rooms.find(query))
+            return rooms
+        except Exception as e:
+            print(f"Error searching discussion rooms: {e}")
+            return []
+
+    @staticmethod
+    def get_all_discussion_rooms():
+        try:
+            rooms = list(mongo.db.discussion_rooms.find())
+            print(rooms)
+            return rooms
+        except Exception as e:
+            print(f"Error retrieving discussion rooms: {e}")
+            return []
+    @staticmethod
+    def find_by_id(discussion_room_id):
+        try:
+            room = mongo.db.discussion_rooms.find_one({"_id": ObjectId(discussion_room_id)})
+            return room
+        except Exception as e:
+            print(f"Error finding discussion room by ID: {e}")
+            return None
+    def get_id(discussion_room_id):
+        try:
+            result = mongo.db.discussion_rooms.find_one({"_id": ObjectId(discussion_room_id)})
+            if result:
+                print(result['_id'])
+                return str(result["_id"])  # Convert to string to avoid ObjectId type issues
+            return None
+        except Exception as e:
+            print(f"Error finding discussion room by ID: {e}")
+            return None
+
+        
+
+class Message:
+    def __init__(self, discussion_room_id=None, sender=None, message=None):
+        self.discussion_room_id = discussion_room_id
+        self.sender = sender
+        self.message = message
+
+    def send_message(discussion_room_id, sender, message):
+        try:
+            message_data = {
+                "discussion_room_id": discussion_room_id,
+                "sender": sender,
+                "message": message,
+                "sent_at": datetime.now()
+            }
+            mongo.db.messages.insert_one(message_data)
+            return True
+        except Exception as e:
+            print(f"Error saving message: {e}")
+            return False
+
+    @staticmethod
+    def get_all_messages(discussion_room_id):
+        try:
+            messages = list(mongo.db.messages.find({"discussion_room_id": discussion_room_id}))
+            print(messages)
+            return messages
+        except Exception as e:
+            print(f"Error getting messages: {e}")
+            return []
+
+    @staticmethod
+    def delete_message(message_id):
+        try:
+            mongo.db.messages.delete_one({"_id": ObjectId(message_id)})
+            return True
+        except Exception as e:
+            print(f"Error deleting message: {e}")
+            return False
+
+    @staticmethod
+    def delete_messages(discussion_room_id):
+        try:
+            mongo.db.messages.delete_many({"discussion_room_id": discussion_room_id})
+            return True
+        except Exception as e:
+            print(f"Error deleting messages: {e}")
+            return False
+
+    @staticmethod
+    def search_messages(search_query):
+        try:
+            query = {"message": {"$regex": search_query, "$options": "i"}}
+            messages = list(mongo.db.messages.find(query))
+            return messages
+        except Exception as e:
+            print(f"Error searching messages: {e}")
+            return []
+        
+    @staticmethod
+    def update_message(message_id, new_details):
+        try:
+            mongo.db.messages.update_one(
+                {"_id": ObjectId(message_id)},
+                {"$set": new_details}
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating message: {e}")
+            return False

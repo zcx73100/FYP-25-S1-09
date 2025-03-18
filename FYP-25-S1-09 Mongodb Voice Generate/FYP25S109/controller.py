@@ -262,3 +262,48 @@ class GenerateVideoController:
         video_path = entity.generate_video()
         return video_path
 
+
+class AddDiscussionRoomController:
+    @staticmethod
+    def add_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by):
+        return DiscussionRoom.create_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by)
+    
+class SearchDiscussionRoomController:
+    @staticmethod
+    def search_discussion_room(search_query):
+        return DiscussionRoom.search_discussion_room(search_query)
+class UpdateDiscussionRoomController:
+    @staticmethod
+    def update_discussion_room(discussion_room_id, new_details):
+        return DiscussionRoom.update_discussion_room(discussion_room_id, new_details)
+class DeleteDiscussionRoomController:
+    @staticmethod
+    def delete_discussion_room(discussion_room_id):
+        return DiscussionRoom.delete_discussion_room(discussion_room_id)
+class RetrieveDiscussionRoomController:
+    @staticmethod
+    def get_all_discussion_rooms():
+        return DiscussionRoom.get_all_discussion_rooms()
+    @staticmethod
+    def get_discussion_room_id(discussion_room_id):
+        return DiscussionRoom.get_id(discussion_room_id)
+
+class AddMessageController:
+    @staticmethod
+    def send_message(discussion_room_id, sender, message):
+        return Message.send_message(discussion_room_id, sender, message)
+
+class UpdateMessageController:
+    @staticmethod
+    def update_message(message_id, new_details):
+        return Message.update_message(message_id, new_details) 
+    
+class DeleteMessageController:
+    @staticmethod
+    def delete_message(message_id):
+        return Message.delete_message(message_id)
+    
+class RetrieveMessageController:
+    @staticmethod
+    def get_all_messages(discussion_room_id):
+        return Message.get_all_messages(discussion_room_id)

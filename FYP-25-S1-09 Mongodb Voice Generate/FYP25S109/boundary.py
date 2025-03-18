@@ -1605,4 +1605,116 @@ class StudentAssignmentBoundary:
 
 
 
+class AccessForumBoundary:
+    @staticmethod
+    @boundary.route('/forum/<classroom_name>', methods=['GET','POST'])
+    def access_forum(classroom_name):
+        return render_template("forum.html", classroom_name=classroom_name, discussion_rooms=RetrieveDiscussionRoomController.get_all_discussion_rooms())
 
+
+class DiscussionRoomBoundary:
+    @staticmethod
+    @boundary.route('/forum/<classroom_name>/create', methods=['POST'])
+    def create_discussion_room(classroom_name):
+        classroom_name = request.form.get('classroom_name')
+        discussion_room_name = request.form.get('discussion_room_name')
+        discussion_room_description = request.form.get('discussion_room_description')
+        created_by = session.get('username')
+        
+        if AddDiscussionRoomController.add_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by):
+            flash("Discussion room created successfully!", "success")
+        else:
+            flash("Failed to create discussion room.", "danger")
+
+        # Redirecting back to the forum page
+        return redirect(url_for('boundary.access_forum', classroom_name=classroom_name))
+
+    @staticmethod
+    @boundary.route('/forum/<classroom_name>/delete', methods=['GET','POST'])
+    def delete_discussion_room(classroom_name):
+        discussion_room_id = request.form.get('discussion_room_id')  # Retrieve from form
+        classroom_name = request.form.get('classroom_name')  # Retrieve from form
+
+        if DeleteDiscussionRoomController.delete_discussion_room(discussion_room_id):
+            flash("Discussion room deleted successfully!", "success")
+        else:
+            flash("Failed to delete discussion room.", "danger")
+
+        return redirect(url_for('boundary.access_forum', classroom_name=classroom_name))
+
+
+    @staticmethod
+    @boundary.route('/discussion_room', methods=['GET'])
+    def view_discussion_room():
+        rooms = RetrieveDiscussionRoomController.get_all_discussion_rooms()
+        return render_template('forum.html', discussion_rooms=rooms)
+
+    @staticmethod
+    @boundary.route('/discussion_room/search', methods=['GET'])
+    def search_discussion_room():
+        search_query = request.args.get('query')
+        rooms = SearchDiscussionRoomController.search_discussion_room(search_query)
+        return render_template('forum.html', discussion_rooms=rooms)
+    
+    @staticmethod
+    @boundary.route('/discussion_room/<discussion_room_id>', methods=['GET', 'POST'])
+    def access_room(discussion_room_id):
+        # Fetch messages using the controller
+        messages = RetrieveMessageController.get_all_messages(discussion_room_id)
+        room = RetrieveDiscussionRoomController.get_discussion_room_id(discussion_room_id)
+
+        # Check if the discussion room exists
+        if not room:
+            flash("Discussion room not found.", "danger")
+            return redirect(url_for('boundary.view_discussion_room'))
+
+        # Render the template with messages and room data
+        return render_template('discussionRoom.html', room=room, messages=messages, discussion_room_id=discussion_room_id)
+
+    
+    @staticmethod
+    @boundary.route('/discussion_room/update', methods=['POST'])
+    def update_discussion_room(discussion_room_id):
+        discussion_room_id = request.form.get('discussion_room_id')
+        discussion_room_name = request.form.get('discussion_room_name')
+        discussion_room_description = request.form.get('discussion_room_description')
+        if UpdateDiscussionRoomController.update_discussion_room(discussion_room_id, discussion_room_name, discussion_room_description):
+            flash("Discussion room updated successfully!", "success")
+        else:
+            flash("Failed to update discussion room.", "danger")
+        return redirect(url_for('view_discussion_room'))
+
+
+class MessageBoundary:
+    @staticmethod
+    @boundary.route('/discussion_room/<discussion_room_id>/message', methods=['POST'])
+    def send_message(discussion_room_id):
+        message_content = request.form.get('message_content')
+        message_author = session.get('username')
+        if AddMessageController.send_message(discussion_room_id, message_author, message_content):
+            flash("Message sent successfully!", "success")
+        else:
+            flash("Failed to send message.", "danger")
+        return redirect(url_for('boundary.access_room', discussion_room_id=discussion_room_id))
+
+    
+    @staticmethod
+    @boundary.route('/message/<message_id>/delete', methods=['POST'])
+    def unsend_message(message_id):
+        if DeleteMessageController.delete_message(message_id):
+            flash("Message deleted successfully!", "success")
+        else:
+            flash("Failed to delete message.", "danger")
+        return redirect(request.referrer)
+
+    @staticmethod
+    @boundary.route('/message/<message_id>/update', methods=['POST'])
+    def edit_message(message_id):
+        message_content = request.form.get('message_content')
+        if UpdateMessageController.update_message(message_id, message_content):
+            flash("Message updated successfully!", "success")
+        else:
+            flash("Failed to update message.", "danger")
+        return redirect(request.referrer)
+    
+       

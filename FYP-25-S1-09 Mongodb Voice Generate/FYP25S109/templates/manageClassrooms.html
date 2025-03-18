@@ -12,6 +12,7 @@
         {% if classrooms %}
             {% for classroom in classrooms %}
                 <div class="classroom-card">
+                    <h5 hidden="true">{{ classroom._id }}</h5>
                     <h5>Classroom Name: {{ classroom.classroom_name }}</h5>
                     <h5>Classroom Description: {{ classroom.description }}</h5>
                     <h5>Classroom Capacity: {{ classroom.capacity }}</h5>

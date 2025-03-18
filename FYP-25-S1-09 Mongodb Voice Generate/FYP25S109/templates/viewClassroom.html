@@ -22,7 +22,10 @@
             {% endif %}
         </ul>
     </div>
-
+    <div class="classroom-section">
+        <h3>💬 Forum</h3>
+        <a href="{{ url_for('boundary.access_forum', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">View Forum</a>
+    </div>
     <div class="classroom-section">
         <h3>📂 Materials</h3>
         {% if session['role'] == 'Teacher' %}
