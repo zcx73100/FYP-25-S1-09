@@ -3,42 +3,71 @@
 {% block content %}
 <h2>{{ classroom.classroom_name }}</h2>
 
-<div class="classroom-grid">
-    <!-- Display existing sections here (you can loop through the sections if they are available) -->
-    <h3>Class Materials</h3>
+{% if session.get('role') == "Teacher" %}
+    <!-- TEACHER VIEW -->
+    <div class="classroom-grid">
+        <h3>Class Materials</h3>
+        <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+            Upload Material
+        </a>
+        <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+            Manage Materials
+        </a>
 
-    <!-- Redirect to Upload Material Page -->
-    <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
-        Upload Material
-    </a>
+        <h3>Assignments</h3>
+        <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+            Upload Assignment
+        </a>
+        <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+            Manage Assignments
+        </a>
 
-    <!-- Manage Materials Button -->
-    <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Materials</a>
-    
-    <h3>Assignments</h3>
-    <!-- Link to Upload Assignment Page -->
-    <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" 
-    class="btn btn-primary">
-    Upload Assignment
-    </a>
+        <h3>Quizzes</h3>
+        <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">
+            Create Quiz
+        </a>
+        <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">
+            Manage Quizzes
+        </a>
 
-    <!-- Link to Manage Assignments -->
-    <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" 
-    class="btn btn-secondary">
-    Manage Assignments
-    </a>
-    
-    <h3>Quizzes</h3>
-    <!-- ✅ Create Quiz Button -->
-    <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Create Quiz</a>
+        <h3>Manage Students</h3>
+        <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
+            <button type="submit" class="btn btn-warning">Manage Students in this Classroom</button>
+        </form>
+    </div>
 
-    <!-- ✅ Manage Quizzes Button -->
-    <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Quizzes</a>
+{% elif session.get('role') == "Student" %}
+    <!-- STUDENT VIEW -->
+    <div class="classroom-grid">
+        <h3>Class Materials</h3>
+        <a href="{{ url_for('boundary.student_view_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-info">
+            View Materials
+        </a>            
 
-    <h3>Manage Students</h3>
-    <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
-        <button type="submit">Manage Students in this Classroom</button>
-    </form>
-</div>
+        <h3>Assignments</h3>
+        <a href="{{ url_for('boundary.student_view_assignments', classroom_name=classroom.classroom_name) }}" 
+           class="btn btn-info">
+            View Assignments
+        </a>
+
+        <h3>Quizzes</h3>
+        <a href="{{ url_for('boundary.student_view_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-info">
+            View Quizzes
+        </a>
+    </div>
+
+    <!-- Redirect Students from Teacher URL -->
+    <script>
+        if (window.location.href.includes('/teacher/viewClassroom/')) {
+            window.location.href = "{{ url_for('boundary.student_view_classroom', classroom_name=classroom.classroom_name) }}";
+        }
+    </script>
+
+
+{% else %}
+    <p class="text-center text-danger">Unauthorized access.</p>
+{% endif %}
 
 {% endblock %}
+
+

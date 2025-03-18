@@ -5,6 +5,8 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from bson import ObjectId
+import mimetypes
+from flask import send_file
 
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
@@ -765,9 +767,10 @@ class TeacherAddClassroomBoundary:
     
 class ViewClassRoomBoundary:
     @staticmethod
-    @boundary.route('/teacher/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
+    @boundary.route('/teacher/viewClassroom/<classroom_name>', methods=['GET'])
     def view_classroom(classroom_name):
-        if 'role' not in session or (session.get('role') != 'Teacher' and session.get('role') != 'Student'):
+        """Redirect students to student view while allowing teachers to access teacher view."""
+        if 'role' not in session or session.get('role') not in ['Teacher', 'Student']:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
@@ -777,11 +780,8 @@ class ViewClassRoomBoundary:
             return redirect(url_for('boundary.manage_classrooms'))
 
         if session.get('role') == 'Student':
-            student_username = session.get('username')
-            if student_username.strip() not in [s.strip() for s in classroom['student_list']]:
-                flash("You are not enrolled in this classroom.", category='error')
-                return redirect(url_for('boundary.home'))
-        
+            return redirect(url_for('boundary.student_view_classroom', classroom_name=classroom_name))
+
         if session.get('role') == 'Teacher':
             teacher_username = session.get('username')
             if teacher_username.strip() != classroom['teacher'].strip():
@@ -789,8 +789,27 @@ class ViewClassRoomBoundary:
                 return redirect(url_for('boundary.home'))
             return render_template("viewClassroom.html", classroom=classroom, classroom_name=classroom_name)
 
-        return render_template("viewClassroom.html", classroom=classroom, classroom_name=classroom_name)
+        return redirect(url_for('boundary.home'))
+    
+    @staticmethod
+    @boundary.route('/student/viewClassroom/<classroom_name>', methods=['GET'])
+    def student_view_classroom(classroom_name):
+        """Student-specific view of a classroom."""
+        if 'role' not in session or session.get('role') != 'Student':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
 
+        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        if not classroom:
+            flash("Classroom not found.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        student_username = session.get('username')
+        if student_username.strip() not in [s.strip() for s in classroom.get('student_list', [])]:
+            flash("You are not enrolled in this classroom.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        return render_template("viewClassroom.html", classroom=classroom, classroom_name=classroom_name)
 
 
 class TeacherDeleteClassroomBoundary:
@@ -1088,6 +1107,15 @@ class TeacherUploadMaterialBoundary:
         else:
             flash('File not found!', 'danger')
             return redirect(url_for('boundary.manage_materials'))
+    
+    '''
+    @boundary.route('/list_materials/<classroom_name>', methods=['GET'])
+    def list_materials(classroom_name):
+        """Retrieve and display all materials uploaded for a specific classroom."""
+        materials = list(mongo.db.materials.find({"classroom_name": classroom_name.strip()}))
+
+        return render_template("viewMaterials.html", materials=materials, classroom_name=classroom_name)
+    '''
 
 
 class TeacherUploadQuizBoundary:
@@ -1205,28 +1233,77 @@ class TeacherAssignmentBoundary:
 
         return render_template('viewSubmissions.html', assignment=assignment, classroom_name=classroom_name)
 
-    @staticmethod
-    @boundary.route('/teacher/grade_assignment/<classroom_name>/<assignment_id>/<student_username>', methods=['POST'])
-    def grade_assignment(classroom_name, assignment_id, student_username):
-        """Assigns grades and feedback to student submissions."""
+    @boundary.route('/teacher/search_assignments', methods=['GET', 'POST'])
+    def search_assignments():
+        """Allows teachers to search assignments by title."""
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        if request.method == 'POST':
-            grade = request.form.get('grade')
-            feedback = request.form.get('feedback')
+        query = request.form.get('query', '').strip()
+        assignments = []
 
-            mongo.db.assignments.update_one(
-                {"_id": ObjectId(assignment_id), "submissions.student_username": student_username},
-                {"$set": {
-                    "submissions.$.grade": grade,
-                    "submissions.$.feedback": feedback
-                }}
+        if query:
+            assignments = list(mongo.db.assignments.find({"title": {"$regex": query, "$options": "i"}}))
+
+        return render_template("searchAssignments.html", assignments=assignments, query=query)
+
+
+    @staticmethod
+    @boundary.route('/teacher/grade_assignment/<classroom_name>/<assignment_id>/<student_username>', methods=['GET', 'POST'])
+    def grade_assignment(classroom_name, assignment_id, student_username):
+        """Assign or update grades and feedback for student submissions."""
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        # Fetch the assignment and student submission details
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+        if not assignment:
+            flash("Assignment not found.", category='error')
+            return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+
+        submission = next((s for s in assignment.get("submissions", []) if s["student_username"] == student_username), None)
+        if not submission:
+            flash("Student submission not found.", category='error')
+            return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+
+        if request.method == 'POST':
+            grade = request.form.get('grade').strip()
+            feedback = request.form.get('feedback', '').strip()
+
+            if not grade:
+                flash("Grade is required.", category='error')
+                return redirect(request.url)
+
+            # Update the assignment grade and feedback
+            update_result = mongo.db.assignments.update_one(
+                {
+                    "_id": ObjectId(assignment_id),
+                    "submissions.student_username": student_username
+                },
+                {
+                    "$set": {
+                        "submissions.$.grade": grade,
+                        "submissions.$.feedback": feedback
+                    }
+                }
             )
 
-            flash('Grade assigned successfully!', 'success')
-            return redirect(url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment_id))
+            if update_result.modified_count > 0:
+                flash("Grade and feedback assigned successfully!", 'success')
+            else:
+                flash("Failed to update the assignment. Try again.", 'error')
+
+            return redirect(url_for('boundary.view_classroom', classroom_name=classroom_name))
+
+        # Render the grading form
+        return render_template("gradeAssignments.html", 
+                            classroom_name=classroom_name, 
+                            assignment=assignment, 
+                            student_username=student_username, 
+                            existing_grade=submission.get("grade", ""), 
+                            existing_feedback=submission.get("feedback", ""))
 
     @staticmethod
     @boundary.route('/teacher/delete_assignment/<classroom_name>/<assignment_id>', methods=['POST'])
@@ -1248,6 +1325,7 @@ class TeacherAssignmentBoundary:
             flash('Assignment not found!', 'danger')
 
         return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+
     
 # ------------------------------------------------------------- Quiz
 class TeacherCreateQuizBoundary:
@@ -1310,3 +1388,142 @@ class TeacherManageQuizBoundary:
         mongo.db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
+    
+
+class StudentAssignmentBoundary:
+
+    SUBMIT_FOLDER_ASSIGNMENT = 'FYP25S109/static/uploads/submissions/'
+
+    @boundary.route('/student/view_assignments/<classroom_name>')
+    def student_view_assignments(classroom_name):
+        """Retrieve and display all assignments uploaded by the teacher."""
+        assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name.strip()}))
+        return render_template("viewAssignments.html", assignments=assignments, classroom_name=classroom_name)
+
+    @boundary.route('/student/view_assignment/<filename>')
+    def student_view_assignment(filename):
+        """Allow students to view the assignment in-browser if possible."""
+        file_path = os.path.abspath(os.path.join("static/uploads/assignments/", filename))
+
+        if os.path.exists(file_path):
+            mime_type, _ = mimetypes.guess_type(file_path)
+            return send_file(file_path, mimetype=mime_type)
+
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
+
+
+    @boundary.route('/student/download_assignment/<filename>')
+    def student_download_assignment(filename):
+        """Allow students to download an assignment."""
+        file_path = os.path.abspath(os.path.join("static/uploads/assignments/", filename))
+
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True)
+
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
+
+    @boundary.route('/student/submit_assignment/<classroom_name>', methods=['GET', 'POST'])
+    def student_submit_assignment(classroom_name):
+        """Allow students to submit assignments."""
+        if request.method == 'POST':
+            if 'file' not in request.files:
+                flash("No file selected.", 'error')
+                return redirect(request.url)
+
+            file = request.files['file']
+            allowed_extensions = {'png', 'pdf', 'docx', 'pptx'}
+            if file.filename.split('.')[-1].lower() not in allowed_extensions:
+                flash("Invalid file format. Allowed: PNG, PDF, DOCX, PPTX.", 'error')
+                return redirect(request.url)
+
+            filename = secure_filename(file.filename)
+            file_path = os.path.join("static/uploads/submissions/", filename)
+            file.save(file_path)
+
+            # Store in database
+            mongo.db.submissions.insert_one({
+                "classroom_name": classroom_name,
+                "student_username": session.get('username'),
+                "filename": filename,
+                "file_path": file_path,
+                "submitted_at": datetime.now()
+            })
+
+            flash("Assignment submitted successfully!", "success")
+            return redirect(url_for('boundary.student_view_assignments', classroom_name=classroom_name))
+
+        return render_template("submitAssignment.html", classroom_name=classroom_name)
+
+
+    @boundary.route('/student/view_quizzes/<classroom_name>')
+    def student_view_quizzes(classroom_name):
+        """Retrieve and display quizzes uploaded by the teacher."""
+        quizzes = list(mongo.db.quizzes.find({"classroom_name": classroom_name.strip()}))
+        return render_template("viewQuizzes.html", quizzes=quizzes, classroom_name=classroom_name)
+
+    @boundary.route('/student/attempt_quiz/<classroom_name>/<quiz_id>', methods=['GET', 'POST'])
+    def attempt_quiz_page(classroom_name, quiz_id):
+        """Allow students to attempt a quiz and get an instant score."""
+        quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+
+        if not quiz:
+            flash("Quiz not found.", "error")
+            return redirect(url_for('boundary.view_quizzes', classroom_name=classroom_name))
+
+        if request.method == 'POST':
+            user_answers = request.form.to_dict()
+            score = 0
+            total_questions = len(quiz["questions"])
+
+            # Compare answers
+            for q in quiz["questions"]:
+                q_id = str(q.get("_id", ""))  # Ensure `_id` exists
+                correct_answer = q["correct_answer"]
+                user_answer = user_answers.get(q_id, "")  # Get answer safely
+                if user_answer.lower() == correct_answer.lower():
+                    score += 1
+
+            percentage_score = (score / total_questions) * 100
+
+            flash(f"You scored {score}/{total_questions} ({percentage_score:.2f}%)", "success")
+            return redirect(url_for('boundary.view_quizzes', classroom_name=classroom_name))
+
+        return render_template("attemptQuiz.html", quiz=quiz, classroom_name=classroom_name)
+
+    
+    @boundary.route('/student/view_materials/<classroom_name>', methods=['GET'])
+    def student_view_materials(classroom_name):
+        """Retrieve and display all materials uploaded for a specific classroom (student view)."""
+        materials = list(mongo.db.materials.find({"classroom_name": classroom_name.strip()}))
+        return render_template("viewMaterials.html", materials=materials, classroom_name=classroom_name)
+
+    @boundary.route('/student/view_material/<filename>')
+    def student_view_material(filename):
+        """Allow students to view the material in-browser if possible."""
+        file_path = os.path.abspath(os.path.join("static/uploads/materials/", filename))
+        print("Attempting to open file:", file_path)  # Debugging print
+
+        if os.path.exists(file_path):
+            mime_type, _ = mimetypes.guess_type(file_path)
+            return send_file(file_path, mimetype=mime_type)
+        
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
+
+
+
+    @boundary.route('/student/download_material/<filename>')
+    def student_download_material(filename):
+        """Allow students to download the material."""
+        file_path = os.path.abspath(os.path.join("static/uploads/materials/", filename))
+
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True)
+        
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
+
+
+
