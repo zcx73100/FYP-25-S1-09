@@ -5,8 +5,6 @@ import json
 from bson import ObjectId
 from datetime import datetime, timezone
 
-OPENSHOT_API_URL = "https://cloud.openshot.org/api"
-API_KEY = "123"
 
 class LoginController:
     @staticmethod
@@ -248,4 +246,19 @@ class StudentSendSubmissionController:
         except Exception as e:
             logging.error(f"Error in submit_assignment_logic: {str(e)}")
             return {"success": False, "message": str(e)}
+
+
+class GenerateVideoController:
+    @staticmethod
+    def generate_voice(text):
+        entity = GenerateVideoEntity(text=text, avatar_path=None)
+        audio_path = entity.generate_voice()
+        return audio_path
+
+    @staticmethod
+    def generate_video(text, avatar_path):
+        entity = GenerateVideoEntity(text, avatar_path)
+        entity.generate_voice()  # Make sure audio is generated first
+        video_path = entity.generate_video()
+        return video_path
 
