@@ -27,12 +27,19 @@
                         <p>{{ submission.student_username }}: 
                             {% if submission.grade %}
                                 Graded ({{ submission.grade }})
+                                <a href="{{ url_for('boundary.grade_assignment', classroom_name=classroom_name, assignment_id=assignment._id, student_username=submission.student_username) }}" class="btn btn-warning btn-sm">
+                                    Edit Grade
+                                </a>
                             {% else %}
-                                Pending
+                                <a href="{{ url_for('boundary.grade_assignment', classroom_name=classroom_name, assignment_id=assignment._id, student_username=submission.student_username) }}" class="btn btn-success btn-sm">
+                                    Grade
+                                </a>
                             {% endif %}
                         </p>
                     {% endfor %}
                 </td>
+                
+                
                 <td>
                     <form action="{{ url_for('boundary.delete_assignment', classroom_name=classroom_name, assignment_id=assignment._id) }}" method="POST">
                         <button type="submit" class="btn btn-danger">Delete</button>
@@ -49,4 +56,12 @@
 
     <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom_name) }}" class="btn btn-secondary mt-3">Back</a>
 </div>
+
+{% if session.get('role') == "Teacher" %}
+    <a href="{{ url_for('boundary.search_assignments') }}" class="btn btn-primary mb-3">
+        Search Assignments
+    </a>
+{% endif %}
+
+
 {% endblock %}

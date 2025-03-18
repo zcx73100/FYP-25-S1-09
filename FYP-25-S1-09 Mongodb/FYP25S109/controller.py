@@ -151,7 +151,30 @@ class UploadAssignmentController:
     def upload_assignment(file, title, uploader, classroom_name):
         assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
         return assignment.save_assignment()
-    
+
+class SearchAssignmentController:
+    @staticmethod
+    def search_assignments(query, classroom_name=None, student_username=None):
+        """Search for assignments by title, course, or student."""
+        search_filter = {}
+
+        if query:
+            search_filter["title"] = {"$regex": query, "$options": "i"}
+
+        if classroom_name:
+            search_filter["classroom_name"] = classroom_name
+
+        if student_username:
+            search_filter["submissions.student_username"] = student_username
+
+        try:
+            assignments = list(mongo.db.assignments.find(search_filter))
+            return assignments
+        except Exception as e:
+            logging.error(f"Error searching assignments: {str(e)}")
+            return []
+
+
 class ViewUserDetailsController:
     @staticmethod
     def view_user_details(username):

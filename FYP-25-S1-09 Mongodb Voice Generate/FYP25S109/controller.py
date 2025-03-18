@@ -3,7 +3,7 @@ from .boundary import *
 import requests
 import json
 from bson import ObjectId
-
+from datetime import datetime, timezone
 
 OPENSHOT_API_URL = "https://cloud.openshot.org/api"
 API_KEY = "123"
@@ -205,6 +205,8 @@ class ViewAssignmentDetailsController:
         assignment = Assignment.get_assignment(assignment_id)
         return assignment
 
+from datetime import datetime, timezone
+
 class StudentSendSubmissionController:
     @staticmethod
     def submit_assignment_logic(assignment_id, student_username, file):
@@ -216,13 +218,34 @@ class StudentSendSubmissionController:
             if not file or file.filename == '':
                 return {"success": False, "message": "No file selected for upload."}
 
-            # Create a Submission entity
-            submission = Submission(assignment_id, student_username, file)
+            # Secure filename
+            filename_secure = secure_filename(file.filename)
 
-            # Save the submission
-            result = submission.save_submission()
-            return result
+            # Define upload path (Ensure UPLOAD_FOLDER_SUBMISSIONS is correctly set)
+            upload_folder = "FYP25S109/static/uploads/submissions"
+            os.makedirs(upload_folder, exist_ok=True)  # Ensure directory exists
+
+            file_path = os.path.join(upload_folder, filename_secure)
+            file.save(file_path)  # Save the file
+
+            # Debugging log
+            print(f"File saved at: {file_path}")
+
+            # Store submission in database (Ensure submitted_at is always a datetime object)
+            submission_data = {
+                "assignment_id": ObjectId(assignment_id),
+                "student_username": student_username,
+                "filename": filename_secure,
+                "file_path": file_path,
+                "submitted_at": datetime.now(timezone.utc),  # ✅ Use timezone-aware UTC
+                "grade": None,
+                "feedback": ""
+            }
+            mongo.db.submissions.insert_one(submission_data)
+
+            return {"success": True, "message": "Submission successful!"}
 
         except Exception as e:
             logging.error(f"Error in submit_assignment_logic: {str(e)}")
             return {"success": False, "message": str(e)}
+

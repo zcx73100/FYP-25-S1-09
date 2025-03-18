@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Assignments for {{ classroom_name }}</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>View</th>
+            <th>Download</th>
+            <th>Submit</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for assignment in assignments %}
+        <tr>
+            <td>{{ assignment.filename }}</td>
+
+            <!-- View Button -->
+            <td>
+                <a href="{{ url_for('boundary.student_view_assignment', filename=assignment.filename) }}" 
+                   target="_blank" class="btn btn-info btn-sm">
+                    View
+                </a>
+            </td>
+
+            <!-- Download Button -->
+            <td>
+                <a href="{{ url_for('boundary.student_download_assignment', filename=assignment.filename) }}" 
+                   class="btn btn-primary btn-sm">
+                    Download
+                </a>
+            </td>
+
+            <!-- Submit Button -->
+            <td>
+                <a href="{{ url_for('boundary.student_submit_assignment', classroom_name=classroom_name) }}" 
+                   class="btn btn-success btn-sm">
+                    Submit
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
+
