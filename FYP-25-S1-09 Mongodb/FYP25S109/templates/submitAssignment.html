@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Submit Assignment</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <label for="file">Upload Assignment:</label>
+    <input type="file" name="file" class="form-control" required>
+    
+    <button type="submit" class="btn btn-primary mt-2">Submit</button>
+</form>
+
+{% endblock %}
+
