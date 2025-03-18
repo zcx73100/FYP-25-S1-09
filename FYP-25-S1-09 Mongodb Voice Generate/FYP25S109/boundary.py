@@ -4,10 +4,11 @@ from . import mongo
 import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from markupsafe import Markup
 import base64
+import mimetypes
 import threading
 import time
 from gradio_client import Client
@@ -20,6 +21,7 @@ UPLOAD_FOLDER = 'FYP25S109/static/uploads/materials'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ASSIGNMENT_UPLOAD_FOLDER = 'FYP25S109/static/uploads/assignments'
 os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
+
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
@@ -1270,49 +1272,138 @@ class TeacherAssignmentBoundary:
             return redirect(request.url)
 
     @staticmethod
-    @boundary.route('/teacher/manage_assignments/<classroom_name>', methods=['GET'])
+    @boundary.route('/teacher/manage_assignments/<classroom_name>', methods=['GET', 'POST'])
     def manage_assignments(classroom_name):
-        assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name.strip()}))
-        return render_template('manageAssignments.html', assignments=assignments, classroom_name=classroom_name)
+        """Retrieve all assignments and allow searching."""
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", "error")
+            return redirect(url_for('boundary.home'))
+
+        query = request.form.get('search', '').strip()
+
+        # Search logic
+        if query:
+            assignments = list(mongo.db.assignments.find({
+                "classroom_name": classroom_name,
+                "title": {"$regex": query, "$options": "i"}  # Case-insensitive search
+            }))
+        else:
+            assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name}))
+
+        return render_template("manageAssignments.html", assignments=assignments, classroom_name=classroom_name)
 
     @staticmethod
-    @boundary.route('/teacher/view_submissions/<classroom_name>/<assignment_id>', methods=['GET'])
+    @boundary.route('/teacher/download_assignment/<filename>')
+    def download_assignment(filename):
+        """Allows teachers to download student-submitted assignments."""
+        file_path = os.path.abspath(os.path.join("static/uploads/submissions/", filename))
+
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True)
+
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
+
+    @staticmethod
+    @boundary.route('/teacher/view_submissions/<classroom_name>/<assignment_id>')
     def view_submissions(classroom_name, assignment_id):
-        """Shows all student submissions for a specific assignment."""
+        """Show all student submissions for an assignment"""
+
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
+        # Ensure the assignment exists
         assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
         if not assignment:
             flash("Assignment not found!", "danger")
             return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
-        
 
-        return render_template('viewSubmissions.html', assignment=assignment, classroom_name=classroom_name)
+        # Fetch submissions and ensure it's always a list
+        submissions = list(mongo.db.submissions.find({"assignment_id": ObjectId(assignment_id)}))
+
+        # Ensure every submission has necessary fields to prevent errors in Jinja
+        for submission in submissions:
+            submission.setdefault("student_username", "Unknown")
+            submission.setdefault("filename", "Not Available")
+            submission.setdefault("submitted_at", None)
+            submission.setdefault("grade", "Not graded")
+            submission.setdefault("_id", ObjectId())  # Ensure submission has an ID
+
+            # Convert `submitted_at` to datetime if it's a string
+            if isinstance(submission["submitted_at"], str):
+                try:
+                    submission["submitted_at"] = datetime.strptime(submission["submitted_at"], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    print(f"⚠️ Invalid date format for submission {submission['_id']}")
+                    submission["submitted_at"] = None
+
+        return render_template(
+            'viewSubmissions.html',
+            assignment=assignment,
+            submissions=submissions,  # Make sure `submissions` is passed
+            classroom_name=classroom_name
+        )
+
+
+
+
+
+    @boundary.route('/delete_submission/<submission_id>', methods=['POST'])
+    def delete_submission(submission_id):
+        """Allows a teacher to delete a student's submission."""
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        # Find the submission
+        submission = mongo.db.submissions.find_one({"_id": ObjectId(submission_id)})
+        if not submission:
+            flash("Submission not found!", "danger")
+            return redirect(request.referrer)
+
+        # Delete the file from storage
+        file_path = submission.get("file_path")
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
+        # Remove submission from database
+        mongo.db.submissions.delete_one({"_id": ObjectId(submission_id)})
+
+        flash("Submission deleted successfully!", "success")
+        return redirect(request.referrer)
+
+
 
     @staticmethod
-    @boundary.route('/teacher/grade_assignment/<classroom_name>/<assignment_id>/<student_username>', methods=['POST'])
-    def grade_assignment(classroom_name, assignment_id, student_username):
+    @boundary.route('/grade_assignment/<classroom_name>/<assignment_id>/<student_username>/<submission_id>', methods=['POST'])
+    def grade_assignment(classroom_name, assignment_id, student_username, submission_id):
         """Assigns grades and feedback to student submissions."""
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        if request.method == 'POST':
-            grade = request.form.get('grade')
-            feedback = request.form.get('feedback')
+        grade = request.form.get('grade')
 
-            mongo.db.assignments.update_one(
-                {"_id": ObjectId(assignment_id), "submissions.student_username": student_username},
-                {"$set": {
-                    "submissions.$.grade": grade,
-                    "submissions.$.feedback": feedback
-                }}
-            )
+        # Ensure grade is a valid number between 0-100
+        try:
+            grade = int(grade)
+            if grade < 0 or grade > 100:
+                raise ValueError
+        except ValueError:
+            flash("Invalid grade! Must be between 0-100.", "danger")
+            return redirect(request.referrer)
 
-            flash('Grade assigned successfully!', 'success')
-            return redirect(url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment_id))
+        # Update grade in the database
+        mongo.db.submissions.update_one(
+            {"_id": ObjectId(submission_id)},
+            {"$set": {"grade": grade}}
+        )
+
+        flash("Grade assigned successfully!", "success")
+        return redirect(url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment_id))
+
+
 
     @staticmethod
     @boundary.route('/teacher/delete_assignment/<classroom_name>/<assignment_id>', methods=['POST'])
@@ -1348,10 +1439,28 @@ class TeacherAssignmentBoundary:
         flash("Assignment submitted successfully!", "success")
         return render_template('viewAssignment.html', assignment=assignment, filename=filename)
     
+    @boundary.route('/view_submitted_assignment/<filename>', methods=['GET'])
+    def view_submitted_assignment(filename):
+        """Serves student-submitted assignments for viewing."""
+        
+        # Ensure the correct absolute file path
+        file_path = os.path.join(os.getcwd(), "FYP25S109", "static", "uploads", "submissions", filename)
+        
+        # Debugging logs
+        print(f"Trying to open file: {file_path}")
+
+        # Check if the file exists
+        if os.path.exists(file_path):
+            mime_type, _ = mimetypes.guess_type(file_path)  # Detect file type
+            return send_file(file_path, mimetype=mime_type, as_attachment=False)
+
+        # If file is not found, show an error
+        flash("File not found!", "danger")
+        return redirect(request.referrer)
 
 
 
-    
+ 
 # ------------------------------------------------------------- Quiz
 class TeacherCreateQuizBoundary:
     @boundary.route('/teacher/create_quiz/<classroom_name>', methods=['GET', 'POST'])
@@ -1473,7 +1582,9 @@ class StudentAssignmentBoundary:
                     return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
 
                 # Call the controller to process the submission
-                result = StudentSendSubmissionController.submit_assignment_logic(assignment_id, student_username, file)
+                result = StudentSendSubmissionController.submit_assignment_logic(
+                    assignment_id, student_username, file
+                )
 
                 if result['success']:
                     flash('Assignment submitted successfully!', 'success')
@@ -1490,3 +1601,7 @@ class StudentAssignmentBoundary:
             logging.error(f"Error in submit_assignment: {str(e)}")
             flash('An error occurred while submitting the assignment.', 'danger')
             return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+
+
+
+

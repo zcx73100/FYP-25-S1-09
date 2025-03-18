@@ -5,7 +5,17 @@
 {% block content %}
 <div class="container mt-5">
     <h2>Manage Assignments</h2>
-    
+
+    <!-- Search Form -->
+    <form method="POST" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Search assignments..." 
+                   value="{{ request.form.get('search', '') }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    <!-- Assignments Table -->
     <table class="table table-striped">
         <thead>
             <tr>
@@ -22,11 +32,11 @@
                 <td>{{ assignment.description }}</td>
                 <td>{{ assignment.deadline }}</td>
                 <td>
-                    <!-- Button to view submissions -->
+                    <!-- View Submissions -->
                     <a href="{{ url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
                        class="btn btn-info btn-sm">View Submissions</a>
 
-                    <!-- Delete button -->
+                    <!-- Delete Assignment -->
                     <form action="{{ url_for('boundary.delete_assignment', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
                           method="POST" style="display: inline;">
                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
@@ -35,7 +45,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="4" class="text-center">No assignments uploaded yet.</td>
+                <td colspan="4" class="text-center">No assignments found.</td>
             </tr>
             {% endfor %}
         </tbody>
