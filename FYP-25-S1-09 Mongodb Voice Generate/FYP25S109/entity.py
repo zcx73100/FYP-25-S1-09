@@ -12,6 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from io import BytesIO
 from bson import ObjectId
 import pyttsx3
+from gradio_client import Client
 from flask import flash, session, redirect, url_for
 
 # Separate Upload Folders
@@ -363,71 +364,77 @@ class GenerateVideoEntity:
         self.text = text
         self.avatar_path = avatar_path
         self.audio_filename = f"{hash(self.text)}.wav"
-        self.audio_path = os.path.join(GENERATE_FOLDER_AUDIOS, self.audio_filename)
+        self.audio_path = os.path.join("FYP25S109/static/generated_audios", self.audio_filename).replace("\\", "/")
+        self.video_filename = f"{hash(self.text)}.mp4"
+        self.video_path = os.path.join("FYP25S109/static/generated_videos", self.video_filename).replace("\\", "/")
 
     def generate_voice(self):
         """Converts text to speech and saves it as an audio file."""
         try:
-            os.makedirs(GENERATE_FOLDER_AUDIOS, exist_ok=True)
-
+            os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
             engine = pyttsx3.init()
             engine.setProperty("rate", 150)
             engine.setProperty("volume", 1.0)
-
-            print(f"🔊 Generating audio for: {self.text}")
             engine.save_to_file(self.text, self.audio_path)
             engine.runAndWait()
 
             if os.path.exists(self.audio_path):
-                print(f"✅ Audio generated successfully: {self.audio_path}")
-                return self.audio_path  
+                return f"/static/generated_audios/{self.audio_filename}"
             else:
                 raise Exception("❌ Failed to generate audio file.")
-
         except Exception as e:
-            print(f"❌ Error generating voice: {str(e)}")  
-            raise e
+            print(f"❌ Error generating voice: {str(e)}")
+            return None
 
     def generate_video(self):
-        """Generates a video using SadTalker API with the selected avatar & generated voice."""
-        try:
-            os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
+            """Generates a video using SadTalker API with the selected avatar & generated voice."""
+            try:
+                # Ensure required files exist
+                if not os.path.exists(self.audio_path):
+                    raise Exception(f"❌ Audio file not found: {self.audio_path}")
+                if not os.path.exists(self.avatar_path):
+                    raise Exception(f"❌ Avatar file not found: {self.avatar_path}")
 
-            # ✅ Ensure required files exist
-            if not os.path.exists(self.audio_path):
-                raise Exception(f"❌ Audio file not found: {self.audio_path}")
+                print(f"🎬 Sending files to SadTalker API:")
+                print(f"🖼️ Avatar: {self.avatar_path}")
+                print(f"🔊 Audio: {self.audio_path}")
 
-            if not os.path.exists(self.avatar_path):
-                raise Exception(f"❌ Avatar file not found: {self.avatar_path}")
+                # Initialize client with the SadTalker API URL
+                client = Client("https://vinthony-sadtalker.hf.space/--replicas/55zml/")
 
-            print(f"🎬 Sending files to SadTalker API:")
-            print(f"🖼️ Avatar: {self.avatar_path}")
-            print(f"🔊 Audio: {self.audio_path}")
+                # Prepare parameters for the prediction (SadTalker API call)
+                result = client.predict(
+                    self.avatar_path,         # Avatar file path
+                    self.audio_path,          # Audio file path
+                    "crop",                   # Preprocess option
+                    True,                     # Still mode option
+                    True,                     # Face enhancement option
+                    0,                        # Batch size
+                    "256",                    # Resolution
+                    0,                        # Pose style
+                    "facevid2vid",            # Face render option
+                    0,                        # Expression scale
+                    True,                     # Use reference video
+                    None,                     # Reference video (optional)
+                    "pose",                   # Pose reference option
+                    True,                     # Use idle animation
+                    5,                        # Length of generated video (seconds)
+                    True,                     # Use eye blink
+                    fn_index=2               # Specify function index (this may vary based on your API setup)
+                )
 
-            # 🎯 **SadTalker API Call**
-            response = requests.post(
-                "https://kevinwang676-sadtalker.hf.space/run/predict",
-                files={
-                    "image": open(self.avatar_path, "rb"),
-                    "audio": open(self.audio_path, "rb"),
-                }
-            )
+                # Check the result and save the generated video
+                if result:
+                    with open(self.video_path, "wb") as f:
+                        f.write(result)  # Write the video to a file
+                    print(f"✅ Video generated successfully: {self.video_path}")
+                    return f"/static/generated_videos/{self.video_filename}"
+                else:
+                    raise Exception("❌ No result returned from SadTalker API.")
 
-            # ✅ Check API Response
-            if response.status_code == 200:
-                with open(self.video_path, "wb") as f:
-                    f.write(response.content)
-
-                print(f"✅ Video generated successfully: {self.video_path}")
-
-                # Return the relative URL for frontend display
-                return f"/static/generated_videos/{self.video_filename}"
-            else:
-                raise Exception(f"❌ SadTalker failed with status {response.status_code}.")
-
-        except Exception as e:
-            print(f"❌ Error generating video: {str(e)}")
-            raise e
+            except Exception as e:
+                print(f"❌ Error generating video: {str(e)}")
+                return None
 
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):

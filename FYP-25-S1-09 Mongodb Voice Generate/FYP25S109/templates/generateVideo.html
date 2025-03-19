@@ -50,63 +50,95 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        console.log("✅ JavaScript Loaded");  // ✅ Confirm JavaScript is running
+    document.addEventListener("DOMContentLoaded", function () {
+        console.log("✅ JavaScript Loaded");
     
         let errorMsg = document.getElementById("error-message");
         let audioPathInput = document.getElementById("audioPath");
-        let generateVoiceBtn = document.getElementById("generateVoice");
-        let audioPreview = document.getElementById("audioPreview");
+        let generateVideoForm = document.getElementById("videoForm");
     
-        if (!generateVoiceBtn) {
-            console.log("❌ ERROR: Generate Voice button not found!");
-            return;
-        }
-    
-        generateVoiceBtn.addEventListener("click", function() {
-            console.log("🎤 Generate Voice button clicked!");
+        generateVideoForm.addEventListener("submit", function (event) {
+            event.preventDefault();  // ✅ Prevents GET request submission
     
             let textInput = document.getElementById("text").value.trim();
-            if (!textInput) {
-                errorMsg.innerText = "❌ Error: Please enter text before generating voice.";
+            let selectedAvatar = document.querySelector("input[name='selected_avatar']:checked");
+            let audioPath = audioPathInput.value.trim();
+    
+            if (!textInput || !selectedAvatar || !audioPath) {
+                errorMsg.innerText = "❌ Error: Text, avatar, and generated voice are required!";
                 errorMsg.style.display = "block";
-                console.log("❌ No text entered!");
+                console.log("❌ Missing required inputs!");
                 return;
             }
     
-            errorMsg.style.display = "none";
-            console.log("📤 Sending request to generate voice...");
+            errorMsg.style.display = "none";  // ✅ Hide previous errors
     
-            fetch("/generate_voice", {
+            console.log("📤 Sending POST request to generate video...");
+    
+            fetch("/generate_video", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: textInput })
+                body: JSON.stringify({
+                    text: textInput,
+                    selected_avatar: selectedAvatar.value,
+                    audio_path: audioPath
+                })
             })
-            .then(response => {
-                console.log("📥 Response received:", response);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log("📥 Received Voice Response:", data);
+                console.log("📥 Received Video Response:", data);
                 if (data.success) {
-                    console.log("✅ Voice generated:", data.audio_url);
-                    audioPathInput.value = data.audio_url;
-                    audioPreview.src = data.audio_url;
-                    audioPreview.style.display = "block";
-                    audioPreview.play();
+                    console.log("✅ Video Generated:", data.video_url);
+                    window.location.href = data.video_url;  // ✅ Redirect to video
                 } else {
                     console.log("❌ Server Error:", data.error);
-                    errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate voice.");
+                    errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate video.");
                     errorMsg.style.display = "block";
                 }
             })
             .catch(error => {
-                console.log("❌ Fetch Error:", error);
                 errorMsg.innerText = "❌ Fetch Error: " + error.message;
                 errorMsg.style.display = "block";
+                console.log("❌ Fetch Error:", error);
             });
+            
         });
     });
+
+    document.getElementById("generateVoice").addEventListener("click", function () {
+        console.log("🎤 Generate Voice button clicked!");
+    
+        let textInput = document.getElementById("text").value.trim();
+        if (!textInput) {
+            alert("⚠ Please enter text for voice generation!");
+            return;
+        }
+    
+        console.log("📤 Sending request to generate voice...");
+        fetch("/generate_voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: textInput })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("📥 Received Voice Response:", data);
+            if (data.success) {
+                console.log("✅ Voice generated:", data.audio_url);
+                let audioPreview = document.getElementById("audioPreview");
+                audioPreview.src = data.audio_url;
+                audioPreview.style.display = "block";
+                document.getElementById("audioPath").value = data.audio_url;  // Store path for video generation
+            } else {
+                console.error("❌ Server Error:", data.error);
+                alert("❌ Error generating voice: " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error("❌ Fetch Error:", error);
+            alert("❌ Fetch Error: " + error.message);
+        });
+    });   
     
 </script>
 

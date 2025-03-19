@@ -26,7 +26,7 @@ os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
-API_URL = "https://kevinwang676-sadtalker.hf.space/"
+API_URL = "https://vinthony-sadtalker.hf.space/--replicas/55zml"
 client = Client(API_URL)
 
 GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
@@ -111,9 +111,9 @@ class HomePage:
             assignments=assignments,  # ✅ Assignments second
             quizzes=quizzes  # ✅ Quizzes last
         )
-
-
-# Generate Video 
+      
+        
+# Generate Video
 video_progress = {}
 
 @boundary.route("/generate_voice", methods=["POST"])
@@ -134,98 +134,113 @@ def generate_voice():
         audio_url = voice_entity.generate_voice()
 
         # ✅ Debugging: Ensure file exists
-        audio_path = os.path.join(GENERATE_FOLDER_AUDIOS, os.path.basename(audio_url))
+        audio_filename = os.path.basename(audio_url)
+        audio_path = os.path.join("FYP25S109", "static", "generated_audios", audio_filename)
+        print(f"🔍 Checking if audio file exists: {audio_path}")
+
         if not os.path.exists(audio_path):
-            print(f"❌ Error: File not saved at {audio_path}")
+            print(f"❌ ERROR: Audio file was NOT saved at {audio_path}")
             return jsonify({"success": False, "error": "Failed to save audio file"}), 500
 
-        print(f"✅ Audio file saved: {audio_path}")
-        return jsonify({"success": True, "audio_url": f"/static/generated_audios/{os.path.basename(audio_url)}"})
+        print(f"✅ Audio file saved successfully: {audio_path}")
+        return jsonify({"success": True, "audio_url": audio_url})
 
     except Exception as e:
         print(f"❌ Server error: {e}")
         return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
-    
-@boundary.route("/generate_video", methods=["GET"])
-def generate_video_page():
-    """Loads the Generate Video Page with available avatars."""
-    try:
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
-        return render_template("generateVideo.html", avatars=avatars)
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Failed to load avatars: {str(e)}"}), 500
 
-@boundary.route("/generate_video", methods=["POST"])
+@boundary.route("/generate_video", methods=["GET", "POST"])
 def generate_video():
-    """Handles video generation requests via SadTalker API."""
+    """Handles video generation requests (GET loads the page, POST generates the video)."""
     try:
-        print("📥 Received video generation request")  
-        data = request.get_json()
+        if request.method == "GET":
+            print("📄 GET request received → Loading generate video page...")
+            avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
+            return render_template("generateVideo.html", avatars=avatars)  # Load the page
 
-        if not data:
-            print("❌ Error: No data received!")
-            return jsonify({"success": False, "error": "No data received"}), 400
+        elif request.method == "POST":
+            print("📥 POST request received → Generating video...")
+            data = request.get_json()
 
-        print(f"🔹 Request Data: {data}")
+            if not data:
+                print("❌ Error: No data received!")
+                return jsonify({"success": False, "error": "No data received"}), 400
 
-        text = data.get("text")
-        avatar_path = data.get("selected_avatar")
-        audio_path = data.get("audio_path")
+            print(f"🔹 Request Data: {data}")
 
-        if not text or not avatar_path or not audio_path:
-            print("❌ Missing required parameters!")
-            return jsonify({"success": False, "error": "Text, avatar, and audio are required!"}), 400
+            text = data.get("text")
+            avatar_path = os.path.join("FYP25S109/static", data.get("selected_avatar")).replace("\\", "/")
+            audio_path = os.path.join("FYP25S109", data.get("audio_path").lstrip("/")).replace("\\", "/")
 
-        print(f"🖼️ Avatar URL: {avatar_path}")
-        print(f"🔊 Audio URL: {audio_path}")
+            if not text or not avatar_path or not audio_path:
+                print("❌ Missing required parameters!")
+                return jsonify({"success": False, "error": "Text, avatar, and audio are required!"}), 400
 
-        # ✅ Call the entity to generate video
-        video_entity = GenerateVideoEntity(text, avatar_path)
-        video_url = video_entity.generate_video(audio_path)
+            print(f"🖼️ Avatar URL: {avatar_path}")
+            print(f"🔊 Audio URL: {audio_path}")
 
-        if not video_url:
-            print("❌ Video generation failed!")
-            return jsonify({"success": False, "error": "Failed to generate video"}), 500
+            # ✅ Call the entity to generate video
+            video_entity = GenerateVideoEntity(text, avatar_path)
+            video_url = video_entity.generate_video()  # No need to pass audio_path here
 
-        print(f"✅ Video generated: {video_url}")
-        return jsonify({"success": True, "video_url": video_url})
+            if not video_url:
+                print("❌ Video generation failed!")
+                return jsonify({"success": False, "error": "Failed to generate video"}), 500
+
+            print(f"✅ Video generated: {video_url}")
+            return jsonify({"success": True, "video_url": video_url})
 
     except Exception as e:
         print(f"❌ Server error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+
 def process_video(video_id, text, avatar_path, audio_path):
+    """Processes video and calls SadTalker API."""
     try:
         for i in range(0, 101, 10):
             video_progress[video_id] = i
-            time.sleep(3)
+            time.sleep(3)  # Simulate processing time
 
+        print(f"🎬 Sending request to SadTalker API with Avatar: {avatar_path} and Audio: {audio_path}")
         result = client.predict(avatar_path, audio_path, "crop", True, True, 0, "256", 0, fn_index=0)
 
         if not result:
+            print("❌ SadTalker API failed to return a video URL!")
             video_progress[video_id] = -1
-            return
+            return None  # Return None on failure
 
+        # ✅ Extract video path and update progress
         video_filename = os.path.basename(result)
         video_path = f"/static/generated_videos/{video_filename}"
         video_progress[video_id] = 100
+        print(f"✅ Video Processing Complete: {video_path}")
+        return video_path  
 
     except Exception as e:
+        print(f"❌ Error in video processing: {e}")
         video_progress[video_id] = -1
+        return None
+
 
 @boundary.route("/video_status", methods=["GET"])
 def video_status():
+    """Fetches video progress status."""
     video_id = request.args.get("video_id")
 
     if video_id not in video_progress:
         return jsonify({"success": False, "error": "Invalid video ID"}), 400
 
     progress = video_progress[video_id]
+
+    # Handle errors if video processing failed
+    if progress == -1:
+        return jsonify({"success": False, "error": "Video processing failed!"}), 500
+
     time_left = (100 - progress) // 10 * 3
 
-    return jsonify({"success": True, "progress": progress, "time_left": time_left})    
-
+    return jsonify({"success": True, "progress": progress, "time_left": time_left})
 
 # Log In
 class LoginBoundary:
