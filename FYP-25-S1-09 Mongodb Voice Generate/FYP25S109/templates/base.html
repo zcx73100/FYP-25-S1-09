@@ -56,7 +56,7 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.confirm_teacher_page') }}">Confirm Teacher Account</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_users') }}">Manage Users</a></li>
                                 </ul>
                             </li>
@@ -71,7 +71,7 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Register Student</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_classrooms') }}">Manage Classrooms</a></li>
                                 </ul>
                             </li>
@@ -89,11 +89,11 @@
                         {% elif session.get('role') in ["Student"] %}
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                                    My Profile
+                                    Student Menu
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('boundary.admin_manage_avatars') }}">Manage Avatars</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
                                 </ul>
                             </li>
                         {% endif %}

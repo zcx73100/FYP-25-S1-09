@@ -639,8 +639,8 @@ class DeleteUploadedVideosBoundary:
 # Manage Avatar
 class ManageAvatarBoundary:
     @staticmethod
-    @boundary.route('/admin_manage_avatars')
-    def admin_manage_avatars():
+    @boundary.route('/manage_avatars')
+    def manage_avatars():
         if 'username' not in session:
             flash("You must be logged in to manage your avatar.", category='error')
             return redirect(url_for('boundary.login'))
@@ -650,7 +650,7 @@ class ManageAvatarBoundary:
         if not avatars:
             flash("No avatars found for your account.", category='info')
         return render_template(
-            "admin_manage_avatars.html",
+            "manage_avatars.html",
             username=username,
             user_role=user_role,
             avatars=avatars
@@ -697,12 +697,12 @@ class DeleteAvatarBoundary:
         avatar = Avatar.find_by_id(avatar_id)
         if not avatar:
             flash("Avatar not found.", category='error')
-            return redirect(url_for('boundary.admin_manage_avatars'))
+            return redirect(url_for('boundary.manage_avatars'))
         if Avatar.delete_avatar(avatar_id):
             flash("Avatar deleted successfully.", category='success')
         else:
             flash("Failed to delete avatar.", category='error')
-        return redirect(url_for('boundary.admin_manage_avatars'))
+        return redirect(url_for('boundary.manage_avatars'))
     
 # Admin Manage User
 class ManageUserBoundary:
