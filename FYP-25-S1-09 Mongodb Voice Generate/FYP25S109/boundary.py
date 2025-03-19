@@ -1645,8 +1645,8 @@ class DiscussionRoomBoundary:
         return redirect(url_for('boundary.access_forum', classroom_name=classroom_name))
 
     @staticmethod
-    @boundary.route('/forum/<classroom_name>/delete', methods=['GET','POST'])
-    def delete_discussion_room(classroom_name):
+    @boundary.route('/forum/<classroom_name>/<discussion_room_id>/delete', methods=['GET','POST'])
+    def delete_discussion_room(classroom_name,discussion_room_id):
         discussion_room_id = request.form.get('discussion_room_id')  # Retrieve from form
         classroom_name = request.form.get('classroom_name')  # Retrieve from form
 
@@ -1659,13 +1659,13 @@ class DiscussionRoomBoundary:
 
 
     @staticmethod
-    @boundary.route('/discussion_room', methods=['GET'])
-    def view_discussion_room():
+    @boundary.route('/forum/', methods=['GET'])
+    def view_discussion_room_list():
         rooms = RetrieveDiscussionRoomController.get_all_discussion_rooms()
         return render_template('forum.html', discussion_rooms=rooms)
 
     @staticmethod
-    @boundary.route('/discussion_room/search', methods=['GET'])
+    @boundary.route('/forum/search', methods=['GET'])
     def search_discussion_room():
         search_query = request.args.get('query')
         rooms = SearchDiscussionRoomController.search_discussion_room(search_query)
@@ -1681,23 +1681,44 @@ class DiscussionRoomBoundary:
         # Check if the discussion room exists
         if not room:
             flash("Discussion room not found.", "danger")
-            return redirect(url_for('boundary.view_discussion_room'))
+            return redirect(url_for('boundary.view_discussion_room_list'))
 
         # Render the template with messages and room data
         return render_template('discussionRoom.html', room=room, messages=messages, discussion_room_id=discussion_room_id)
 
-    
     @staticmethod
-    @boundary.route('/discussion_room/update', methods=['POST'])
-    def update_discussion_room(discussion_room_id):
-        discussion_room_id = request.form.get('discussion_room_id')
-        discussion_room_name = request.form.get('discussion_room_name')
-        discussion_room_description = request.form.get('discussion_room_description')
-        if UpdateDiscussionRoomController.update_discussion_room(discussion_room_id, discussion_room_name, discussion_room_description):
-            flash("Discussion room updated successfully!", "success")
-        else:
-            flash("Failed to update discussion room.", "danger")
-        return redirect(url_for('view_discussion_room'))
+    @boundary.route('/discussion_room/update', methods=['GET', 'POST'])
+    def update_discussion_room():
+        discussion_room_id = request.args.get('discussion_room_id') or request.form.get('discussion_room_id')
+
+        if request.method == 'GET':
+            # Fetch existing details from the database
+            discussion_room = UpdateDiscussionRoomController.get_discussion_room_by_id(discussion_room_id)
+
+            if not discussion_room:
+                flash("Discussion room not found.", "danger")
+                return redirect(url_for('boundary.view_discussion_room_list'))
+
+            # Show the update form
+            return render_template('update_discussion_room.html', discussion_room=discussion_room)
+
+        elif request.method == 'POST':
+            discussion_room_name = request.form.get('discussion_room_name')
+            discussion_room_description = request.form.get('discussion_room_description')
+            print(f"Discussion Room Name: {discussion_room_name}")
+            print(f"Discussion Room Description: {discussion_room_description}")
+            new_details = {
+                "discussion_room_name": discussion_room_name,
+                "discussion_room_description": discussion_room_description
+            }
+
+            if UpdateDiscussionRoomController.update_discussion_room(discussion_room_id, new_details):
+                flash("Discussion room updated successfully!", "success")
+            else:
+                flash("Failed to update discussion room.", "danger")
+
+            return redirect(url_for('boundary.view_discussion_room_list'))
+
 
 
 class MessageBoundary:

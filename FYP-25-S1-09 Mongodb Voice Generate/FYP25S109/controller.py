@@ -272,14 +272,20 @@ class SearchDiscussionRoomController:
     @staticmethod
     def search_discussion_room(search_query):
         return DiscussionRoom.search_discussion_room(search_query)
+    
 class UpdateDiscussionRoomController:
+    @staticmethod
+    def get_discussion_room_by_id(discussion_room_id):
+        return DiscussionRoom.find_by_id(discussion_room_id)
     @staticmethod
     def update_discussion_room(discussion_room_id, new_details):
         return DiscussionRoom.update_discussion_room(discussion_room_id, new_details)
+    
 class DeleteDiscussionRoomController:
     @staticmethod
     def delete_discussion_room(discussion_room_id):
         return DiscussionRoom.delete_discussion_room(discussion_room_id)
+    
 class RetrieveDiscussionRoomController:
     @staticmethod
     def get_all_discussion_rooms():

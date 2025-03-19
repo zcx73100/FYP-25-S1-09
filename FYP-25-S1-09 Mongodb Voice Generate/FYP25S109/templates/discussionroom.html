@@ -50,10 +50,7 @@
     </div>
     <!-- Back Button -->
     <div class="mb-3">
-        <form action="{{ url_for('boundary.access_forum',classroom_name=classroom_name) }}" method="POST">
-            <input type="hidden" name="classroom_name" value="{{ classroom_name }}">
-            <button type="submit" class="btn btn-secondary">Back</button>
-        </form>
+        <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">Back</a>
     </div>
 </div>
 
