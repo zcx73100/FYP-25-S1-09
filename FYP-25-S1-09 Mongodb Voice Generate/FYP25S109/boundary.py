@@ -567,7 +567,6 @@ class UploadTutorialBoundary:
             file = request.files.get('file')
             title = request.form.get("title")
             username = session.get("username")
-            user_role = session.get("role", "User")
             description = request.form.get("description")
             if not title:
                 flash("Please provide a title for the video.", category='error')
@@ -583,7 +582,6 @@ class UploadTutorialBoundary:
                 video_name=file.filename,
                 video_file=file,
                 username=username,
-                user_role=user_role,
                 description = description
             )
             result = video.save_video()
