@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Manage Quizzes for {{ classroom_name }}</h2>
+
+<a href="{{ url_for('boundary.create_quiz', classroom_name=classroom_name) }}" class="btn btn-primary">Create New Quiz</a>
+
+<h3>Existing Quizzes</h3>
+<ul>
+    {% for quiz in quizzes %}
+    <li>
+        <a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id|string) }}">{{ quiz.title or "Untitled Quiz" }}</a>
+        <form action="{{ url_for('boundary.delete_quiz', quiz_id=quiz._id) }}" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

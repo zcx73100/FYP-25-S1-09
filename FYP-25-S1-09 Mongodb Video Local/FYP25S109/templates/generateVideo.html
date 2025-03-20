@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-center mt-4">Create Animated Video</h2>
+
+    <div id="error-message" class="alert alert-danger text-center" style="display: none;"></div>
+
+    <form id="videoForm" class="card p-4 shadow mt-4">
+        <div class="mb-3">
+            <label for="text" class="form-label">Enter Text for Animation:</label>
+            <textarea id="text" name="text" class="form-control" required></textarea>
+        </div>
+
+        <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">Generate Voice</button>
+
+        <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
+        <input type="hidden" id="audioPath" name="audioPath">
+
+        <div class="mb-3">
+            <label class="form-label">Select an Avatar:</label>
+            <div class="avatar-grid">
+                {% if avatars %}
+                    {% for avatar in avatars %}
+                    <label class="avatar-option me-2">
+                        <input type="radio" name="selected_avatar" value="{{ avatar.file_path }}">
+                        <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}" width="150" height="150">
+                        <p>Avatar Name: {{ avatar.avatarname }}</p>
+                    </label>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-danger">No avatars available.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Generate Video</button>
+
+        <div id="progress-container" style="display: none; margin-top: 20px;">
+            <label class="form-label">Video Generation Progress:</label>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" 
+                    style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    0%
+                </div>
+            </div>
+            <p id="time-left" class="text-center mt-2"></p>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        console.log("✅ JavaScript Loaded");
+    
+        let errorMsg = document.getElementById("error-message");
+        let audioPathInput = document.getElementById("audioPath");
+        let generateVideoForm = document.getElementById("videoForm");
+    
+        generateVideoForm.addEventListener("submit", function (event) {
+            event.preventDefault();  // ✅ Prevents GET request submission
+    
+            let textInput = document.getElementById("text").value.trim();
+            let selectedAvatar = document.querySelector("input[name='selected_avatar']:checked");
+            let audioPath = audioPathInput.value.trim();
+    
+            if (!textInput || !selectedAvatar || !audioPath) {
+                errorMsg.innerText = "❌ Error: Text, avatar, and generated voice are required!";
+                errorMsg.style.display = "block";
+                console.log("❌ Missing required inputs!");
+                return;
+            }
+    
+            errorMsg.style.display = "none";  // ✅ Hide previous errors
+    
+            console.log("📤 Sending POST request to generate video...");
+    
+            fetch("/generate_video", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    text: textInput,
+                    selected_avatar: selectedAvatar.value,
+                    audio_path: audioPath
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("📥 Received Video Response:", data);
+                if (data.success) {
+                    console.log("✅ Video Generated:", data.video_url);
+                    window.location.href = data.video_url;  // ✅ Redirect to video
+                } else {
+                    console.log("❌ Server Error:", data.error);
+                    errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate video.");
+                    errorMsg.style.display = "block";
+                }
+            })
+            .catch(error => {
+                errorMsg.innerText = "❌ Fetch Error: " + error.message;
+                errorMsg.style.display = "block";
+                console.log("❌ Fetch Error:", error);
+            });
+            
+        });
+    });
+
+    document.getElementById("generateVoice").addEventListener("click", function () {
+        console.log("🎤 Generate Voice button clicked!");
+    
+        let textInput = document.getElementById("text").value.trim();
+        if (!textInput) {
+            alert("⚠ Please enter text for voice generation!");
+            return;
+        }
+    
+        console.log("📤 Sending request to generate voice...");
+        fetch("/generate_voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: textInput })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("📥 Received Voice Response:", data);
+            if (data.success) {
+                console.log("✅ Voice generated:", data.audio_url);
+                let audioPreview = document.getElementById("audioPreview");
+                audioPreview.src = data.audio_url;
+                audioPreview.style.display = "block";
+                document.getElementById("audioPath").value = data.audio_url;  // Store path for video generation
+            } else {
+                console.error("❌ Server Error:", data.error);
+                alert("❌ Error generating voice: " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error("❌ Fetch Error:", error);
+            alert("❌ Fetch Error: " + error.message);
+        });
+    });   
+    
+</script>
+
+{% endblock %}

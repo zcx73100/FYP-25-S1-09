@@ -1,0 +1,78 @@
+{% extends "base.html" %}  
+
+{% block content %} 
+<h2 class="upload-title">Upload Assignment for {{ classroom_name }}</h2>  
+
+<form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom_name) }}" 
+      method="POST" enctype="multipart/form-data" class="upload-form">  
+
+    <input type="text" name="title" placeholder="Assignment Title" class="input-field">  
+    <input type="text" name="description" placeholder="Assignment Description" class="input-field">  
+    <input type="datetime-local" name="deadline" class="input-field">  
+    <input type="file" name="file" class="file-input">  
+
+    <button type="submit" class="upload-button">Upload Assignment</button>  
+</form>  
+
+<style>
+  /* Container for the form */
+.upload-form {
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Title styling */
+.upload-title {
+    text-align: center;
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+/* Styling for text inputs and datetime picker */
+.input-field {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.input-field:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+/* File input styling */
+.file-input {
+    border: none;
+    font-size: 16px;
+}
+
+/* Upload button styling */
+.upload-button {
+    background-color: #007bff;
+    color: white;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.upload-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+</style>
+{% endblock %}

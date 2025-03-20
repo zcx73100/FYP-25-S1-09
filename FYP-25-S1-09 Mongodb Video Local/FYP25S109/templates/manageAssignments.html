@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Assignments{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Manage Assignments</h2>
+
+    <!-- Search Form -->
+    <form method="POST" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Search assignments..." 
+                   value="{{ request.form.get('search', '') }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    <!-- Assignments Table -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Deadline</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for assignment in assignments %}
+            <tr>
+                <td>{{ assignment.title }}</td>
+                <td>{{ assignment.description }}</td>
+                <td>{{ assignment.deadline }}</td>
+                <td>
+                    <!-- View Submissions -->
+                    <a href="{{ url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
+                       class="btn btn-info btn-sm">View Submissions</a>
+
+                    <!-- Delete Assignment -->
+                    <form action="{{ url_for('boundary.delete_assignment', classroom_name=classroom_name, assignment_id=assignment._id) }}" 
+                          method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="text-center">No assignments found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom_name) }}" class="btn btn-secondary mt-3">Back</a>
+</div>
+{% endblock %}
