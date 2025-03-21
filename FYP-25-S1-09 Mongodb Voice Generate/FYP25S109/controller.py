@@ -76,7 +76,7 @@ class AddAvatarController:
         avatar = Avatar(avatar_file, avatarname, username)
         return avatar.save_image()  
 
-class AdminDeleteAvatarController:
+class DeleteAvatarController:
     @staticmethod
     def delete_avatar(avatar_id):
         return Avatar.delete_avatar(avatar_id)  # Call entity method

@@ -696,7 +696,7 @@ class DeleteAvatarBoundary:
         if not avatar:
             flash("Avatar not found.", category='error')
             return redirect(url_for('boundary.manage_avatars'))
-        if Avatar.delete_avatar(avatar_id):
+        if DeleteAvatarController.delete_avatar(avatar_id):
             flash("Avatar deleted successfully.", category='success')
         else:
             flash("Failed to delete avatar.", category='error')
