@@ -603,7 +603,7 @@ class ViewUploadedVideosBoundary:
         ))
         return render_template("manageVideo.html", videos=admin_videos)
     
-    
+
 # View Uploaded Videos (Single Video)
 class ViewSingleTutorialBoundary:
     @staticmethod
@@ -961,9 +961,6 @@ class TeacherManageStudentsBoundary:
     @staticmethod
     @boundary.route('/teacher/manageStudents/<classroom_name>', methods=['GET', 'POST'])
     def manage_students(classroom_name):
-        if 'role' not in session or session.get('role') != 'Teacher':
-            flash("Unauthorized access.", category='error')
-            return redirect(url_for('boundary.home'))
 
         # Retrieve classroom document
         classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
@@ -1078,12 +1075,7 @@ class TeacherManageStudentsBoundary:
     @staticmethod
     @boundary.route('/teacher/searchStudent/<classroom_name>', methods=['GET'])
     def search_student(classroom_name):
-        if 'role' not in session or session.get('role') != 'Teacher':
-            flash("Unauthorized access.", category='error')
-            return redirect(url_for('boundary.home'))
-
         query = request.args.get('query', '').strip()  # Get query from request parameters
-
         # Retrieve classroom document
         classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
         if not classroom:
@@ -1441,18 +1433,6 @@ class TeacherAssignmentBoundary:
         return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
     
     
-    @staticmethod
-    @boundary.route('/view_assignment/<assignment_id>/<filename>')
-    def view_assignment(assignment_id, filename):
-        # Fetch the assignment from the database using assignment_id (if needed)
-        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
-
-
-        file_path = os.path.join(ASSIGNMENT_UPLOAD_FOLDER, filename)
-        
-        flash("Assignment submitted successfully!", "success")
-        return render_template('viewAssignment.html', assignment=assignment, filename=filename)
-    
     @boundary.route('/view_submitted_assignment/<filename>', methods=['GET'])
     def view_submitted_assignment(filename):
         """Serves student-submitted assignments for viewing."""
@@ -1570,6 +1550,17 @@ class TeacherAnnouncementBoundary:
         flash("Announcement deleted successfully!", category='success')
         return redirect(request.referrer)
     
+class ViewAssignmentBoundary:
+    @staticmethod
+    @boundary.route('/view_assignment/<assignment_id>/<filename>')
+    def view_assignment(assignment_id, filename):
+        # Fetch the assignment from the database using assignment_id (if needed)
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+
+        file_path = os.path.join(ASSIGNMENT_UPLOAD_FOLDER, filename)
+        
+        flash("Assignment submitted successfully!", "success")
+        return render_template('viewAssignment.html', assignment=assignment, filename=filename)
 
 class StudentAssignmentBoundary:
     UPLOAD_FOLDER = "FYP25S109/static/uploads/submissions/"
@@ -1615,7 +1606,7 @@ class StudentAssignmentBoundary:
             logging.error(f"Error in submit_assignment: {str(e)}")
             flash('An error occurred while submitting the assignment.', 'danger')
             return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
-
+    
 
 
 class AccessForumBoundary:

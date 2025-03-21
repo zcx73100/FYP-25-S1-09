@@ -22,14 +22,17 @@
     <button type="submit">Search</button>
 </form>
 
-<h2>Enrolled Students</h2>
+
+<h2>{% if session.get('role') == "Student" %}Students in this classroom{% else %}Enrolled Students{% endif %}</h2>
 <table border="1">
     <tr>
         <th>Username</th>
         <th>Email</th>
         <th>Role</th>
         <th>Status</th>
+        {% if session.get('role') != "Student" %}
         <th>Actions</th>
+        {% endif %}
     </tr>
     {% for student in enrolled_students %}
     <tr>
@@ -37,6 +40,7 @@
         <td>{{ student.email }}</td>
         <td>{{ student.role }}</td>
         <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
+        {% if session.get('role') != "Student" %}
         <td>
             <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
                 {% if student.status != "suspended" %}
@@ -60,10 +64,12 @@
                 <button type="submit">Remove from Classroom</button>
             </form>
         </td>
+        {% endif %}
     </tr>
     {% endfor %}
 </table>
 
+{% if session.get('role') != "Student" %}
 <h2>Unenrolled Students</h2>
 <table border="1">
     <tr>
@@ -87,6 +93,7 @@
     </tr>
     {% endfor %}
 </table>
+{% endif %}
 
 <!-- Back to Classroom Button -->
 <form method="post" action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">

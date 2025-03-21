@@ -90,14 +90,12 @@
             {% endif %}
         </ul>
     </div>
-    {% if session['role'] == 'Teacher' %}
     <div class="classroom-section">
-        <h3>Manage Students</h3>
+        <h3>Students in this Classroom</h3>
         <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
-            <button type="submit" class="btn btn-primary">Manage Students in this Classroom</button>
+            <button type="submit" class="btn btn-primary">See Students in this Classroom</button>
         </form>
     </div>
-    {% endif %}
 
     <style>
         .file-button {
