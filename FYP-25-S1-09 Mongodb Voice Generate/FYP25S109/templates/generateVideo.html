@@ -2,30 +2,32 @@
 
 {% block content %}
 <div class="container">
-    <h2 class="text-center mt-4">Create Animated Video</h2>
+    <h2 class="text-center mt-4">🎬 Create Animated Video</h2>
 
     <div id="error-message" class="alert alert-danger text-center" style="display: none;"></div>
 
     <form id="videoForm" class="card p-4 shadow mt-4">
+        <!-- Text Input -->
         <div class="mb-3">
             <label for="text" class="form-label">Enter Text for Animation:</label>
             <textarea id="text" name="text" class="form-control" required></textarea>
         </div>
 
-        <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">Generate Voice</button>
-
+        <!-- Voice Generation -->
+        <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">🔊 Generate Voice</button>
         <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
-        <input type="hidden" id="audioPath" name="audioPath">
+        <input type="hidden" id="audio_path" name="audio_path">
 
+        <!-- Avatar Selection -->
         <div class="mb-3">
-            <label class="form-label">Select an Avatar:</label>
+            <label class="form-label">🖼️ Select an Avatar:</label>
             <div class="avatar-grid">
                 {% if avatars %}
                     {% for avatar in avatars %}
                     <label class="avatar-option me-2">
-                        <input type="radio" name="selected_avatar" value="{{ avatar.file_path }}">
+                        <input type="radio" name="avatar_path" value="/static/{{ avatar.file_path }}" required>
                         <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}" width="150" height="150">
-                        <p>Avatar Name: {{ avatar.avatarname }}</p>
+                        <p>{{ avatar.avatarname }}</p>
                     </label>
                     {% endfor %}
                 {% else %}
@@ -34,8 +36,10 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100">Generate Video</button>
+        <!-- Video Generation -->
+        <button type="submit" class="btn btn-primary w-100">🎥 Generate Video</button>
 
+        <!-- Loading Bar (optional placeholder) -->
         <div id="progress-container" style="display: none; margin-top: 20px;">
             <label class="form-label">Video Generation Progress:</label>
             <div class="progress">
@@ -44,77 +48,29 @@
                     0%
                 </div>
             </div>
-            <p id="time-left" class="text-center mt-2"></p>
         </div>
     </form>
+
+    <!-- Output Video -->
+    <div id="video-preview" class="text-center mt-4"></div>
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        console.log("✅ JavaScript Loaded");
-    
-        let errorMsg = document.getElementById("error-message");
-        let audioPathInput = document.getElementById("audioPath");
-        let generateVideoForm = document.getElementById("videoForm");
-    
-        generateVideoForm.addEventListener("submit", function (event) {
-            event.preventDefault();  // ✅ Prevents GET request submission
-    
-            let textInput = document.getElementById("text").value.trim();
-            let selectedAvatar = document.querySelector("input[name='selected_avatar']:checked");
-            let audioPath = audioPathInput.value.trim();
-    
-            if (!textInput || !selectedAvatar || !audioPath) {
-                errorMsg.innerText = "❌ Error: Text, avatar, and generated voice are required!";
-                errorMsg.style.display = "block";
-                console.log("❌ Missing required inputs!");
-                return;
-            }
-    
-            errorMsg.style.display = "none";  // ✅ Hide previous errors
-    
-            console.log("📤 Sending POST request to generate video...");
-    
-            fetch("/generate_video", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    text: textInput,
-                    selected_avatar: selectedAvatar.value,
-                    audio_path: audioPath
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("📥 Received Video Response:", data);
-                if (data.success) {
-                    console.log("✅ Video Generated:", data.video_url);
-                    window.location.href = data.video_url;  // ✅ Redirect to video
-                } else {
-                    console.log("❌ Server Error:", data.error);
-                    errorMsg.innerText = "❌ Error: " + (data.error || "Failed to generate video.");
-                    errorMsg.style.display = "block";
-                }
-            })
-            .catch(error => {
-                errorMsg.innerText = "❌ Fetch Error: " + error.message;
-                errorMsg.style.display = "block";
-                console.log("❌ Fetch Error:", error);
-            });
-            
-        });
-    });
+document.addEventListener("DOMContentLoaded", function () {
+    const errorMsg = document.getElementById("error-message");
+    const audioPathInput = document.getElementById("audio_path");
+    const generateVideoForm = document.getElementById("videoForm");
+    const audioPreview = document.getElementById("audioPreview");
+    const videoPreview = document.getElementById("video-preview");
 
+    // 🎤 Generate Voice
     document.getElementById("generateVoice").addEventListener("click", function () {
-        console.log("🎤 Generate Voice button clicked!");
-    
-        let textInput = document.getElementById("text").value.trim();
+        const textInput = document.getElementById("text").value.trim();
         if (!textInput) {
             alert("⚠ Please enter text for voice generation!");
             return;
         }
-    
-        console.log("📤 Sending request to generate voice...");
+
         fetch("/generate_voice", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -122,24 +78,66 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log("📥 Received Voice Response:", data);
             if (data.success) {
-                console.log("✅ Voice generated:", data.audio_url);
-                let audioPreview = document.getElementById("audioPreview");
+                audioPathInput.value = data.audio_url;
                 audioPreview.src = data.audio_url;
                 audioPreview.style.display = "block";
-                document.getElementById("audioPath").value = data.audio_url;  // Store path for video generation
             } else {
-                console.error("❌ Server Error:", data.error);
-                alert("❌ Error generating voice: " + data.error);
+                alert("❌ Voice generation failed: " + data.error);
             }
         })
         .catch(error => {
-            console.error("❌ Fetch Error:", error);
-            alert("❌ Fetch Error: " + error.message);
+            console.error("❌ Error:", error);
+            alert("❌ Error generating voice.");
         });
-    });   
-    
-</script>
+    });
 
+    // 🎬 Submit Video Generation Form
+    generateVideoForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const text = document.getElementById("text").value.trim();
+        const avatarRadio = document.querySelector("input[name='avatar_path']:checked");
+        const avatarPath = avatarRadio ? avatarRadio.value : null;
+        const audioPath = audioPathInput.value.trim();
+
+        if (!text || !avatarPath || !audioPath) {
+            errorMsg.innerText = "❌ Please enter text, select an avatar, and generate voice.";
+            errorMsg.style.display = "block";
+            return;
+        }
+        errorMsg.style.display = "none";
+
+        const formData = new FormData();
+        formData.append("text", text);
+        formData.append("avatar_path", avatarPath);
+        formData.append("audio_path", audioPath);
+
+        document.getElementById("progress-container").style.display = "block";
+
+        fetch("/generate_video", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const videoURL = data.video_url;
+                videoPreview.innerHTML = `
+                    <video width="400" controls autoplay>
+                        <source src="${videoURL}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>`;
+            } else {
+                errorMsg.innerText = "❌ Error: " + (data.error || "Video generation failed.");
+                errorMsg.style.display = "block";
+            }
+        })
+        .catch(error => {
+            errorMsg.innerText = "❌ Error: " + error.message;
+            errorMsg.style.display = "block";
+        });
+    });
+});
+</script>
 {% endblock %}
