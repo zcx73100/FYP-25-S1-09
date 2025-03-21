@@ -55,7 +55,7 @@ class DeleteVideoController:
     def delete_video(video_id):
         return TutorialVideo.delete_video(video_id)  # Call entity method
     
-class SearchVideoController:
+class SearchTutorialController:
     @staticmethod
     def search_video(search_query):
         return TutorialVideo.search_video(search_query)  # Call entity method

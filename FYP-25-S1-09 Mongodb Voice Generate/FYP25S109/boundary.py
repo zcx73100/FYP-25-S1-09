@@ -458,9 +458,9 @@ class SearchBoundary:
             return redirect(url_for('boundary.home'))
 
         if filter_type == 'video':
-            search_results = TutorialVideo.search_video(search_query)
+            search_results = SearchTutorialController.search_video(search_query)
         elif filter_type == 'avatar':
-            search_results = Avatar.search_avatar(search_query)
+            search_results = SearchAvatarController.search_avatar(search_query)
         else:
             flash("Invalid filter type.", category="error")
             return redirect(url_for('boundary.home'))
