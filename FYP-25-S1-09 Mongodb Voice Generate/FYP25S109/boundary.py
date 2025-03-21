@@ -659,7 +659,7 @@ class AddAvatarBoundary:
     UPLOAD_FOLDER_AVATAR = 'FYP25S109/static/uploads/avatar/'
 
     @staticmethod
-    @boundary.route('/admin_create_avatar', methods=['GET', 'POST'])
+    @boundary.route('/create_avatar', methods=['GET', 'POST'])
     def create_avatar():
         if 'username' not in session:
             flash("You must be logged in to create an avatar.", category='error')
@@ -672,7 +672,7 @@ class AddAvatarBoundary:
 
             if not username or not avatar_file or not avatarname:
                 flash("Username, avatar name, and avatar file are required.", category='error')
-                return redirect(url_for('boundary.admin_create_avatar'))
+                return redirect(url_for('boundary.create_avatar'))
 
             result = AddAvatarController.add_avatar(username, avatarname, avatar_file)
 
@@ -681,7 +681,7 @@ class AddAvatarBoundary:
             else:
                 flash(f"Failed to add avatar: {result['message']}", category='error')
 
-            return redirect(url_for('boundary.admin_create_avatar'))
+            return redirect(url_for('boundary.create_avatar'))
 
         return render_template("admin_add_avatar.html")
     

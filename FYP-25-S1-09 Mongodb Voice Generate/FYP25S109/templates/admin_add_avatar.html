@@ -3,7 +3,7 @@
     <h2>Add Avatar</h2>
 
     <!-- Avatar Upload Form -->
-    <form id="avatarForm" action="{{ url_for('boundary.admin_create_avatar') }}" method="post" enctype="multipart/form-data">
+    <form id="avatarForm" action="{{ url_for('boundary.create_avatar') }}" method="post" enctype="multipart/form-data">
         <label for="avatar_file">Upload a portrait image:</label>
         <input type="file" name="avatar" id="avatar_file" accept="image/png, image/jpeg, image/jpg" required>
 
