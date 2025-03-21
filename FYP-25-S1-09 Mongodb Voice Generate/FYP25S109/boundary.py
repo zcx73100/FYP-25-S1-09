@@ -660,7 +660,7 @@ class AddAvatarBoundary:
 
     @staticmethod
     @boundary.route('/admin_create_avatar', methods=['GET', 'POST'])
-    def admin_create_avatar():
+    def create_avatar():
         if 'username' not in session:
             flash("You must be logged in to create an avatar.", category='error')
             return redirect(url_for('boundary.login'))
