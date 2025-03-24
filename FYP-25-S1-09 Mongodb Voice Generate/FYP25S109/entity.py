@@ -14,6 +14,12 @@ from bson import ObjectId
 import pyttsx3
 from gradio_client import Client
 from flask import flash, session, redirect, url_for
+import wave
+import subprocess
+import shutil
+import base64
+import mimetypes
+from gtts import gTTS
 
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
@@ -359,6 +365,7 @@ class Avatar:
             logging.error(f"Error deleting avatar: {str(e)}")
         return False
 
+"""
 class GenerateVideoEntity:
     def __init__(self, text, avatar_path=None):
         self.text = text
@@ -369,7 +376,6 @@ class GenerateVideoEntity:
         self.video_path = os.path.join("FYP25S109/static/generated_videos", self.video_filename).replace("\\", "/")
 
     def generate_voice(self):
-        """Converts text to speech and saves it as an audio file."""
         try:
             os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
             engine = pyttsx3.init()
@@ -387,7 +393,6 @@ class GenerateVideoEntity:
             return None
 
     def generate_video(self):
-            """Generates a video using SadTalker API with the selected avatar & generated voice."""
             try:
                 # Ensure required files exist
                 if not os.path.exists(self.audio_path):
@@ -435,6 +440,95 @@ class GenerateVideoEntity:
             except Exception as e:
                 print(f"❌ Error generating video: {str(e)}")
                 return None
+"""
+
+class GenerateVideoEntity:
+    def __init__(self, text, avatar_path=None, audio_path=None):
+        self.text = text
+        self.avatar_path = avatar_path
+        self.audio_path = audio_path
+
+        # Always generate a unique filename for audio/video
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        if not self.audio_path:
+            self.audio_filename = f"voice_{timestamp}.wav"
+            self.audio_path = os.path.join("FYP25S109/static/generated_audios", self.audio_filename).replace("\\", "/")
+
+        self.video_filename = f"video_{timestamp}.mp4"
+        self.video_path = os.path.join("FYP25S109/static/generated_videos", self.video_filename).replace("\\", "/")
+
+    def generate_voice(self):
+        try:
+            os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
+
+            # Save MP3 from gTTS first
+            mp3_temp = self.audio_path.replace(".wav", ".mp3")
+            tts = gTTS(text=self.text, lang="en")
+            tts.save(mp3_temp)
+
+            # Convert to WAV using ffmpeg
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", mp3_temp, self.audio_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            if result.returncode != 0:
+                print("❌ FFmpeg error:", result.stderr.decode())
+                return None
+
+            return f"/static/generated_audios/{os.path.basename(self.audio_path)}"
+        except Exception as e:
+            print(f"❌ Error generating voice: {e}")
+            return None
+
+    def generate_video(self):
+        try:
+            if not os.path.exists(self.avatar_path) or not os.path.exists(self.audio_path):
+                raise FileNotFoundError("Missing avatar or audio file")
+
+            SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
+
+            with open(self.avatar_path, "rb") as avatar_file, open(self.audio_path, "rb") as audio_file:
+                files = {
+                    "image_file": (
+                        os.path.basename(self.avatar_path),
+                        avatar_file,
+                        mimetypes.guess_type(self.avatar_path)[0] or "image/jpeg"
+                    ),
+                    "audio_file": (
+                        os.path.basename(self.audio_path),
+                        audio_file,
+                        mimetypes.guess_type(self.audio_path)[0] or "audio/wav"
+                    ),
+                }
+
+                data = {
+                    "preprocess_type": "crop",
+                    "is_still_mode": "false",
+                    "enhancer": "false",
+                    "batch_size": "2",
+                    "size_of_image": "256",
+                    "pose_style": "0"
+                }
+
+                response = requests.post(SADTALKER_API, files=files, data=data)
+
+            print("🔁 SadTalker Response Code:", response.status_code)
+            if response.status_code != 200:
+                print("❌ SadTalker Error:", response.text)
+                return None
+
+            os.makedirs(os.path.dirname(self.video_path), exist_ok=True)
+            with open(self.video_path, "wb") as f:
+                f.write(response.content)
+
+            print(f"✅ Video saved to: {self.video_path}")
+            return f"/static/generated_videos/{os.path.basename(self.video_path)}"
+
+        except Exception as e:
+            print(f"❌ Error during SadTalker call: {e}")
+            return None   
 
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):

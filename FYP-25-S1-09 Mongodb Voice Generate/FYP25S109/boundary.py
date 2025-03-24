@@ -114,11 +114,11 @@ class HomePage:
       
         
 # Generate Video
+"""
 video_progress = {}
 
 @boundary.route("/generate_voice", methods=["POST"])
 def generate_voice():
-    """Handles text-to-speech voice generation."""
     try:
         data = request.get_json()
         text = data.get("text")
@@ -151,7 +151,6 @@ def generate_voice():
 
 @boundary.route("/generate_video", methods=["GET", "POST"])
 def generate_video():
-    """Handles video generation requests (GET loads the page, POST generates the video)."""
     try:
         if request.method == "GET":
             print("📄 GET request received → Loading generate video page...")
@@ -197,7 +196,6 @@ def generate_video():
 
 
 def process_video(video_id, text, avatar_path, audio_path):
-    """Processes video and calls SadTalker API."""
     try:
         for i in range(0, 101, 10):
             video_progress[video_id] = i
@@ -226,7 +224,6 @@ def process_video(video_id, text, avatar_path, audio_path):
 
 @boundary.route("/video_status", methods=["GET"])
 def video_status():
-    """Fetches video progress status."""
     video_id = request.args.get("video_id")
 
     if video_id not in video_progress:
@@ -241,6 +238,73 @@ def video_status():
     time_left = (100 - progress) // 10 * 3
 
     return jsonify({"success": True, "progress": progress, "time_left": time_left})
+"""
+
+# Generate Video Local
+@boundary.route("/generate_voice", methods=["POST"])
+def generate_voice():
+    try:
+        data = request.get_json()
+        text = data.get("text")
+
+        if not text:
+            return jsonify({"success": False, "error": "Text is required"}), 400
+
+        voice_entity = GenerateVideoEntity(text)
+        audio_url = voice_entity.generate_voice()
+
+        if not audio_url:
+            return jsonify({"success": False, "error": "Voice generation failed"}), 500
+
+        return jsonify({"success": True, "audio_url": audio_url})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": repr(e)}), 500
+
+# =========================
+# 🎬 Generate Talking Video
+# =========================
+@boundary.route("/generate_video", methods=["GET", "POST"])
+def generate_video():
+    try:
+        if request.method == "GET":
+            avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
+            return render_template("generateVideo.html", avatars=avatars)
+
+        # POST — handle video generation request
+        text = request.form.get("text")
+        avatar_path = request.form.get("avatar_path")
+        audio_path = request.form.get("audio_path")
+
+        print("📥 Incoming POST /generate_video:")
+        print("Text:", text)
+        print("Avatar Path:", avatar_path)
+        print("Audio Path:", audio_path)
+
+        if not all([text, avatar_path, audio_path]):
+            return jsonify({"success": False, "error": "Missing required parameters"}), 400
+
+        # Rebuild absolute file paths from relative URLs
+        avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
+        audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
+
+        if not os.path.exists(avatar_path):
+            return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
+        if not os.path.exists(audio_path):
+            return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
+
+        # Generate the video
+        entity = GenerateVideoEntity(text, avatar_path, audio_path)
+        video_url = entity.generate_video()
+
+        if not video_url:
+            return jsonify({"success": False, "error": "Video generation failed"}), 500
+
+        return jsonify({"success": True, "video_url": video_url})
+
+    except Exception as e:
+        print(f"❌ Error in /generate_video route: {str(e)}")
+        return jsonify({"success": False, "error": repr(e)}), 500
 
 # Log In
 class LoginBoundary:
