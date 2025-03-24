@@ -63,25 +63,25 @@ class HomePage:
         if role == "Teacher":
             classrooms = list(mongo.db.classroom.find(
                 {"teacher": username},
-                {"_id": 0, "classroom_name": 1, "description": 1}
+                {"_id": 1, "classroom_name": 1, "description": 1}
             ))
 
         elif role == "Student":
             classrooms = list(mongo.db.classroom.find(
                 {"student_list": username},
-                {"_id": 0, "classroom_name": 1, "description": 1}
+                {"_id": 1, "classroom_name": 1, "description": 1}
             ))
 
         elif role == "Admin":
             classrooms = list(mongo.db.classroom.find(
                 {},  # ✅ No filter, Admins see all classrooms
-                {"_id": 0, "classroom_name": 1, "description": 1}
+                {"_id": 1, "classroom_name": 1, "description": 1}
             ))
 
         # ✅ Fetch Classroom-Specific Announcements
         announcements = {c["classroom_name"]: list(mongo.db.announcements.find(
             {"classroom_name": c["classroom_name"]},
-            {"_id": 0, "title": 1, "content": 1, "created_at": 1}
+            {"_id": 1, "title": 1, "content": 1, "created_at": 1}
         )) for c in classrooms}
 
         # ✅ Fetch Materials, Assignments, and Quizzes Per Classroom
@@ -792,7 +792,7 @@ class ManageUserBoundary:
         return redirect(url_for('boundary.manage_users'))
     
 # -------------------------------------------------------------TEACHER-----------------------------------------------
-#Teacher manage classrooms
+# Teacher manage classrooms
 class TeacherManageClassroomsBoundary:
     @staticmethod
     @boundary.route('/teacher/manageClassrooms', methods=['GET'])
@@ -804,7 +804,7 @@ class TeacherManageClassroomsBoundary:
         classrooms = list(mongo.db.classroom.find({"teacher": username}))
         return render_template("manageClassrooms.html", classrooms=classrooms)
 
-class TeacherAddClassroomBoundary: 
+class TeacherAddClassroomBoundary:
     @staticmethod
     @boundary.route('/teacher/addClassroom', methods=['GET', 'POST'])
     def add_classroom():
@@ -823,7 +823,7 @@ class TeacherAddClassroomBoundary:
                 return redirect(url_for('boundary.add_classroom'))
 
             controller = AddClassroomController()
-            result = controller.create_classroom(classroom_name, teacher, classroom_description, classroom_capacity,)
+            result = controller.create_classroom(classroom_name, teacher, classroom_description, classroom_capacity)
 
             if result['success']:
                 flash(result['message'], category='success')
@@ -832,19 +832,19 @@ class TeacherAddClassroomBoundary:
                 flash(result['message'], category='error')
 
         return render_template("addClassroom.html")
-    
+
 from datetime import datetime
 
 class ViewClassRoomBoundary:
     @staticmethod
-    @boundary.route('/viewClassroom/<classroom_name>', methods=['GET', 'POST'])
-    def view_classroom(classroom_name):
+    @boundary.route('/viewClassroom/<classroom_id>', methods=['GET', 'POST'])
+    def view_classroom(classroom_id):
         if 'role' not in session or session.get('role') not in ['Teacher', 'Student']:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
         # Fetch the classroom details
-        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
@@ -861,15 +861,14 @@ class ViewClassRoomBoundary:
             if username.strip() != classroom.get('teacher', '').strip():
                 flash("You are not the teacher of this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
-
         # Fetch classroom data
-        materials = list(mongo.db.materials.find({"classroom_name": classroom_name}))
-        assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name}))
-        quizzes = list(mongo.db.quizzes.find({"classroom_name": classroom_name}))
+        materials = list(mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)}))
+        assignments = list(mongo.db.assignments.find({"classroom_id": ObjectId(classroom_id)}))
+        quizzes = list(mongo.db.quizzes.find({"classroom_id": ObjectId(classroom_id)}))
 
         # ✅ Fetch announcements for this classroom
         announcements = list(mongo.db.announcements.find(
-            {"classroom_name": classroom_name},
+            {"classroom_id": ObjectId(classroom_id)},
             {"_id": 0, "title": 1, "content": 1, "created_at": 1}
         ))
 
@@ -887,36 +886,36 @@ class ViewClassRoomBoundary:
             materials=materials,
             assignments=assignments,
             quizzes=quizzes,
-            announcements=announcements  # ✅ Pass announcements to the template
+            announcements=announcements
         )
-
 
 class TeacherDeleteClassroomBoundary:
     @staticmethod
-    @boundary.route('/teacher/deleteClassroom/<classroom_name>', methods=['POST'])
-    def delete_classroom(classroom_name):
+    @boundary.route('/teacher/deleteClassroom/<classroom_id>', methods=['POST'])
+    def delete_classroom(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        result = mongo.db.classroom.delete_one({"classroom_name": classroom_name})
+        result = mongo.db.classroom.delete_one({"_id": ObjectId(classroom_id)})
 
         if result.deleted_count:
-            flash(f"Classroom {classroom_name} deleted successfully.", category='success')
+            flash(f"Classroom deleted successfully.", category='success')
         else:
             flash("Classroom not found.", category='error')
 
         return redirect(url_for('boundary.manage_classrooms'))
-    #update classroom
+
+# Update classroom
 class TeacherUpdateClassroomBoundary:
     @staticmethod
-    @boundary.route('/teacher/updateClassroom/<classroom_name>', methods=['GET', 'POST'])
-    def update_classroom(classroom_name):
+    @boundary.route('/teacher/updateClassroom/<classroom_id>', methods=['GET', 'POST'])
+    def update_classroom(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
 
         if not classroom:
             flash("Classroom not found.", category='error')
@@ -929,9 +928,9 @@ class TeacherUpdateClassroomBoundary:
 
             if not new_classroom_name:
                 flash("Classroom name is required.", category='error')
-                return redirect(url_for('boundary.update_classroom', classroom_name=classroom_name))
+                return redirect(url_for('boundary.update_classroom', classroom_id=classroom_id))
 
-            result = UpdateClassroomController.update_classroom(classroom_name, new_details={
+            result = UpdateClassroomController.update_classroom(ObjectId(classroom_id), new_details={
                 "classroom_name": new_classroom_name,
                 "description": new_description,
                 "capacity": new_capacity
@@ -940,30 +939,22 @@ class TeacherUpdateClassroomBoundary:
             return redirect(url_for('boundary.manage_classrooms'))
 
         return render_template("updateClassroom.html", classroom=classroom)
+
 class TeacherSearchClassroomBoundary:
     @staticmethod
-    @boundary.route('/teacher/searchClassroom', methods=['GET','POST'])
+    @boundary.route('/teacher/searchClassroom', methods=['GET', 'POST'])
     def search_classroom():
-
         query = request.args.get('query', '').strip() if request.method == 'GET' else request.form.get('query', '').strip()
-        classrooms = list(mongo.db.classroom.find(
-            {"$or": [
-                {"classroom_name": {"$regex": query, "$options": "i"}},
-                {"description": {"$regex": query, "$options": "i"}},
-                {"teacher": {"$regex": query, "$options": "i"}}
-            ]},
-            {"_id": 0, "classroom_name": 1, "description": 1, "teacher": 1, "capacity": 1}
-        ))
+        classrooms = SearchClassroomController.search_classroom(query)
 
         return render_template("ClassroomSearchResult.html", classrooms=classrooms, query=query)
 
 class TeacherManageStudentsBoundary:
     @staticmethod
-    @boundary.route('/teacher/manageStudents/<classroom_name>', methods=['GET', 'POST'])
-    def manage_students(classroom_name):
-
-        # Retrieve classroom document
-        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+    @boundary.route('/teacher/manageStudents/<classroom_id>', methods=['GET', 'POST'])
+    def manage_students(classroom_id):
+        # Retrieve classroom document using classroom_id
+        classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
 
         if not classroom:
             flash("Classroom not found.", category='error')
@@ -996,8 +987,8 @@ class TeacherManageStudentsBoundary:
             unenrolled_students=unenrolled_students
         )
 
-    @boundary.route('/teacher/enrollStudent/<classroom_name>', methods=['POST'])
-    def enroll_student(classroom_name):
+    @boundary.route('/teacher/enrollStudent/<classroom_id>', methods=['POST'])
+    def enroll_student(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
@@ -1007,18 +998,19 @@ class TeacherManageStudentsBoundary:
 
             if not student_username:
                 flash("Username cannot be empty.", category='error')
-                return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+                return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
 
             # Call the controller to handle enrollment
-            result = EnrollStudentController.enroll_student(classroom_name, student_username)
+            result = EnrollStudentController.enroll_student(classroom_id, student_username)
             if result["success"]:
                 flash(result["message"], category='success')
             else:
                 flash(result["message"], category='error')
 
-        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
-    @boundary.route('/teacher/removeStudent/<classroom_name>', methods=['POST'])
-    def remove_student(classroom_name):
+        return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
+
+    @boundary.route('/teacher/removeStudent/<classroom_id>', methods=['POST'])
+    def remove_student(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
@@ -1028,19 +1020,20 @@ class TeacherManageStudentsBoundary:
 
             if not student_username:
                 flash("Username cannot be empty.", category='error')
-                return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+                return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
 
             # Call the controller to handle removal
-            result = RemoveStudentController.remove_student(classroom_name, student_username)
+            result = RemoveStudentController.remove_student(classroom_id, student_username)
             if result["success"]:
                 flash(result["message"], category='success')
             else:
                 flash(result["message"], category='error')
 
-        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+        return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
+
     @staticmethod
-    @boundary.route('/teacher/suspendStudent/<classroom_name>', methods=['POST'])
-    def suspend_student(classroom_name):
+    @boundary.route('/teacher/suspendStudent/<classroom_id>', methods=['POST'])
+    def suspend_student(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
@@ -1048,16 +1041,17 @@ class TeacherManageStudentsBoundary:
         student_username = request.form.get('username')
         if not student_username:
             flash("Username cannot be empty.", category='error')
-            return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+            return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
 
         # Call the Controller to handle suspension
-        result = SuspendStudentController.suspend_student(classroom_name, student_username)
+        result = SuspendStudentController.suspend_student(classroom_id, student_username)
 
         flash(result['message'], category='success' if result['success'] else 'error')
-        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+        return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
+
     @staticmethod
-    @boundary.route('/teacher/unsuspendStudent/<classroom_name>', methods=['POST'])
-    def unsuspend_student(classroom_name):
+    @boundary.route('/teacher/unsuspendStudent/<classroom_id>', methods=['POST'])
+    def unsuspend_student(classroom_id):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
@@ -1065,19 +1059,20 @@ class TeacherManageStudentsBoundary:
         student_username = request.form.get('username')
         if not student_username:
             flash("Username cannot be empty.", category='error')
-            return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+            return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
 
         # Call the Controller to handle unsuspension
-        result = UnsuspendStudentController.unsuspend_student(classroom_name, student_username)
+        result = UnsuspendStudentController.unsuspend_student(classroom_id, student_username)
 
         flash(result['message'], category='success' if result['success'] else 'error')
-        return redirect(url_for('boundary.manage_students', classroom_name=classroom_name))
+        return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
+
     @staticmethod
-    @boundary.route('/teacher/searchStudent/<classroom_name>', methods=['GET'])
-    def search_student(classroom_name):
+    @boundary.route('/teacher/searchStudent/<classroom_id>', methods=['GET'])
+    def search_student(classroom_id):
         query = request.args.get('query', '').strip()  # Get query from request parameters
-        # Retrieve classroom document
-        classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+        # Retrieve classroom document using classroom_id
+        classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
@@ -1115,12 +1110,12 @@ class TeacherManageStudentsBoundary:
             query=query
         )
 
-#---------------------------------------------------------------------------------------
 
+#---------------------------------------------------------------------------------------
 class TeacherManageMaterialBoundary:
     @boundary.route('/upload_material', methods=['POST'])
     def upload_material():
-        classroom_name = request.form.get('classroom_name')
+        classroom_id = request.form.get('classroom_id')
         title = request.form.get('title')
         description = request.form.get('description')
         file = request.files.get('file')
@@ -1132,38 +1127,38 @@ class TeacherManageMaterialBoundary:
 
             # Store metadata in MongoDB
             mongo.db.materials.insert_one({
-                "classroom_name": classroom_name.strip(),
+                "classroom_id": ObjectId(classroom_id),
                 "filename": filename,
                 "title": title.strip() if title else "Untitled",
                 "description": description.strip() if description else "No description provided"
             })
 
             flash('Material uploaded successfully!', 'success')
-            return redirect(url_for('boundary.manage_materials', classroom_name=classroom_name))
+            return redirect(url_for('boundary.manage_materials', classroom_id=classroom_id))
         else:
             flash('Invalid file type!', 'danger')
             return redirect(request.url)
 
-    @boundary.route('/upload_material/<classroom_name>', methods=['GET'])
-    def upload_material_page(classroom_name):
-        return render_template("uploadMaterial.html", classroom_name=classroom_name)
+    @boundary.route('/upload_material/<classroom_id>', methods=['GET'])
+    def upload_material_page(classroom_id):
+        return render_template("uploadMaterial.html", classroom_id=classroom_id)
     
-    @boundary.route('/manage_materials/<classroom_name>', methods=['GET'])
-    def manage_materials(classroom_name):
-        materials = list(mongo.db.materials.find({"classroom_name": classroom_name.strip()}))
-        return render_template('manageMaterials.html', materials=materials, classroom_name=classroom_name)
+    @boundary.route('/manage_materials/<classroom_id>', methods=['GET'])
+    def manage_materials(classroom_id):
+        materials = list(mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)}))
+        return render_template('manageMaterials.html', materials=materials, classroom_id=classroom_id)
 
-    @boundary.route('/delete_material/<classroom_name>/<filename>', methods=['POST'])
-    def delete_material(classroom_name, filename):
+    @boundary.route('/delete_material/<classroom_id>/<filename>', methods=['POST'])
+    def delete_material(classroom_id, filename):
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
         
         # Remove entry from MongoDB
-        mongo.db.materials.delete_one({"classroom_name": classroom_name, "filename": filename})
+        mongo.db.materials.delete_one({"classroom_id": ObjectId(classroom_id), "filename": filename})
         
         flash('Material deleted successfully!', 'success')
-        return redirect(url_for('boundary.manage_materials', classroom_name=classroom_name))
+        return redirect(url_for('boundary.manage_materials', classroom_id=classroom_id))
 
     @boundary.route('/view_material/<filename>')
     def view_material(filename):
@@ -1179,7 +1174,6 @@ class TeacherManageMaterialBoundary:
                 text_content = file.read()
 
         return render_template('viewMaterial.html', filename=filename, text_content=text_content)
-
 
 
 
@@ -1242,14 +1236,15 @@ class ViewUserDetailsBoundary:
         return render_template("userDetails.html", user_info=user_info)
     
 
+
 # ------------------------------------------------------------------------------------------------------- Upload Assignment
 class TeacherAssignmentBoundary:
-    @boundary.route('/teacher/upload_assignment/<classroom_name>', methods=['GET'])
-    def upload_assignment_page(classroom_name):
-        return render_template("uploadAssignment.html", classroom_name=classroom_name)
+    @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['GET'])
+    def upload_assignment_page(classroom_id):
+        return render_template("uploadAssignment.html", classroom_id=classroom_id)
 
-    @boundary.route('/teacher/upload_assignment/<classroom_name>', methods=['POST'])
-    def upload_assignment(classroom_name):
+    @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['POST'])
+    def upload_assignment(classroom_id):
         title = request.form.get('title')
         description = request.form.get('description')
         deadline = request.form.get('deadline')
@@ -1260,26 +1255,19 @@ class TeacherAssignmentBoundary:
             file_path = os.path.join('static/uploads/assignments', filename)
             file.save(file_path)
 
-            # Store assignment details in MongoDB
-            mongo.db.assignments.insert_one({
-                "classroom_name": classroom_name.strip(),
-                "filename": filename,
-                "file_path": file_path,
-                "title": title.strip() if title else "Untitled",
-                "description": description.strip() if description else "No description provided",
-                "deadline": deadline,
-                "submissions": []
-            })
-
-            flash('Assignment uploaded successfully!', 'success')
-            return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+            # Call the controller method to save assignment
+            result = UploadAssignmentController.upload_assignment(
+                file, title, ObjectId(classroom_id), description, deadline, filename, file_path
+            )
+            flash(result['message'], 'success' if result['success'] else 'danger')
+            return redirect(request.url) if result['success'] else redirect(request.url)
         else:
             flash('Invalid file type!', 'danger')
             return redirect(request.url)
 
     @staticmethod
-    @boundary.route('/teacher/manage_assignments/<classroom_name>', methods=['GET', 'POST'])
-    def manage_assignments(classroom_name):
+    @boundary.route('/teacher/manage_assignments/<classroom_id>', methods=['GET', 'POST'])
+    def manage_assignments(classroom_id):
         """Retrieve all assignments and allow searching."""
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", "error")
@@ -1290,13 +1278,13 @@ class TeacherAssignmentBoundary:
         # Search logic
         if query:
             assignments = list(mongo.db.assignments.find({
-                "classroom_name": classroom_name,
+                "classroom_id": ObjectId(classroom_id),
                 "title": {"$regex": query, "$options": "i"}  # Case-insensitive search
             }))
         else:
-            assignments = list(mongo.db.assignments.find({"classroom_name": classroom_name}))
+            assignments = list(mongo.db.assignments.find({"classroom_id": ObjectId(classroom_id)}))
 
-        return render_template("manageAssignments.html", assignments=assignments, classroom_name=classroom_name)
+        return render_template("manageAssignments.html", assignments=assignments, classroom_id=classroom_id)
 
     @staticmethod
     @boundary.route('/teacher/download_assignment/<filename>')
@@ -1311,8 +1299,8 @@ class TeacherAssignmentBoundary:
         return redirect(request.referrer)
 
     @staticmethod
-    @boundary.route('/teacher/view_submissions/<classroom_name>/<assignment_id>')
-    def view_submissions(classroom_name, assignment_id):
+    @boundary.route('/teacher/view_submissions/<classroom_id>/<assignment_id>')
+    def view_submissions(classroom_id, assignment_id):
         """Show all student submissions for an assignment"""
 
         if 'role' not in session or session.get('role') != 'Teacher':
@@ -1323,7 +1311,7 @@ class TeacherAssignmentBoundary:
         assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
         if not assignment:
             flash("Assignment not found!", "danger")
-            return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+            return redirect(url_for('boundary.manage_assignments', classroom_id=classroom_id))
 
         # Fetch submissions and ensure it's always a list
         submissions = list(mongo.db.submissions.find({"assignment_id": ObjectId(assignment_id)}))
@@ -1348,14 +1336,12 @@ class TeacherAssignmentBoundary:
             'viewSubmissions.html',
             assignment=assignment,
             submissions=submissions,  # Make sure `submissions` is passed
-            classroom_name=classroom_name
+            classroom_id=classroom_id
         )
 
 
 
-
-
-    @boundary.route('/delete_submission/<submission_id>', methods=['POST'])
+    @boundary.route('/delete_submission/<submission_id>')
     def delete_submission(submission_id):
         """Allows a teacher to delete a student's submission."""
         if 'role' not in session or session.get('role') != 'Teacher':
@@ -1412,8 +1398,8 @@ class TeacherAssignmentBoundary:
 
 
     @staticmethod
-    @boundary.route('/teacher/delete_assignment/<classroom_name>/<assignment_id>', methods=['POST'])
-    def delete_assignment(classroom_name, assignment_id):
+    @boundary.route('/teacher/delete_assignment/<classroom_id>/<assignment_id>')
+    def delete_assignment(classroom_id, assignment_id):
         """Deletes an assignment and its associated file."""
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
@@ -1430,7 +1416,7 @@ class TeacherAssignmentBoundary:
         else:
             flash('Assignment not found!', 'danger')
 
-        return redirect(url_for('boundary.manage_assignments', classroom_name=classroom_name))
+        return redirect(url_for('boundary.manage_assignments', classroom_id=classroom_id))
     
     
     @boundary.route('/view_submitted_assignment/<filename>', methods=['GET'])
@@ -1457,8 +1443,8 @@ class TeacherAssignmentBoundary:
  
 # ------------------------------------------------------------- Quiz
 class TeacherCreateQuizBoundary:
-    @boundary.route('/teacher/create_quiz/<classroom_name>', methods=['GET', 'POST'])
-    def create_quiz(classroom_name):
+    @boundary.route('/teacher/create_quiz/<classroom_id>', methods=['GET', 'POST'])
+    def create_quiz(classroom_id):
         if request.method == 'POST':  # Handling POST request when submitting form
             quiz_title = request.form.get('quiz_title')
             description = request.form.get('description')
@@ -1485,10 +1471,10 @@ class TeacherCreateQuizBoundary:
 
             if not quiz_title or not questions:
                 flash('Quiz must have a title and at least one question!', 'danger')
-                return redirect(url_for('boundary.manage_quizzes', classroom_name=classroom_name))
+                return redirect(url_for('boundary.manage_quizzes', classroom_id=classroom_id))
 
             quiz_data = {
-                "classroom_name": classroom_name,
+                "classroom_id": classroom_id,
                 "title": quiz_title,
                 "description": description,
                 "questions": questions
@@ -1500,16 +1486,16 @@ class TeacherCreateQuizBoundary:
             else:
                 flash('Failed to create quiz.', 'danger')
 
-            return redirect(url_for('boundary.manage_quizzes', classroom_name=classroom_name))
+            return redirect(url_for('boundary.manage_quizzes', classroom_id=classroom_id))
 
-        return render_template("uploadQuiz.html", classroom_name=classroom_name)
+        return render_template("uploadQuiz.html", classroom_id=classroom_id)
 
 
 class TeacherManageQuizBoundary:
-    @boundary.route('/teacher/manage_quizzes/<classroom_name>', methods=['GET'])
-    def manage_quizzes(classroom_name):
-        quizzes = list(mongo.db.quizzes.find({"classroom_name": classroom_name}))
-        return render_template("manageQuizzes.html", quizzes=quizzes, classroom_name=classroom_name)
+    @boundary.route('/teacher/manage_quizzes/<classroom_id>', methods=['GET'])
+    def manage_quizzes(classroom_id):
+        quizzes = list(mongo.db.quizzes.find({"classroom_id": classroom_id}))
+        return render_template("manageQuizzes.html", quizzes=quizzes, classroom_id=classroom_id)
 
     @boundary.route('/teacher/delete_quiz/<quiz_id>', methods=['POST'])
     def delete_quiz(quiz_id):
@@ -1518,9 +1504,10 @@ class TeacherManageQuizBoundary:
         return redirect(request.referrer)
 
 
+
 class TeacherAnnouncementBoundary:
-    @boundary.route('/teacher/add_announcement/<classroom_name>', methods=['GET', 'POST'])
-    def add_announcement(classroom_name):
+    @boundary.route('/teacher/add_announcement/<classroom_id>/<classroom_name>', methods=['GET', 'POST'])
+    def add_announcement(classroom_id, classroom_name):
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
@@ -1531,9 +1518,10 @@ class TeacherAnnouncementBoundary:
 
             if not title or not content:
                 flash("Title and content cannot be empty.", category='error')
-                return redirect(url_for('boundary.add_announcement', classroom_name=classroom_name))
+                return redirect(url_for('boundary.add_announcement', classroom_id=classroom_id, classroom_name=classroom_name))
 
             mongo.db.announcements.insert_one({
+                "classroom_id": ObjectId(classroom_id),
                 "classroom_name": classroom_name.strip(),
                 "title": title.strip(),
                 "content": content.strip(),
@@ -1541,14 +1529,17 @@ class TeacherAnnouncementBoundary:
             })
 
             flash("Announcement added successfully!", category='success')
-            return redirect(url_for('boundary.view_classroom', classroom_name=classroom_name))
+            return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
 
         return render_template("addAnnouncement.html", classroom_name=classroom_name)
-    
-    def delete_announcement(announcement_id):
+
+    @boundary.route('/teacher/delete_announcement/<classroom_id>/<announcement_id>', methods=['POST'])
+    def delete_announcement(classroom_id, announcement_id):
         mongo.db.announcements.delete_one({"_id": ObjectId(announcement_id)})
+
         flash("Announcement deleted successfully!", category='success')
-        return redirect(request.referrer)
+        return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
+
     
 class ViewAssignmentBoundary:
     @staticmethod
@@ -1611,47 +1602,42 @@ class StudentAssignmentBoundary:
 
 class AccessForumBoundary:
     @staticmethod
-    @boundary.route('/forum/<classroom_name>', methods=['GET','POST'])
-    def access_forum(classroom_name):
-        return render_template("forum.html", classroom_name=classroom_name, discussion_rooms=RetrieveDiscussionRoomController.get_all_discussion_rooms())
+    @boundary.route('/forum/<classroom_id>', methods=['GET','POST'])
+    def access_forum(classroom_id):
+        return render_template("forum.html", classroom_id=classroom_id, discussion_rooms=RetrieveDiscussionRoomController.get_all_discussion_rooms_by_classroom_id(classroom_id))
 
 
 class DiscussionRoomBoundary:
     @staticmethod
-    @boundary.route('/forum/<classroom_name>/create', methods=['POST'])
-    def create_discussion_room(classroom_name):
-        classroom_name = request.form.get('classroom_name')
+    @boundary.route('/forum/<classroom_id>/create', methods=['POST'])
+    def create_discussion_room(classroom_id):
         discussion_room_name = request.form.get('discussion_room_name')
         discussion_room_description = request.form.get('discussion_room_description')
         created_by = session.get('username')
         
-        if AddDiscussionRoomController.add_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by):
+        if AddDiscussionRoomController.add_discussion_room(classroom_id, discussion_room_name, discussion_room_description, created_by):
             flash("Discussion room created successfully!", "success")
         else:
             flash("Failed to create discussion room.", "danger")
 
         # Redirecting back to the forum page
-        return redirect(url_for('boundary.access_forum', classroom_name=classroom_name))
+        return redirect(url_for('boundary.access_forum', classroom_id=classroom_id))
 
     @staticmethod
-    @boundary.route('/forum/<classroom_name>/<discussion_room_id>/delete', methods=['GET','POST'])
-    def delete_discussion_room(classroom_name,discussion_room_id):
-        discussion_room_id = request.form.get('discussion_room_id')  # Retrieve from form
-        classroom_name = request.form.get('classroom_name')  # Retrieve from form
-
+    @boundary.route('/forum/<classroom_id>/<discussion_room_id>/delete', methods=['GET', 'POST'])
+    def delete_discussion_room(classroom_id, discussion_room_id):
         if DeleteDiscussionRoomController.delete_discussion_room(discussion_room_id):
             flash("Discussion room deleted successfully!", "success")
         else:
             flash("Failed to delete discussion room.", "danger")
 
-        return redirect(url_for('boundary.access_forum', classroom_name=classroom_name))
-
+        return redirect(url_for('boundary.access_forum', classroom_id=classroom_id))
 
     @staticmethod
-    @boundary.route('/forum/', methods=['GET'])
-    def view_discussion_room_list():
-        rooms = RetrieveDiscussionRoomController.get_all_discussion_rooms()
-        return render_template('forum.html', discussion_rooms=rooms)
+    @boundary.route('/forum/<classroom_id>', methods=['GET'])
+    def view_discussion_room_list(classroom_id):
+        rooms = RetrieveDiscussionRoomController.get_all_discussion_rooms_by_classroom_id(classroom_id)
+        return render_template('forum.html', discussion_rooms=rooms, classroom_id=classroom_id)
 
     @staticmethod
     @boundary.route('/forum/search', methods=['GET'])
@@ -1659,7 +1645,7 @@ class DiscussionRoomBoundary:
         search_query = request.args.get('query')
         rooms = SearchDiscussionRoomController.search_discussion_room(search_query)
         return render_template('forum.html', discussion_rooms=rooms)
-    
+
     @staticmethod
     @boundary.route('/discussion_room/<discussion_room_id>', methods=['GET', 'POST'])
     def access_room(discussion_room_id):
@@ -1676,9 +1662,8 @@ class DiscussionRoomBoundary:
         return render_template('discussionRoom.html', room=room, messages=messages, discussion_room_id=discussion_room_id)
 
     @staticmethod
-    @boundary.route('/discussion_room/update', methods=['GET', 'POST'])
-    def update_discussion_room():
-        discussion_room_id = request.args.get('discussion_room_id') or request.form.get('discussion_room_id')
+    @boundary.route('/discussion_room/update/<discussion_room_id>', methods=['GET', 'POST'])
+    def update_discussion_room(discussion_room_id):
 
         if request.method == 'GET':
             # Fetch existing details from the database
@@ -1692,10 +1677,12 @@ class DiscussionRoomBoundary:
             return render_template('update_discussion_room.html', discussion_room=discussion_room)
 
         elif request.method == 'POST':
+            classroom_id = request.form.get('classroom_id') or discussion_room.get('classroom_id')
             discussion_room_name = request.form.get('discussion_room_name')
             discussion_room_description = request.form.get('discussion_room_description')
             print(f"Discussion Room Name: {discussion_room_name}")
             print(f"Discussion Room Description: {discussion_room_description}")
+            
             new_details = {
                 "discussion_room_name": discussion_room_name,
                 "discussion_room_description": discussion_room_description
@@ -1706,8 +1693,7 @@ class DiscussionRoomBoundary:
             else:
                 flash("Failed to update discussion room.", "danger")
 
-            return redirect(url_for('boundary.view_discussion_room_list'))
-
+            return redirect(url_for('boundary.access_forum', classroom_id=classroom_id))
 
 
 class MessageBoundary:

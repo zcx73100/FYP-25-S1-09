@@ -43,7 +43,7 @@
             <div class="classroom-card">
                 <div class="classroom-header">
                     <h4>🏫 {{ classroom.classroom_name }}</h4>
-                    <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" class="btn view-btn">⭐ View Classroom</a>
+                    <a href="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}" class="btn view-btn">⭐ View Classroom</a>
                 </div>
 
                 <p class="classroom-description">{{ classroom.description }}</p>
@@ -74,7 +74,7 @@
                             <li>No materials available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-success">📂 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% endif %}" class="btn btn-success">📂 View More</a>
                 </div>
                 <hr class="separator">
 
@@ -88,7 +88,7 @@
                             <li>No assignments available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-secondary">📑 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% endif %}" class="btn btn-secondary">📑 View More</a>
                 </div>
                 <hr class="separator">
 
@@ -102,7 +102,7 @@
                             <li>No quizzes available.</li>
                         {% endfor %}
                     </ul>
-                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}{% endif %}" class="btn btn-primary">📚 View More</a>
+                    <a href="{% if session['role'] == 'Teacher' %}{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% else %}{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name, classroom_id=classroom._id) }}{% endif %}" class="btn btn-primary">📚 View More</a>
                 </div>
             </div>
         {% endfor %}

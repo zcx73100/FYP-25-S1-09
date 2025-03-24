@@ -114,20 +114,14 @@ class StudentViewClassroomController:
 
 class EnrollStudentController:
     @staticmethod
-    def enroll_student(classroom_name, student_username):
-        return Classroom.enroll_student(classroom_name, student_username)
+    def enroll_student(classroom_id, student_username):
+        return Classroom.enroll_student(classroom_id, student_username)
 
 class RemoveStudentController:
     @staticmethod
-    def remove_student(classroom_name, student_username):
-        return Classroom.remove_student(classroom_name, student_username)
+    def remove_student(classroom_id, student_username):
+        return Classroom.remove_student(classroom_id, student_username)
     
-class TeacherUploadAssignmentController:
-    @staticmethod
-    def upload_assignment(file, title, uploader, classroom_name):
-        pass
-        #assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
-        #return assignment.save_assignment()
 class ViewAssignmentController:
     @staticmethod
     def view_assignment(username):
@@ -148,8 +142,10 @@ class UploadQuizController:
 
 class UploadAssignmentController:
     @staticmethod
-    def upload_assignment(file, title, uploader, classroom_name):
-        assignment = Assignment(title=title, assignment_file=file, username=uploader, classroom_name=classroom_name)
+    def upload_assignment(file, title, classroom_id, description, deadline, filename, file_path):
+        # Create Assignment object and save it
+        assignment = Assignment(title=title, file=file, classroom_id=classroom_id, description=description, 
+                                due_date=deadline, filename=filename, file_path=file_path)
         return assignment.save_assignment()
     
 class ViewUserDetailsController:
@@ -159,7 +155,7 @@ class ViewUserDetailsController:
 
 class SuspendStudentController:
     @staticmethod
-    def suspend_student(classroom_name, student_username):
+    def suspend_student(classroom_id, student_username):
         # Call the Entity to perform the suspension
         success = Classroom.suspend_student(student_username)
         if success:
@@ -188,8 +184,8 @@ class SearchStudentController:
 
 class UpdateClassroomController:
     @staticmethod
-    def update_classroom(classroom_name, new_details):
-        return Classroom.update_classroom(classroom_name, new_details)
+    def update_classroom(classroom_id, new_details):
+        return Classroom.update_classroom(classroom_id, new_details)
     
 class SearchClassroomController:
     @staticmethod
@@ -288,8 +284,8 @@ class DeleteDiscussionRoomController:
     
 class RetrieveDiscussionRoomController:
     @staticmethod
-    def get_all_discussion_rooms():
-        return DiscussionRoom.get_all_discussion_rooms()
+    def get_all_discussion_rooms_by_classroom_id(classroom_id):
+        return DiscussionRoom.get_all_discussion_rooms_by_classroom_id(classroom_id)
     @staticmethod
     def get_discussion_room_id(discussion_room_id):
         return DiscussionRoom.get_id(discussion_room_id)

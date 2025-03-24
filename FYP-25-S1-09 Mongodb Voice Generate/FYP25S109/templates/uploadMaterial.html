@@ -18,6 +18,7 @@
 
     <form action="{{ url_for('boundary.upload_material') }}" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="classroom_name" value="{{ classroom_name }}">
+        <input type="hidden" name="classroom_id" value="{{ classroom_id }}">
 
         <div class="mb-3">
             <label for="title" class="form-label">Material Title:</label>
@@ -35,7 +36,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary">Upload Material</button>
-        <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom_name) }}" class="btn btn-secondary">Cancel</a>
+        <a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
 {% endblock %}

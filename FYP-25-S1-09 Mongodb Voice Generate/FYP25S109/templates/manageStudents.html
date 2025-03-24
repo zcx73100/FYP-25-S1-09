@@ -16,7 +16,7 @@
 
 <!-- Search Form -->
 <h2>Search Students</h2>
-<form method="get" action="{{ url_for('boundary.search_student', classroom_name=classroom.classroom_name, query=query) }}">
+<form method="get" action="{{ url_for('boundary.search_student', classroom_id= classroom.classroom_id, query=query) }}">
     <input type="hidden" name="classroom" value="{{ classroom.classroom_name }}">
     <input type="text" name="query" placeholder="Search by username or email" required>
     <button type="submit">Search</button>
@@ -42,16 +42,16 @@
         <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
         {% if session.get('role') != "Student" %}
         <td>
-            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_id= classroom._id) }}" style="display:inline;">
                 {% if student.status != "suspended" %}
-                    <input type="hidden" name="classroom" value="{{ classroom.classroom_name }}">
+                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
                     <input type="hidden" name="username" value="{{ student.username }}">
                     <button type="submit">Suspend</button>
                 {% endif %}
             </form>
-            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_name=classroom.classroom_name) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_id= classroom._id) }}" style="display:inline;">
                 {% if student.status == "suspended" %}
-                    <input type="hidden" name="classroom" value="{{ classroom.classroom_name }}">
+                    <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
                     <input type="hidden" name="username" value="{{ student.username }}">
                     <button type="submit">Activate</button>
                 {% endif %}
@@ -59,7 +59,8 @@
             <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
                 <button type="submit">View Details</button>
             </form>
-            <form method="post" action="{{ url_for('boundary.remove_student', classroom_name=classroom.classroom_name) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
+            <form method="post" action="{{ url_for('boundary.remove_student', classroom_id= classroom._id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
+                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
                 <input type="hidden" name="username" value="{{ student.username }}">
                 <button type="submit">Remove from Classroom</button>
             </form>
@@ -82,7 +83,8 @@
         <td>{{ student.username }}</td>
         <td>{{ student.email }}</td>
         <td>
-            <form method="post" action="{{ url_for('boundary.enroll_student', classroom_name=classroom.classroom_name) }}" style="display:inline;">
+            <form method="post" action="{{ url_for('boundary.enroll_student', classroom_id= classroom._id) }}" style="display:inline;">
+                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
                 <input type="hidden" name="username" value="{{ student.username }}">
                 <button type="submit">Enroll</button>
             </form>
@@ -96,7 +98,7 @@
 {% endif %}
 
 <!-- Back to Classroom Button -->
-<form method="post" action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">
+<form method="post" action="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}">
     <button type="submit">Back to Classroom</button>
 </form>
 

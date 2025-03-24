@@ -1,18 +1,23 @@
 {% extends "base.html" %}  
 
 {% block content %} 
-<h2 class="upload-title">Upload Assignment for {{ classroom_name }}</h2>  
+<h2 class="upload-title">Upload Assignment</h2>  
 
-<form action="{{ url_for('boundary.upload_assignment', classroom_name=classroom_name) }}" 
+<form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}" 
       method="POST" enctype="multipart/form-data" class="upload-form">  
-
+    <p>Assignment Title:</p>
     <input type="text" name="title" placeholder="Assignment Title" class="input-field">  
-    <input type="text" name="description" placeholder="Assignment Description" class="input-field">  
+    <p>Assignment Description:</p>
+    <input type="text" name="description" placeholder="Assignment Description" class="input-field">
+    <p>Deadline:</p>
     <input type="datetime-local" name="deadline" class="input-field">  
+    <p>Upload File:</p>
     <input type="file" name="file" class="file-input">  
 
     <button type="submit" class="upload-button">Upload Assignment</button>  
 </form>  
+<!-- Use an anchor tag for the return button -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary">Return</a>
 
 <style>
   /* Container for the form */

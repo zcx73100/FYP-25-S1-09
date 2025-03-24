@@ -2,7 +2,7 @@
 {% block content %}
 <h2 class="title">Update Classroom</h2>
 <div class="form-container">
-    <form action="{{ url_for('boundary.update_classroom', classroom_name=classroom.classroom_name) }}" method="POST" class="classroom-form">
+    <form action="{{ url_for('boundary.update_classroom', classroom_id=classroom._id) }}" method="POST" class="classroom-form">
         <label for="classroom_name">Classroom Name:</label>
         <input type="text" name="classroom_name" id="classroom_name" value="{{ classroom.classroom_name }}" required>
 

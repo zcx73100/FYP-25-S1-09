@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
     <h2>Manage Classrooms</h2>
-    <form action="{{ url_for('boundary.search_classroom')}}" method="[GET,POST]">
+    <form action="{{ url_for('boundary.search_classroom')}}" method="GET">
         <input type="text" name="query" placeholder="Search Classroom">
         <button type="submit">Search</button>
     </form>
@@ -12,18 +12,24 @@
         {% if classrooms %}
             {% for classroom in classrooms %}
                 <div class="classroom-card">
-                    <h5 hidden="true">{{ classroom._id }}</h5>
+                    <h5 hidden="true">ID: {{ classroom._id }}</h5>
                     <h5>Classroom Name: {{ classroom.classroom_name }}</h5>
                     <h5>Classroom Description: {{ classroom.description }}</h5>
                     <h5>Classroom Capacity: {{ classroom.capacity }}</h5>
-                    <h5>Number of Students Enrolled: {{classroom.student_list |length }}</h5>
-                    <form action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}" method="POST">
+                    <h5>Number of Students Enrolled: {{ classroom.student_list | length }}</h5>
+                    
+                    <!-- View Classroom -->
+                    <form action="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}" method="POST">
                         <button type="submit">View Classroom</button>
                     </form>
-                    <form action="{{ url_for('boundary.update_classroom', classroom_name=classroom.classroom_name) }}" method="POST">
+                    
+                    <!-- Update Classroom -->
+                    <form action="{{ url_for('boundary.update_classroom', classroom_id=classroom._id) }}" method="POST">
                         <button type="submit">Update Classroom Details</button>
                     </form>
-                    <form action="{{ url_for('boundary.delete_classroom', classroom_name=classroom.classroom_name) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this classroom?');">
+                    
+                    <!-- Delete Classroom -->
+                    <form action="{{ url_for('boundary.delete_classroom', classroom_id=classroom._id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this classroom?');">
                         <button type="submit">Delete Classroom</button>
                     </form>
                 </div>

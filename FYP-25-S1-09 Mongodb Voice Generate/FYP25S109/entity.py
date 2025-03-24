@@ -486,18 +486,20 @@ class Classroom:
             logging.error(f"Error deleting classroom: {str(e)}")
             return False
     @staticmethod
-    def update_classroom(classroom_name, updated_data):
-        """ Updates a classroom by ID """
+    def update_classroom(classroom_id, updated_data):
+        """ Updates a classroom by _id """
         try:
             result = mongo.db.classroom.update_one(
-                {"classroom_name": classroom_name},
+                {"_id": ObjectId(classroom_id)},  # Convert string ID to ObjectId
                 {"$set": updated_data}
             )
             if result.modified_count > 0:
-                return True
+                return {"success": True, "message": "Classroom updated successfully."}
+            else:
+                return {"success": False, "message": "No changes made or classroom not found."}
         except Exception as e:
             logging.error(f"Error updating classroom: {str(e)}")
-            return
+            return {"success": False, "message": str(e)}
     
     @staticmethod
     def find_by_teacher(teacher):
@@ -520,7 +522,7 @@ class Classroom:
             return []
     
     @staticmethod
-    def enroll_student(classroom_name, student_username):
+    def enroll_student(classroom_id, student_username):
         """Enrolls a student into a classroom, avoiding duplicates."""
         try:
             # Check if the student exists and has the "Student" role
@@ -529,7 +531,7 @@ class Classroom:
                 return {"success": False, "message": f"Student '{student_username}' not found or not a student."}
 
             # Check if the classroom exists
-            classroom = mongo.db.classroom.find_one({"classroom_name": classroom_name})
+            classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
             if not classroom:
                 return {"success": False, "message": "Classroom not found."}
 
@@ -539,7 +541,7 @@ class Classroom:
 
             # Enroll the student using $addToSet to avoid duplicates
             result = mongo.db.classroom.update_one(
-                {"classroom_name": classroom_name},
+                {"_id": ObjectId(classroom_id)},
                 {"$addToSet": {"student_list": student_username}}
             )
             if result.modified_count > 0:
@@ -551,11 +553,11 @@ class Classroom:
             return {"success": False, "message": str(e)}
     
     @staticmethod
-    def remove_student(classroom_name, student_username):
+    def remove_student(classroom_id, student_username):
         """Removes a student from a classroom."""
         try:
             result = mongo.db.classroom.update_one(
-                {"classroom_name": classroom_name},
+                {"_id": ObjectId(classroom_id)},
                 {"$pull": {"student_list": student_username}}
             )
             if result.modified_count > 0:
@@ -663,21 +665,23 @@ class Material:
             return {"success": False, "message": str(e)}
 
 class Assignment:
-    def __init__(self, title=None, file=None, username=None, user_role=None, description=None, due_date=None):
+    def __init__(self, title=None, file=None, classroom_id=None, description=None, due_date=None, filename=None, file_path=None):
         self.title = title
         self.file = file
-        self.username = username
-        self.user_role = user_role
+        self.classroom_id = classroom_id
         self.description = description
         self.due_date = due_date
+        self.filename = filename
+        self.file_path = file_path
 
     def save_assignment(self):
         UPLOAD_FOLDER_ASSIGNMENT = 'FYP25S109/static/uploads/materials/'
-        ALLOWED_ASSIGNMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt','zip'}
+        ALLOWED_ASSIGNMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'}
         try:
             if not self.file:
                 raise ValueError("No file selected for upload.")
 
+            # Secure filename to prevent malicious filenames
             filename = secure_filename(self.file.filename)
             file_path = os.path.join(UPLOAD_FOLDER_ASSIGNMENT, filename)
 
@@ -687,11 +691,12 @@ class Assignment:
 
             self.file.save(file_path)
 
+            # Insert assignment into MongoDB
             mongo.db.assignments.insert_one({
                 'title': self.title,
-                'file_name': filename,
-                'file_path': file_path,
-                'username': self.username,
+                'file_name': self.filename,
+                'file_path': self.file_path,
+                'classroom_id': self.classroom_id,  # Ensure classroom_id is saved
                 'upload_date': datetime.now(),
                 'description': self.description,
                 'due_date': self.due_date
@@ -723,11 +728,10 @@ class Assignment:
         except Exception as e:
             logging.error(f"Error deleting assignment: {str(e)}")
             return {"success": False, "message": str(e)}
-    
+
     @staticmethod
     def get_assignment(assignment_id):
         try:
-            print(assignment_id)
             assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
             return assignment
         except Exception as e:
@@ -849,17 +853,17 @@ class Submission:
 
 
 class DiscussionRoom:
-    def __init__(self, classroom_name=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
-        self.classroom_name = classroom_name
+    def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
+        self.classroom_id = classroom_id
         self.discussion_room_name = discussion_room_name
         self.discussion_room_description = discussion_room_description
         self.created_by = created_by
 
     @staticmethod
-    def create_discussion_room(classroom_name, discussion_room_name, discussion_room_description,created_by):
+    def create_discussion_room(classroom_id, discussion_room_name, discussion_room_description,created_by):
         try:
             room_data = {
-                "classroom_name": classroom_name,
+                "classroom_id": ObjectId(classroom_id),
                 "discussion_room_name": discussion_room_name,
                 "discussion_room_description": discussion_room_description,
                 "created_at": datetime.now(),
@@ -904,9 +908,9 @@ class DiscussionRoom:
             return []
 
     @staticmethod
-    def get_all_discussion_rooms():
+    def get_all_discussion_rooms_by_classroom_id(classroom_id):
         try:
-            rooms = list(mongo.db.discussion_rooms.find())
+            rooms = list(mongo.db.discussion_rooms.find({"classroom_id":ObjectId(classroom_id)}))
             print(rooms)
             return rooms
         except Exception as e:

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Manage Quizzes for {{ classroom_name }}</h2>
+<h2>Manage Quizzes</h2>
 
-<a href="{{ url_for('boundary.create_quiz', classroom_name=classroom_name) }}" class="btn btn-primary">Create New Quiz</a>
+<a href="{{ url_for('boundary.create_quiz', classroom_id=classroom_id) }}" class="btn btn-primary">Create New Quiz</a>
 
 <h3>Existing Quizzes</h3>
 <ul>

@@ -6,7 +6,7 @@
     <div class="classroom-section">
         <h3>📢 Announcements</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.add_announcement', classroom_name=classroom.classroom_name) }}" class="btn btn-warning">📢 Add Announcement</a>
+            <a href="{{ url_for('boundary.add_announcement', classroom_name=classroom.classroom_name, classroom_id = classroom._id) }}" class="btn btn-warning">📢 Add Announcement</a>
         {% endif %}
         <ul>
             {% if announcements %}
@@ -22,15 +22,17 @@
             {% endif %}
         </ul>
     </div>
+
     <div class="classroom-section">
         <h3>💬 Forum</h3>
-        <a href="{{ url_for('boundary.access_forum', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">View Forum</a>
+        <a href="{{ url_for('boundary.access_forum', classroom_id=classroom._id) }}" class="btn btn-primary">View Forum</a>
     </div>
+
     <div class="classroom-section">
         <h3>📂 Materials</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.upload_material_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Material</a>
-            <a href="{{ url_for('boundary.manage_materials', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Materials</a>
+            <a href="{{ url_for('boundary.upload_material_page', classroom_id=classroom._id) }}" class="btn btn-primary">Upload Material</a>
+            <a href="{{ url_for('boundary.manage_materials', classroom_id=classroom._id) }}" class="btn btn-secondary">Manage Materials</a>
         {% endif %}
         <ul>
             {% if materials %}
@@ -50,8 +52,8 @@
     <div class="classroom-section">
         <h3>📄 Assignments</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.upload_assignment_page', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Upload Assignment</a>
-            <a href="{{ url_for('boundary.manage_assignments', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Assignments</a>
+            <a href="{{ url_for('boundary.upload_assignment_page', classroom_id=classroom._id) }}" class="btn btn-primary">Upload Assignment</a>
+            <a href="{{ url_for('boundary.manage_assignments', classroom_id=classroom._id) }}" class="btn btn-secondary">Manage Assignments</a>
         {% endif %}
         <ul>
             {% if assignments %}
@@ -59,9 +61,9 @@
                     <li>
                         <strong>{{ assignment.title }}</strong>: {{ assignment.description }}
                         <br>
-                        <span>📅 Due: {{ assignment.deadline | default("Not specified") }}</span>
+                        <span>📅 Due: {{ assignment.due_date | default("Not specified") }}</span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.filename, classroom_name =classroom.classroom_name) }}" class="file-button">📄 View</a>
+                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}
@@ -73,8 +75,8 @@
     <div class="classroom-section">
         <h3>📝 Quizzes</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.create_quiz', classroom_name=classroom.classroom_name) }}" class="btn btn-primary">Create Quiz</a>
-            <a href="{{ url_for('boundary.manage_quizzes', classroom_name=classroom.classroom_name) }}" class="btn btn-secondary">Manage Quizzes</a>
+            <a href="{{ url_for('boundary.create_quiz', classroom_id=classroom._id) }}" class="btn btn-primary">Create Quiz</a>
+            <a href="{{ url_for('boundary.manage_quizzes', classroom_id=classroom._id) }}" class="btn btn-secondary">Manage Quizzes</a>
         {% endif %}
         <ul>
             {% if quizzes %}
@@ -90,12 +92,14 @@
             {% endif %}
         </ul>
     </div>
+
     <div class="classroom-section">
         <h3>Students in this Classroom</h3>
-        <form action="{{ url_for('boundary.manage_students', classroom_name=classroom.classroom_name) }}" method="POST">
+        <form action="{{ url_for('boundary.manage_students', classroom_id=classroom._id) }}" method="POST">
+            <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
             <button type="submit" class="btn btn-primary">See Students in this Classroom</button>
         </form>
-    </div>
+    </div>    
 
     <style>
         .file-button {

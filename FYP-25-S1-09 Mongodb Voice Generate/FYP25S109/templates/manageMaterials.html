@@ -34,8 +34,8 @@
                 <td>{{ material.title }}</td>
                 <td>{{ material.description }}</td>
                 <td>
-                    <a href="{{ url_for('boundary.view_material', filename=material.filename) }}" class="btn btn-primary">View</a>
-                    <form action="{{ url_for('boundary.delete_material', classroom_name=classroom_name, filename=material.filename) }}" method="POST" style="display:inline;">
+                    <a href="{{ url_for('boundary.view_material', filename=material.filename, classroom_id=classroom_id) }}" class="btn btn-primary">View</a>
+                    <form action="{{ url_for('boundary.delete_material', classroom_name=classroom_name, filename=material.filename, classroom_id=classroom_id) }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </td>
@@ -50,6 +50,6 @@
     </table>
 
     <!-- Back Button -->
-    <a href="{{ url_for('boundary.view_classroom', classroom_name=classroom_name) }}" class="btn btn-secondary mt-3">Back</a>
+    <a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary mt-3">Back</a>
 </div>
 {% endblock %}

@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Create a New MCQ Quiz</h2>
+<h2 class="title">Create a New MCQ Quiz</h2>
 
-<form action="{{ url_for('boundary.create_quiz', classroom_name=classroom_name) }}" method="POST">
+<form action="{{ url_for('boundary.create_quiz', classroom_id=classroom_id) }}" method="POST" class="quiz-form">
     <label for="quiz_title">Quiz Title:</label>
-    <input type="text" name="quiz_title" required>
+    <input type="text" name="quiz_title" class="input-field" required>
 
     <label for="description">Description:</label>
-    <textarea name="description"></textarea>
+    <textarea name="description" class="textarea-field"></textarea>
 
     <div id="questions-container">
         <div class="question">
             <label for="question_1">Question 1:</label>
-            <input type="text" name="question_1" required>
+            <input type="text" name="question_1" class="input-field" required>
     
             <label>Options:</label>
-            <input type="text" name="option_1_1" required>
-            <input type="text" name="option_1_2" required>
-            <input type="text" name="option_1_3" required>
-            <input type="text" name="option_1_4" required>
+            <input type="text" name="option_1_1" class="input-field" required>
+            <input type="text" name="option_1_2" class="input-field" required>
+            <input type="text" name="option_1_3" class="input-field" required>
+            <input type="text" name="option_1_4" class="input-field" required>
     
             <label for="correct_answer_1">Correct Answer:</label>
-            <select name="correct_answer_1">
+            <select name="correct_answer_1" class="select-field">
                 <option value="1">Choice 1</option>
                 <option value="2">Choice 2</option>
                 <option value="3">Choice 3</option>
@@ -31,34 +31,124 @@
         </div>
     </div>
     
-    <button type="button" id="add-question">Add Question</button>
-    <button type="submit">Create Quiz</button>
-    
-    <script>
-        document.getElementById("add-question").addEventListener("click", function() {
-            let container = document.getElementById("questions-container");
-            let index = container.getElementsByClassName("question").length + 1;
-            let questionDiv = document.createElement("div");
-            questionDiv.className = "question";
-            questionDiv.innerHTML = `
-                <label>Question ${index}:</label>
-                <input type="text" name="question_${index}" required>
-                <label>Choices:</label>
-                <input type="text" name="option_${index}_1" required>
-                <input type="text" name="option_${index}_2" required>
-                <input type="text" name="option_${index}_3" required>
-                <input type="text" name="option_${index}_4" required>
-                <br>
-                <label>Correct Answer:</label>
-                <select name="correct_answer_${index}">
-                    <option value="1">Choice 1</option>
-                    <option value="2">Choice 2</option>
-                    <option value="3">Choice 3</option>
-                    <option value="4">Choice 4</option>
-                </select>
-            `;
-            container.appendChild(questionDiv);
-        });
-    </script>
+    <button type="button" id="add-question" class="btn">Add Question</button>
+    <button type="submit" class="btn submit-btn">Create Quiz</button>
+</form>
+
+<script>
+    document.getElementById("add-question").addEventListener("click", function() {
+        let container = document.getElementById("questions-container");
+        let index = container.getElementsByClassName("question").length + 1;
+        let questionDiv = document.createElement("div");
+        questionDiv.className = "question";
+        questionDiv.innerHTML = `
+            <label>Question ${index}:</label>
+            <input type="text" name="question_${index}" class="input-field" required>
+            <label>Choices:</label>
+            <input type="text" name="option_${index}_1" class="input-field" required>
+            <input type="text" name="option_${index}_2" class="input-field" required>
+            <input type="text" name="option_${index}_3" class="input-field" required>
+            <input type="text" name="option_${index}_4" class="input-field" required>
+            <label>Correct Answer:</label>
+            <select name="correct_answer_${index}" class="select-field">
+                <option value="1">Choice 1</option>
+                <option value="2">Choice 2</option>
+                <option value="3">Choice 3</option>
+                <option value="4">Choice 4</option>
+            </select>
+        `;
+        container.appendChild(questionDiv);
+    });
+</script>
+
+<style>
+    .title {
+        font-size: 1.8rem;
+        text-align: center;
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .quiz-form {
+        max-width: 100%;
+        margin: auto;
+        padding: 20px;
+        border-radius: 10px;
+        background-color: #f4f4f4;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    label {
+        margin: 8px 0;
+        display: block;
+        font-weight: bold;
+        color: #555;
+    }
+
+    .input-field, .textarea-field, .select-field {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0 15px 0;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+    }
+
+    .textarea-field {
+        height: 100px;
+        resize: vertical;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        margin: 5px;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        background-color: #007bff;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .btn:hover {
+        background-color: #0056b3;
+    }
+
+    .submit-btn {
+        background-color: #28a745;
+    }
+
+    .submit-btn:hover {
+        background-color: #218838;
+    }
+
+    .question {
+        margin: 15px 0;
+        padding: 10px;
+        background-color: #e9ecef;
+        border-radius: 5px;
+        white-space: normal;
+    }
+
+    .questions-container {
+        max-width: 100%;
+        overflow-x: auto;
+        padding: 10px;
+        white-space: nowrap;
+    }
+
+    .question label {
+        margin-top: 5px;
+    }
+
+    .question input,
+    .question select {
+        margin: 5px;
+        min-width: 200px;
+    }
+</style>
+
 
 {% endblock %}
