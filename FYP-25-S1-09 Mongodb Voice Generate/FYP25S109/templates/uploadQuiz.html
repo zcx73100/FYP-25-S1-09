@@ -3,34 +3,39 @@
 {% block content %}
 <h2 class="title">Create a New MCQ Quiz</h2>
 
-<form action="{{ url_for('boundary.create_quiz', classroom_id=classroom_id) }}" method="POST" class="quiz-form">
+<form action="{{ url_for('boundary.upload_quiz', classroom_id=classroom_id) }}" method="POST" class="quiz-form" enctype="multipart/form-data">
     <label for="quiz_title">Quiz Title:</label>
     <input type="text" name="quiz_title" class="input-field" required>
 
     <label for="description">Description:</label>
-    <textarea name="description" class="textarea-field"></textarea>
+    <textarea name="quiz_description" class="textarea-field"></textarea>
 
-    <div id="questions-container">
-        <div class="question">
-            <label for="question_1">Question 1:</label>
-            <input type="text" name="question_1" class="input-field" required>
-    
-            <label>Options:</label>
-            <input type="text" name="option_1_1" class="input-field" required>
-            <input type="text" name="option_1_2" class="input-field" required>
-            <input type="text" name="option_1_3" class="input-field" required>
-            <input type="text" name="option_1_4" class="input-field" required>
-    
-            <label for="correct_answer_1">Correct Answer:</label>
-            <select name="correct_answer_1" class="select-field">
-                <option value="1">Choice 1</option>
-                <option value="2">Choice 2</option>
-                <option value="3">Choice 3</option>
-                <option value="4">Choice 4</option>
-            </select>
+    <div class="questions-wrapper">
+        <div id="questions-container">
+            <div class="question">
+                <label for="question_1">Question 1:</label>
+                <input type="text" name="question_1" class="input-field" required>
+
+                <label>Options:</label>
+                <input type="text" name="option_1_1" class="input-field" required>
+                <input type="text" name="option_1_2" class="input-field" required>
+                <input type="text" name="option_1_3" class="input-field" required>
+                <input type="text" name="option_1_4" class="input-field" required>
+
+                <label for="correct_answer_1">Correct Answer:</label>
+                <select name="correct_answer_1" class="select-field">
+                    <option value="1">Choice 1</option>
+                    <option value="2">Choice 2</option>
+                    <option value="3">Choice 3</option>
+                    <option value="4">Choice 4</option>
+                </select>
+
+                <label for="image_1">Upload Image:</label>
+                <input type="file" name="image_1" class="input-field" accept="image/*">
+            </div>
         </div>
     </div>
-    
+
     <button type="button" id="add-question" class="btn">Add Question</button>
     <button type="submit" class="btn submit-btn">Create Quiz</button>
 </form>
@@ -56,6 +61,8 @@
                 <option value="3">Choice 3</option>
                 <option value="4">Choice 4</option>
             </select>
+            <label>Upload Image:</label>
+            <input type="file" name="image_${index}" class="input-field" accept="image/*">
         `;
         container.appendChild(questionDiv);
     });
@@ -124,19 +131,29 @@
         background-color: #218838;
     }
 
-    .question {
-        margin: 15px 0;
+    .questions-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
         padding: 10px;
-        background-color: #e9ecef;
+        border: 1px solid #ddd;
         border-radius: 5px;
-        white-space: normal;
+        background-color: #f9f9f9;
     }
 
-    .questions-container {
-        max-width: 100%;
-        overflow-x: auto;
-        padding: 10px;
-        white-space: nowrap;
+    #questions-container {
+        display: flex;
+        gap: 20px;
+    }
+
+    .question {
+        flex: 0 0 auto;
+        width: 400px; /* Adjust width as needed */
+        padding: 15px;
+        background-color: #e9ecef;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        white-space: normal;
     }
 
     .question label {
@@ -149,6 +166,5 @@
         min-width: 200px;
     }
 </style>
-
 
 {% endblock %}

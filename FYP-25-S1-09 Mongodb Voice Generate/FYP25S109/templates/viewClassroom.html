@@ -75,14 +75,14 @@
     <div class="classroom-section">
         <h3>📝 Quizzes</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.create_quiz', classroom_id=classroom._id) }}" class="btn btn-primary">Create Quiz</a>
+            <a href="{{ url_for('boundary.upload_quiz', classroom_id=classroom._id) }}" class="btn btn-primary">Create Quiz</a>
             <a href="{{ url_for('boundary.manage_quizzes', classroom_id=classroom._id) }}" class="btn btn-secondary">Manage Quizzes</a>
         {% endif %}
         <ul>
             {% if quizzes %}
                 {% for quiz in quizzes %}
                     <li>
-                        <strong>{{ quiz.title }}</strong>: {{ quiz.total_questions }} Questions
+                        <strong>{{ quiz.title }}
                         <br>
                         <a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}" class="file-button">📄 View</a>
                     </li>

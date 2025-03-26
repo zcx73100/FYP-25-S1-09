@@ -136,9 +136,15 @@ class UploadMaterialController:
 
 class UploadQuizController:
     @staticmethod
-    def upload_quiz(file, title, uploader, classroom_name):
-        quiz = Quiz(title=title, quiz_file=file, username=uploader, classroom_name=classroom_name)
+    def upload_quiz(quiz_title, quiz_description, questions, classroom_id):
+        quiz = Quiz(
+            title=quiz_title,
+            description=quiz_description,
+            questions=questions,
+            classroom_id=classroom_id
+        )
         return quiz.save_quiz()
+
 
 class UploadAssignmentController:
     @staticmethod

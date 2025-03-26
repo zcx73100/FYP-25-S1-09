@@ -21,7 +21,7 @@
         <p>
             <strong>Correct Answer:</strong> 
             {% if question.correct_answer is not none %}
-                {{ question.options[question.correct_answer] }}
+                {{ question.options[question.correct_answer|int] }}
             {% else %}
                 <span style="color: red;">Error: No correct answer found</span>
             {% endif %}
@@ -30,5 +30,5 @@
     {% endfor %}
 </ul>
 
-<a href="{{ url_for('boundary.manage_quizzes', classroom_name=quiz.classroom_name) }}" class="btn btn-primary">Back to Quizzes</a>
+<a href="{{ url_for('boundary.manage_quizzes', classroom_id=quiz.classroom_id) }}" class="btn btn-primary">Back to Quizzes</a>
 {% endblock %}

@@ -27,7 +27,7 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
 API_URL = "https://vinthony-sadtalker.hf.space/--replicas/55zml"
-client = Client(API_URL)
+#client = Client(API_URL)
 
 GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
 GENERATE_FOLDER_VIDEOS = 'FYP25S109/static/generated_videos'
@@ -1239,31 +1239,8 @@ class TeacherManageMaterialBoundary:
 
         return render_template('viewMaterial.html', filename=filename, text_content=text_content)
 
+    
 
-
-class TeacherManageQuizBoundary:
-    UPLOAD_FOLDER_QUIZ = 'FYP25S109/static/uploads/quiz/'
-
-    @staticmethod
-    @boundary.route('/teacher/upload_quiz/<classroom_name>', methods=['GET', 'POST'])
-    def upload_quiz(classroom_name):
-        if request.method == 'POST':
-            quiz_title = request.form.get('quiz_title')
-            quiz_description = request.form.get('quiz_description')
-            questions = request.form.getlist('questions')
-
-            # Store quiz in the database
-            mongo.db.quizzes.insert_one({
-                "classroom_name": classroom_name,
-                "title": quiz_title,
-                "description": quiz_description,
-                "questions": questions
-            })
-
-            flash("Quiz created successfully!", "success")
-            return redirect(url_for('boundary.manage_quizzes', classroom_name=classroom_name))
-
-        return render_template("uploadQuiz.html", classroom_name=classroom_name)
 
 class TeacherViewQuizBoundary:
     @boundary.route('/teacher/view_quiz/<quiz_id>', methods=['GET'])
@@ -1503,62 +1480,57 @@ class TeacherAssignmentBoundary:
         return redirect(request.referrer)
 
 
+class TeacherManageQuizBoundary:
+    UPLOAD_FOLDER_QUIZ = 'FYP25S109/static/uploads/quiz/'
 
- 
-# ------------------------------------------------------------- Quiz
-class TeacherCreateQuizBoundary:
-    @boundary.route('/teacher/create_quiz/<classroom_id>', methods=['GET', 'POST'])
-    def create_quiz(classroom_id):
-        if request.method == 'POST':  # Handling POST request when submitting form
-            quiz_title = request.form.get('quiz_title')
-            description = request.form.get('description')
-
-            # Extract questions dynamically
+    @boundary.route('/teacher/upload_quiz/<classroom_id>', methods=['GET', 'POST'])
+    def upload_quiz(classroom_id):
+        if request.method == "POST":
+            quiz_title = request.form.get('quiz_title', '').strip()
+            quiz_description = request.form.get('quiz_description', '').strip()
             questions = []
-            index = 1
-            while request.form.get(f'question_{index}'):
-                question_text = request.form.get(f'question_{index}')
+
+            question_count = sum(1 for key in request.form.keys() if key.startswith('question_'))
+
+            for i in range(1, question_count + 1):
+                question_text = request.form.get(f'question_{i}', '').strip()
                 options = [
-                    request.form.get(f'option_{index}_1'),
-                    request.form.get(f'option_{index}_2'),
-                    request.form.get(f'option_{index}_3'),
-                    request.form.get(f'option_{index}_4'),
+                    request.form.get(f'option_{i}_1', '').strip(),
+                    request.form.get(f'option_{i}_2', '').strip(),
+                    request.form.get(f'option_{i}_3', '').strip(),
+                    request.form.get(f'option_{i}_4', '').strip()
                 ]
-                correct_answer = int(request.form.get(f'correct_answer_{index}')) - 1  # Store as index
+                correct_answer = request.form.get(f'correct_answer_{i}', '').strip()
+                image_file = request.files.get(f'image_{i}')
+
+                # Convert image to base64 if uploaded
+                image_data = None
+                if image_file and image_file.filename:
+                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
 
                 questions.append({
                     "text": question_text,
                     "options": options,
-                    "correct_answer": correct_answer
+                    "correct_answer": correct_answer,
+                    "image": image_data
                 })
-                index += 1
 
-            if not quiz_title or not questions:
-                flash('Quiz must have a title and at least one question!', 'danger')
+            # Call controller function
+            result = UploadQuizController.upload_quiz(quiz_title, quiz_description, questions, classroom_id)
+
+            if result.get("success"):
+                flash("Quiz created successfully!", "success")
                 return redirect(url_for('boundary.manage_quizzes', classroom_id=classroom_id))
-
-            quiz_data = {
-                "classroom_id": classroom_id,
-                "title": quiz_title,
-                "description": description,
-                "questions": questions
-            }
-
-            result = mongo.db.quizzes.insert_one(quiz_data)
-            if result.inserted_id:
-                flash('Quiz created successfully!', 'success')
             else:
-                flash('Failed to create quiz.', 'danger')
+                flash(f"Error: {result.get('message')}", "danger")
 
-            return redirect(url_for('boundary.manage_quizzes', classroom_id=classroom_id))
-
+        # If GET request, show the quiz creation form
         return render_template("uploadQuiz.html", classroom_id=classroom_id)
-
-
-class TeacherManageQuizBoundary:
+    
+    
     @boundary.route('/teacher/manage_quizzes/<classroom_id>', methods=['GET'])
     def manage_quizzes(classroom_id):
-        quizzes = list(mongo.db.quizzes.find({"classroom_id": classroom_id}))
+        quizzes = list(mongo.db.quizzes.find({"classroom_id": ObjectId(classroom_id)}))
         return render_template("manageQuizzes.html", quizzes=quizzes, classroom_id=classroom_id)
 
     @boundary.route('/teacher/delete_quiz/<quiz_id>', methods=['POST'])

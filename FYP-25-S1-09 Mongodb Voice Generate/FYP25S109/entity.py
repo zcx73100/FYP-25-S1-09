@@ -833,28 +833,29 @@ class Assignment:
             return None
         
 class Quiz:
-    def __init__(self, title=None, questions=None, username=None, user_role=None, description=None):
+    def __init__(self, title=None, description=None, questions=None, classroom_id=None):
         self.title = title
-        self.questions = questions
-        self.username = username
-        self.user_role = user_role
         self.description = description
+        self.questions = questions
+        self.classroom_id = classroom_id
 
     def save_quiz(self):
-        try:
+            try:
+                quiz_data = {
+                    'title': self.title,
+                    'description': self.description,
+                    'questions': self.questions,
+                    'classroom_id': ObjectId(self.classroom_id),
+                    'upload_date': datetime.now()
+                }
 
-            mongo.db.quiz.insert_one({
-                'title': self.title,
-                'questions': self.questions,
-                'username': self.username,
-                'upload_date': datetime.now(),
-                'description': self.description
-            })
-            return {"success": True, "message": "Quiz uploaded successfully."}
+                mongo.db.quizzes.insert_one(quiz_data)
+                return {"success": True, "message": "Quiz uploaded successfully."}
 
-        except Exception as e:
-            logging.error(f"Error saving quiz: {str(e)}")
-            return {"success": False, "message": str(e)}
+            except Exception as e:
+                logging.error(f"Error saving quiz: {str(e)}")
+                return {"success": False, "message": str(e)}
+
 
     @staticmethod
     def search_quiz(search_query):
