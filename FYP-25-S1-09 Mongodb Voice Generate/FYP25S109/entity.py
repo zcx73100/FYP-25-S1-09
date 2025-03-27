@@ -546,7 +546,7 @@ class Classroom:
                 'classroom_name': classroom_name,
                 'teacher': teacher,
                 'student_list': student_list,
-                'capacity': classroom_capacity,
+                'capacity': int(classroom_capacity),
                 'description': classroom_description,
                 'upload_date': datetime.now()
             })
@@ -861,7 +861,7 @@ class Quiz:
     def search_quiz(search_query):
         try:
             # Use case-insensitive and partial matching
-            quizzes = mongo.db.quiz.find({
+            quizzes = mongo.db.quizzes.find({
                 "title": {"$regex": search_query, "$options": "i"}
             })
             return list(quizzes)
@@ -872,7 +872,7 @@ class Quiz:
     @staticmethod
     def delete_quiz(quiz_id):
         try:
-            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
+            quiz = mongo.db.quizzes.find_one({"_id": quiz_id})
             if quiz:
                 os.remove(quiz['file_path'])
         except Exception as e:
@@ -882,21 +882,49 @@ class Quiz:
     @staticmethod
     def find_by_id(quiz_id):
         try:
-            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
+            quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
             return quiz
         except Exception as e:
             logging.error(f"Failed to find quiz by ID: {str(e)}")
             return None
 
     @staticmethod
-    def delete_quiz(quiz_id):
+    def attempt_quiz(quiz_id, student_username, answers):
         try:
-            quiz = mongo.db.quiz.find_one({"_id": quiz_id})
-            if quiz:
-                os.remove(quiz['file_path'])
+            quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+            if not quiz:
+                return {"success": False, "message": "Quiz not found."}
+
+            # Check if the student already attempted the quiz
+            for attempt in quiz.get("attempts", []):
+                if attempt["student"] == student_username:
+                    return {"success": False, "message": "You have already attempted this quiz."}
+
+            # Calculate score
+            score = sum(
+                1 for question in quiz['questions']
+                if str(question['_id']) in answers and question['answer'] == answers[str(question['_id'])]
+            )
+
+            # Append new attempt
+            new_attempt = {
+                "student": student_username,
+                "answers": answers,
+                "score": score,
+                "attempted_at": datetime.now()
+            }
+
+            mongo.db.quizzes.update_one(
+                {"_id": ObjectId(quiz_id)},
+                {"$push": {"attempts": new_attempt}}
+            )
+
+            return {"success": True, "message": f"Quiz submitted successfully. Score: {score}"}
+
         except Exception as e:
-            logging.error(f"Error deleting quiz: {str(e)}")
+            logging.error(f"Error attempting quiz: {str(e)}")
             return {"success": False, "message": str(e)}
+
         
 class Submission:
     def __init__(self, assignment_id, student, file, submission_date=None):

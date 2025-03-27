@@ -84,7 +84,12 @@
                     <li>
                         <strong>{{ quiz.title }}
                         <br>
-                        <a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}" class="file-button">📄 View</a>
+                        {% if session['role'] == 'Teacher' %}
+                            <a href="{{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}" class="file-button">📄 View</a>
+                        {% endif %}
+                        {% if session['role'] == 'Student' %}
+                            <a href="{{ url_for('boundary.attempt_quiz', quiz_id=quiz._id) }}" class="btn btn-success">Attempt Quiz</a>
+                        {% endif %}
                     </li>
                 {% endfor %}
             {% else %}

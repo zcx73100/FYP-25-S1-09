@@ -145,6 +145,13 @@ class UploadQuizController:
         )
         return quiz.save_quiz()
 
+class AttemptQuizController:
+    @staticmethod
+    def attempt_quiz(quiz_id, student_username, answers):
+        quiz = Quiz.find_by_id(quiz_id)
+        return quiz.attempt_quiz(quiz_id, student_username, answers)
+
+
 
 class UploadAssignmentController:
     @staticmethod

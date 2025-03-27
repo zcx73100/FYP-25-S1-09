@@ -78,27 +78,29 @@ class HomePage:
                 {"_id": 1, "classroom_name": 1, "description": 1}
             ))
 
-        # ✅ Fetch Classroom-Specific Announcements
-        announcements = {c["classroom_name"]: list(mongo.db.announcements.find(
-            {"classroom_name": c["classroom_name"]},
+        # ✅ Extract classroom _ids
+        classroom_ids = [classroom["_id"] for classroom in classrooms]
+
+        # ✅ Fetch Classroom-Specific Announcements, Materials, Assignments, and Quizzes by _id
+        announcements = {classroom["_id"]: list(mongo.db.announcements.find(
+            {"classroom_id": classroom["_id"]},
             {"_id": 1, "title": 1, "content": 1, "created_at": 1}
-        )) for c in classrooms}
+        )) for classroom in classrooms}
 
-        # ✅ Fetch Materials, Assignments, and Quizzes Per Classroom
-        materials = {c["classroom_name"]: list(mongo.db.materials.find(
-            {"classroom_name": c["classroom_name"]},
+        materials = {classroom["_id"]: list(mongo.db.materials.find(
+            {"classroom_id": classroom["_id"]}, # ✅ Filter by classroom_id
             {"_id": 1, "title": 1}
-        )) for c in classrooms}
+        )) for classroom in classrooms}
 
-        assignments = {c["classroom_name"]: list(mongo.db.assignments.find(
-            {"classroom_name": c["classroom_name"]},
+        assignments = {classroom["_id"]: list(mongo.db.assignments.find(
+            {"classroom_id": classroom["_id"]}, # ✅ Filter by classroom_id
             {"_id": 1, "title": 1}
-        )) for c in classrooms}
+        )) for classroom in classrooms}
 
-        quizzes = {c["classroom_name"]: list(mongo.db.quizzes.find(
-            {"classroom_name": c["classroom_name"]},
+        quizzes = {str(classroom["_id"]): list(mongo.db.quizzes.find(
+            {"classroom_id": ObjectId(classroom["_id"])},  # ✅ Filter by classroom_id
             {"_id": 1, "title": 1}
-        )) for c in classrooms}
+        )) for classroom in classrooms}
 
         return render_template(
             "homepage.html",
@@ -111,6 +113,7 @@ class HomePage:
             assignments=assignments,  # ✅ Assignments second
             quizzes=quizzes  # ✅ Quizzes last
         )
+
       
         
 # Generate Video
@@ -1539,6 +1542,29 @@ class TeacherManageQuizBoundary:
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
 
+class StudentQuizBoundary:
+    @boundary.route('/attempt_quiz/<quiz_id>', methods=['GET', 'POST'])
+    def attempt_quiz(quiz_id):
+        # Ensure the user is a student
+        if 'role' not in session or session['role'] != 'Student':
+            flash("Unauthorized access!", "danger")
+            return redirect(url_for('boundary.home'))
+        
+        if request.method == 'POST':
+            answers = request.form.to_dict()
+            result = AttemptQuizController.attempt_quiz(quiz_id, session['username'], answers)
+            print(quiz_id)
+            flash(result["message"], "success" if result["success"] else "danger")
+            return redirect(url_for('boundary.home'))
+
+        # Fetch quiz details for the GET request
+        quiz = Quiz.find_by_id(quiz_id)
+        if not quiz:
+            flash("Quiz not found!", "danger")
+            return redirect(url_for('boundary.home'))
+        
+        return render_template('attempt_quiz.html', quiz=quiz)
+
 
 
 class TeacherAnnouncementBoundary:
@@ -1753,7 +1779,7 @@ class MessageBoundary:
         else:
             flash("Failed to delete message.", "danger")
         return redirect(request.referrer)
-
+    
     @staticmethod
     @boundary.route('/message/<message_id>/update', methods=['POST'])
     def edit_message(message_id):

@@ -53,8 +53,8 @@
                 <div class="classroom-section">
                     <h5>📢 Announcements:</h5>
                     <ul>
-                        {% if announcements.get(classroom.classroom_name) %}
-                            {% for announcement in announcements[classroom.classroom_name] %}
+                        {% if announcements.get(classroom._id) %}
+                            {% for announcement in announcements[classroom._id] %}
                                 <li><strong>{{ announcement.title }}</strong>: {{ announcement.content }}</li>
                             {% endfor %}
                         {% else %}
@@ -68,7 +68,7 @@
                 <div class="classroom-section">
                     <h5>📂 Recent Materials:</h5>
                     <ul>
-                        {% for material in materials.get(classroom.classroom_name, [])[:2] %}
+                        {% for material in materials.get(classroom._id, [])[:2] %}
                             <li>{{ material.title }}</li>
                         {% else %}
                             <li>No materials available.</li>
@@ -82,7 +82,7 @@
                 <div class="classroom-section">
                     <h5>📄 Recent Assignments:</h5>
                     <ul>
-                        {% for assignment in assignments.get(classroom.classroom_name, [])[:2] %}
+                        {% for assignment in assignments.get(classroom._id, [])[:2] %}
                             <li>{{ assignment.title }}</li>
                         {% else %}
                             <li>No assignments available.</li>
@@ -96,7 +96,7 @@
                 <div class="classroom-section">
                     <h5>📝 Recent Quizzes:</h5>
                     <ul>
-                        {% for quiz in quizzes.get(classroom.classroom_name, [])[:2] %}
+                        {% for quiz in quizzes.get(classroom._id, [])[:2] %}
                             <li>{{ quiz.title }}</li>
                         {% else %}
                             <li>No quizzes available.</li>
