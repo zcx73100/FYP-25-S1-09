@@ -455,7 +455,9 @@ class GenerateVideoEntity:
             self.audio_path = os.path.join("FYP25S109/static/generated_audios", self.audio_filename).replace("\\", "/")
 
         self.video_filename = f"video_{timestamp}.mp4"
-        self.video_path = os.path.join("FYP25S109/static/generated_videos", self.video_filename).replace("\\", "/")
+        self.video_path = os.path.abspath(
+            os.path.join("D:/Code/FYP-25-S1-09 Mongodb Voice Generate/FYP25S109/static/generated_videos", self.video_filename)
+        )
 
     def generate_voice(self):
         try:
@@ -515,20 +517,33 @@ class GenerateVideoEntity:
                 response = requests.post(SADTALKER_API, files=files, data=data)
 
             print("🔁 SadTalker Response Code:", response.status_code)
-            if response.status_code != 200:
-                print("❌ SadTalker Error:", response.text)
+            result = response.json()
+            print("📦 SadTalker JSON Response:", result)
+
+            if response.status_code != 200 or "video_path" not in result:
+                print("❌ SadTalker Error or Missing Key:", result)
                 return None
 
+            video_path_on_disk = result.get("video_path")
+            video_url_for_frontend = result.get("video_url")
+
+            print("🧪 SadTalker returned video path:", video_path_on_disk)
+
+            if not os.path.exists(video_path_on_disk):
+                print("❌ File not found at path:", video_path_on_disk)
+                return None
+
+            # ✅ Move to Flask static directory (optional, you could skip if already in static folder)
             os.makedirs(os.path.dirname(self.video_path), exist_ok=True)
-            with open(self.video_path, "wb") as f:
-                f.write(response.content)
+            shutil.copy(video_path_on_disk, self.video_path)
 
             print(f"✅ Video saved to: {self.video_path}")
-            return f"/static/generated_videos/{os.path.basename(self.video_path)}"
+            return video_url_for_frontend
 
         except Exception as e:
             print(f"❌ Error during SadTalker call: {e}")
-            return None   
+            return None
+
 
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):
@@ -973,8 +988,6 @@ class Submission:
             logging.error(f"Error saving submission: {str(e)}")
             return {"success": False, "message": str(e)}
         
-
-
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
         self.classroom_id = classroom_id
@@ -1057,8 +1070,6 @@ class DiscussionRoom:
         except Exception as e:
             print(f"Error finding discussion room by ID: {e}")
             return None
-
-        
 
 class Message:
     def __init__(self, discussion_room_id=None, sender=None, message=None):

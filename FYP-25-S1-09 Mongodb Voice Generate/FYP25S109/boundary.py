@@ -26,7 +26,7 @@ os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
-API_URL = "https://vinthony-sadtalker.hf.space/--replicas/55zml"
+# API_URL = "https://vinthony-sadtalker.hf.space/--replicas/55zml"
 #client = Client(API_URL)
 
 GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
@@ -264,9 +264,21 @@ def generate_voice():
     except Exception as e:
         return jsonify({"success": False, "error": repr(e)}), 500
 
-# =========================
-# 🎬 Generate Talking Video
-# =========================
+# Generate Talking Video
+@boundary.route("/status")
+def proxy_status():
+    return requests.get("http://127.0.0.1:7860/status").json()
+
+@boundary.route("/progress")
+def proxy_progress():
+    try:
+        response = requests.get("http://127.0.0.1:7860/progress")
+        response.raise_for_status()  # 🚨 force error for non-200s
+        return jsonify(response.json())
+    except Exception as e:
+        print(f"Progress fetch failed: {e}")  # ✅ useful log
+        return jsonify({"progress": 0, "error": str(e)})
+
 @boundary.route("/generate_video", methods=["GET", "POST"])
 def generate_video():
     try:
