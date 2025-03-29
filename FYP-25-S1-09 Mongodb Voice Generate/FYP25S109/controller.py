@@ -146,10 +146,63 @@ class UploadQuizController:
         return quiz.save_quiz()
 
 class AttemptQuizController:
+    from datetime import datetime, timezone
+
+class AttemptQuizController:
     @staticmethod
     def attempt_quiz(quiz_id, student_username, answers):
-        quiz = Quiz.find_by_id(quiz_id)
-        return quiz.attempt_quiz(quiz_id, student_username, answers)
+        # Retrieve the quiz and its questions from MongoDB
+        quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+
+        if not quiz:
+            return {"error": "Quiz not found."}
+
+        correct_count = 0
+        total = len(quiz.get("questions", []))
+        results = []
+        answer_log = {}
+
+        # Iterate through the quiz questions and compare answers
+        for i, question in enumerate(quiz["questions"]):
+            qid = str(question.get("_id", i))  # Fallback to index if _id missing
+            correct = question.get("correct_answer")
+            selected = answers.get(qid)
+
+            # Ensure selected value is handled correctly
+            if selected is None:
+                selected = "None"  # No selection, mark as None
+
+            # Compare selected answer with the correct one
+            if selected == correct:
+                correct_count += 1
+
+            results.append({
+                "text": question.get("text", ""),
+                "image": question.get("image"),
+                "correct": correct,
+                "selected": selected
+            })
+
+            answer_log[qid] = selected
+
+        # Store the attempt in the database with UTC timestamp
+        mongo.db.quiz_attempts.insert_one({
+            "student_username": student_username,
+            "quiz_id": ObjectId(quiz_id),
+            "answers": answer_log,
+            "score": correct_count,
+            "total": total,
+            "timestamp": datetime.now(timezone.utc)  # Using the updated method to get the UTC time
+        })
+
+        return {
+            "score": correct_count,
+            "total": total,
+            "results": results,
+            "classroom_id": str(quiz.get("classroom_id"))
+        }
+
+
 
 
 

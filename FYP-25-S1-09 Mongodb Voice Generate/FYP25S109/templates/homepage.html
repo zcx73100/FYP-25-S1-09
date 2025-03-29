@@ -96,8 +96,16 @@
                 <div class="classroom-section">
                     <h5>📝 Recent Quizzes:</h5>
                     <ul>
-                        {% for quiz in quizzes.get(classroom._id, [])[:2] %}
-                            <li>{{ quiz.title }}</li>
+                        {% for quiz in quizzes.get(classroom._id|string, [])[:2] %}
+                            <li>
+                                <a href="{% if session['role'] == 'Teacher' %}
+                                            {{ url_for('boundary.view_quiz', quiz_id=quiz._id) }}
+                                         {% else %}
+                                            {{ url_for('boundary.attempt_quiz', quiz_id=quiz._id) }}
+                                         {% endif %}">
+                                    {{ quiz.title }}
+                                </a>
+                            </li>
                         {% else %}
                             <li>No quizzes available.</li>
                         {% endfor %}

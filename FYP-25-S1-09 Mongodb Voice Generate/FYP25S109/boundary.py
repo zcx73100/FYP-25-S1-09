@@ -1,5 +1,4 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory
-from datetime import datetime
 from . import mongo
 import os
 from werkzeug.utils import secure_filename
@@ -1557,26 +1556,72 @@ class TeacherManageQuizBoundary:
 class StudentQuizBoundary:
     @boundary.route('/attempt_quiz/<quiz_id>', methods=['GET', 'POST'])
     def attempt_quiz(quiz_id):
-        # Ensure the user is a student
-        if 'role' not in session or session['role'] != 'Student':
-            flash("Unauthorized access!", "danger")
-            return redirect(url_for('boundary.home'))
-        
+        from datetime import datetime, timezone
+        student_username = session.get('username')
+
         if request.method == 'POST':
-            answers = request.form.to_dict()
-            result = AttemptQuizController.attempt_quiz(quiz_id, session['username'], answers)
-            print(quiz_id)
-            flash(result["message"], "success" if result["success"] else "danger")
-            return redirect(url_for('boundary.home'))
+            answers = {}
+            results = []
+            score = 0
+            total = 0
 
-        # Fetch quiz details for the GET request
-        quiz = Quiz.find_by_id(quiz_id)
+            quiz = mongo.db.quizzes.find_one({'_id': ObjectId(quiz_id)})
+            if not quiz:
+                flash("Quiz not found.", "danger")
+                return redirect(url_for('boundary.home'))
+
+            for index, question in enumerate(quiz.get("questions", [])):
+                qid_str = str(question.get("_id", index))
+                submitted_index = request.form.get(qid_str)
+
+                selected_index = -1  # Default for unanswered
+                selected_value = "None"
+
+                if submitted_index is not None and submitted_index.isdigit():
+                    selected_index = int(submitted_index)
+                    options = question.get("options", [])
+                    if 0 <= selected_index < len(options):
+                        selected_value = options[selected_index]
+
+                try:
+                    correct_index = int(question.get("correct_answer", -1)) - 1
+                except (ValueError, TypeError):
+                    correct_index = -1
+                correct_value = question.get("options", [])[correct_index] if 0 <= correct_index < len(question.get("options", [])) else "N/A"
+
+                if selected_index == correct_index:
+                    score += 1
+
+                results.append({
+                    "text": question.get("text", ""),
+                    "correct": correct_value,
+                    "selected": selected_value,
+                    "image": question.get("image", None)
+                })
+
+                # ✅ Save index instead of value here:
+                answers[qid_str] = selected_index  
+                total += 1
+                
+            # Store the attempt in the database
+            mongo.db.quiz_attempts.insert_one({
+                "student_username": student_username,
+                "quiz_id": ObjectId(quiz_id),
+                "answers": answers,
+                "score": score,
+                "total": total,
+                "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc)
+            })
+
+            classroom_id = quiz.get("classroom_id", "")
+            return render_template('quiz_result.html', score=score, total=total, results=results, classroom_id=classroom_id)
+
+        # GET Request - Show Quiz Form
+        quiz = mongo.db.quizzes.find_one({'_id': ObjectId(quiz_id)})
         if not quiz:
-            flash("Quiz not found!", "danger")
+            flash("Quiz not found.", "danger")
             return redirect(url_for('boundary.home'))
-        
         return render_template('attempt_quiz.html', quiz=quiz)
-
 
 
 class TeacherAnnouncementBoundary:

@@ -9,21 +9,29 @@
     {% for question in quiz.questions %}
     <li>
         <strong>{{ question.text }}</strong>
+
+        {% if question.image %}
+        <div>
+            <img src="data:image/png;base64,{{ question.image }}" alt="Question Image"
+                 style="max-width: 300px; margin: 10px 0;">
+        </div>
+        {% endif %}
+
         <ul>
-            {% if question.options %}
-                {% for option in question.options %}
-                <li>{{ option }}</li>
-                {% endfor %}
-            {% else %}
-                <li style="color: red;">Error: No options found</li>
-            {% endif %}
+            {% set correct_index = question.correct_answer | int - 1 %}
+            {% for option in question.options %}
+                <li{% if loop.index0 == correct_index %} style="color: green; font-weight: bold;"{% endif %}>
+                    {{ option }}
+                </li>
+            {% endfor %}
         </ul>
+
         <p>
-            <strong>Correct Answer:</strong> 
-            {% if question.correct_answer is not none %}
-                {{ question.options[question.correct_answer|int] }}
+            <strong>Correct Answer:</strong>
+            {% if correct_index >= 0 and correct_index < question.options|length %}
+                {{ question.options[correct_index] }}
             {% else %}
-                <span style="color: red;">Error: No correct answer found</span>
+                <span style="color: red;">Error: Invalid or missing correct answer</span>
             {% endif %}
         </p>
     </li>
