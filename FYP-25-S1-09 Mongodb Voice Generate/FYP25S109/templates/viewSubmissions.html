@@ -3,6 +3,8 @@
 {% block content %}
 <h2 class="submissions-title">Submissions for Assignment: {{ assignment.title }}</h2>
 
+{% if submissions %}
+
 <table class="submissions-table">
     <tr>
         <th class="table-header">Student</th>
@@ -27,7 +29,12 @@
         </td>
         <td class="table-data">
             {% if submission.grade is not none %}
-                {{ submission.grade }}
+                {% if submission.grade >= 85 %} HD
+                {% elif submission.grade >= 75 %} D
+                {% elif submission.grade >= 65 %} C
+                {% elif submission.grade >= 50 %} P
+                {% else %} F
+                {% endif %}
             {% else %}
                 Not graded
             {% endif %}
@@ -41,11 +48,10 @@
         </td>
         <td class="table-actions">
             <!-- Grade Form -->
-            <form action="{{ url_for('boundary.grade_assignment', classroom_name=classroom_name, assignment_id=assignment._id, student_username=submission.student_username, submission_id=submission._id) }}" method="POST" class="grade-form">
+            <form action="{{ url_for('boundary.grade_assignment', classroom_id=classroom_id, assignment_id=assignment._id, student_username=submission.student_username, submission_id=submission._id) }}" method="POST" class="grade-form">
                 <input type="number" name="grade" min="0" max="100" required class="grade-input">
                 <button type="submit" class="grade-button">Grade</button>
             </form>
-
             <!-- Delete Submission Button -->
             <form action="{{ url_for('boundary.delete_submission', submission_id=submission._id) }}" method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this submission?');">
                 <button type="submit" class="delete-button">Delete</button>
@@ -54,9 +60,14 @@
     </tr>
     {% endfor %}
 </table>
+{% else %}
+<p class="no-submissions">No submissions have been made for this assignment yet.</p>
+{% endif %}
+
+<!-- Back Button -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="back-button">Back to Classroom Page</a>
 
 <style>
-    /* Styling for the main title */
 .submissions-title {
     text-align: center;
     color: #333;
@@ -64,7 +75,13 @@
     margin-bottom: 20px;
 }
 
-/* Styling for the table */
+.no-submissions {
+    text-align: center;
+    font-size: 18px;
+    color: #555;
+    margin-top: 20px;
+}
+
 .submissions-table {
     width: 90%;
     margin: 0 auto;
@@ -75,7 +92,6 @@
     overflow: hidden;
 }
 
-/* Table header styling */
 .table-header {
     background: #007bff;
     color: white;
@@ -84,7 +100,6 @@
     font-size: 16px;
 }
 
-/* Table row styling */
 .table-row:nth-child(even) {
     background: #f1f1f1;
 }
@@ -93,13 +108,11 @@
     background: #e0e0e0;
 }
 
-/* Table data styling */
 .table-data {
     padding: 12px;
     border-bottom: 1px solid #ddd;
 }
 
-/* View link styling */
 .view-link {
     color: #007bff;
     text-decoration: none;
@@ -110,14 +123,12 @@
     text-decoration: underline;
 }
 
-/* Action buttons container */
 .table-actions {
     display: flex;
     gap: 10px;
     padding: 12px;
 }
 
-/* Grade form input */
 .grade-input {
     padding: 8px;
     border: 1px solid #ccc;
@@ -126,7 +137,6 @@
     width: 80px;
 }
 
-/* Grade button */
 .grade-button {
     background-color: #28a745;
     color: white;
@@ -142,7 +152,6 @@
     background-color: #218838;
 }
 
-/* Delete button */
 .delete-button {
     background-color: red;
     color: white;
@@ -158,8 +167,22 @@
     background-color: darkred;
 }
 
+.back-button {
+    display: block;
+    width: fit-content;
+    margin: 20px auto;
+    padding: 10px 20px;
+    font-size: 16px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    text-align: center;
+    transition: background 0.3s;
+}
+
+.back-button:hover {
+    background: #0056b3;
+}
 </style>
 {% endblock %}
-
-
-

@@ -1423,8 +1423,8 @@ class TeacherAssignmentBoundary:
 
 
     @staticmethod
-    @boundary.route('/grade_assignment/<classroom_name>/<assignment_id>/<student_username>/<submission_id>', methods=['POST'])
-    def grade_assignment(classroom_name, assignment_id, student_username, submission_id):
+    @boundary.route('/grade_assignment/<classroom_id>/<assignment_id>/<student_username>/<submission_id>', methods=['POST'])
+    def grade_assignment(classroom_id, assignment_id, student_username, submission_id):
         """Assigns grades and feedback to student submissions."""
         if 'role' not in session or session.get('role') != 'Teacher':
             flash("Unauthorized access.", category='error')
@@ -1448,7 +1448,7 @@ class TeacherAssignmentBoundary:
         )
 
         flash("Grade assigned successfully!", "success")
-        return redirect(url_for('boundary.view_submissions', classroom_name=classroom_name, assignment_id=assignment_id))
+        return redirect(url_for('boundary.view_submissions', classroom_id=classroom_id, assignment_id=assignment_id))
 
 
 

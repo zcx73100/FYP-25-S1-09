@@ -144,9 +144,7 @@ class UploadQuizController:
             classroom_id=classroom_id
         )
         return quiz.save_quiz()
-
-class AttemptQuizController:
-    from datetime import datetime, timezone
+    
 
 class AttemptQuizController:
     @staticmethod
@@ -265,7 +263,6 @@ class ViewAssignmentDetailsController:
         assignment = Assignment.get_assignment(assignment_id)
         return assignment
 
-from datetime import datetime, timezone
 
 class StudentSendSubmissionController:
     @staticmethod
