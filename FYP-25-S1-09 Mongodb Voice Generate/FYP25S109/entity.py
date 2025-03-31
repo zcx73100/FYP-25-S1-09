@@ -754,8 +754,7 @@ class Assignment:
     def save_assignment(self):
         try:
             # Store file in GridFS
-            with open(self.file_path, "rb") as f:
-                file_id = fs.put(f, filename=self.filename, content_type=mimetypes.guess_type(self.filename)[0])
+            file_id = fs.put(self.file, filename=self.filename, content_type=mimetypes.guess_type(self.filename)[0])
 
             # Insert assignment details into MongoDB
             mongo.db.assignments.insert_one({
@@ -772,6 +771,7 @@ class Assignment:
         except Exception as e:
             logging.error(f"Error saving assignment: {str(e)}")
             return {"success": False, "message": str(e)}
+
 
     @staticmethod
     def search_assignment(search_query):
@@ -802,6 +802,15 @@ class Assignment:
             return assignment
         except Exception as e:
             logging.error(f"Failed to find assignment by ID: {str(e)}")
+            return None
+        
+    @staticmethod
+    def get_assignment_file(file_id):
+        try:
+            file = fs.get(ObjectId(file_id))  # Retrieve from GridFS
+            return file.read()  # Return file content
+        except Exception as e:
+            logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
             return None
         
 class Quiz:

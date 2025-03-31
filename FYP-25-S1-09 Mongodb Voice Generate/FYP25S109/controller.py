@@ -216,12 +216,13 @@ class AttemptQuizController:
 
 class UploadAssignmentController:
     @staticmethod
-    def upload_assignment(title, classroom_id, description, deadline, filename):
+    def upload_assignment(title, classroom_id, description, deadline, file, filename):
         assignment = Assignment(
             title=title, classroom_id=classroom_id, description=description, 
-            due_date=deadline, filename=filename
+            due_date=deadline, file=file, filename=filename  # Pass file directly
         )
         return assignment.save_assignment()
+
     
 class ViewUserDetailsController:
     @staticmethod

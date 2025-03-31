@@ -1281,11 +1281,13 @@ class TeacherManageMaterialBoundary:
             file_base64 = base64.b64encode(file_content).decode('utf-8')
 
             return render_template("viewMaterial.html",
+                                material_id=material['_id'],
                                 filename=material['file_name'],
                                 classroom_id=classroom_id,
                                 file_base64=file_base64,
                                 file_extension=file_extension,
                                 text_content=file_content.decode('utf-8') if file_extension in ['txt', 'md'] else None)
+    
     @boundary.route('/search_materials/<classroom_id>', methods=['GET'])
     def search_materials(classroom_id):
         search_query = request.args.get('search_query', '').strip()
@@ -1304,6 +1306,33 @@ class TeacherManageMaterialBoundary:
             materials = mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)})
 
         return render_template('manageMaterials.html', materials=materials, classroom_id=classroom_id)
+    @staticmethod
+    @boundary.route('/teacher/download_material/<material_id>')
+    def download_material(material_id):
+        material = mongo.db.materials.find_one({"_id": ObjectId(material_id)})
+        if not material:
+            flash("Material not found!", "danger")
+            return redirect(url_for("boundary.home"))
+
+        try:
+            # Initialize GridFS
+            fs = gridfs.GridFS(mongo.db)
+            
+            # Retrieve file from GridFS
+            file_data = fs.get(material["file_id"])  
+            
+            return send_file(
+                io.BytesIO(file_data.read()),  # Read the binary data
+                mimetype=mimetypes.guess_type(material["file_name"])[0] or "application/octet-stream",
+                as_attachment=True,
+                download_name=material["file_name"]
+            )
+        except Exception as e:
+            flash(f"Error downloading file: {str(e)}", "danger")
+            return redirect(url_for("boundary.home"))
+
+        
+
 #---------------------------------------------------------------------------------------
 class TeacherViewQuizBoundary:
     @boundary.route('/teacher/view_quiz/<quiz_id>', methods=['GET'])
@@ -1355,19 +1384,19 @@ class TeacherAssignmentBoundary:
         file = request.files.get('file')
 
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join('static/uploads/assignments', filename)
-            file.save(file_path)
+            filename = secure_filename(file.filename)  # Secure the filename
 
-            # Call controller to save the assignment
+            # Call controller to upload directly to MongoDB
             result = UploadAssignmentController.upload_assignment(
-                title, ObjectId(classroom_id), description, deadline, filename
+                title, ObjectId(classroom_id), description, deadline, file, filename
             )
+            
             flash(result['message'], 'success' if result['success'] else 'danger')
             return redirect(request.url)
         else:
             flash('Invalid file type!', 'danger')
             return redirect(request.url)
+
 
     @staticmethod
     @boundary.route('/teacher/manage_assignments/<classroom_id>', methods=['GET', 'POST'])
@@ -1391,16 +1420,22 @@ class TeacherAssignmentBoundary:
         return render_template("manageAssignments.html", assignments=assignments, classroom_id=classroom_id)
 
     @staticmethod
-    @boundary.route('/teacher/download_assignment/<filename>')
-    def download_assignment(filename):
-        """Allows teachers to download student-submitted assignments."""
-        file_path = os.path.abspath(os.path.join("static/uploads/submissions/", filename))
+    @boundary.route('/teacher/download_assignment/<assignment_id>')
+    def download_assignment(assignment_id):
+        assignment = Assignment.get_assignment(assignment_id)
 
-        if os.path.exists(file_path):
-            return send_file(file_path, as_attachment=True)
+        if not assignment:
+            flash("Assignment not found!", "danger")
+            return redirect(url_for("boundary.home"))
 
-        flash("File not found!", "danger")
-        return redirect(request.referrer)
+        file_data = Assignment.get_assignment_file(assignment["file_id"])
+        
+        return send_file(
+            io.BytesIO(file_data),
+            mimetype=mimetypes.guess_type(assignment["file_name"])[0],
+            as_attachment=True,
+            download_name=assignment["file_name"]
+        )
 
     @staticmethod
     @boundary.route('/teacher/view_submissions/<classroom_id>/<assignment_id>')
@@ -1710,16 +1745,33 @@ class TeacherAnnouncementBoundary:
 
     
 class ViewAssignmentBoundary:
-    @staticmethod
-    @boundary.route('/view_assignment/<assignment_id>/<filename>')
-    def view_assignment(assignment_id, filename):
-        # Fetch the assignment from the database using assignment_id (if needed)
-        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+    @boundary.route('/teacher/view_assignment/<assignment_id>')
+    def view_assignment(assignment_id):
+        assignment = Assignment.get_assignment(assignment_id)
 
-        file_path = os.path.join(ASSIGNMENT_UPLOAD_FOLDER, filename)
-        
-        flash("Assignment submitted successfully!", "success")
-        return render_template('viewAssignment.html', assignment=assignment, filename=filename)
+        if not assignment:
+            flash("Assignment not found!", "danger")
+            return redirect(url_for("boundary.home"))
+
+        # Get file content
+        file_data = Assignment.get_assignment_file(assignment["file_id"])
+        file_extension = assignment["file_name"].split(".")[-1]
+
+        # Convert to Base64 (for PDFs and text)
+        if file_extension in ["pdf", "txt", "md"]:
+            file_base64 = base64.b64encode(file_data).decode("utf-8")
+            text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
+        else:
+            file_base64 = None
+            text_content = None
+
+        return render_template("viewAssignment.html",
+                            filename=assignment["file_name"],
+                            file_extension=file_extension,
+                            file_base64=file_base64,
+                            text_content=text_content,
+                            assignment=assignment)
+
 
 class StudentAssignmentBoundary:
     UPLOAD_FOLDER = "FYP25S109/static/uploads/submissions/"
