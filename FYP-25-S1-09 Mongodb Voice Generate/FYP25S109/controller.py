@@ -46,8 +46,8 @@ class ResetPasswordController:
 
 class UploadTutorialController:
     @staticmethod
-    def upload_video(file, title, uploader, user_role):
-        video = TutorialVideo(title=title, video_file=file, username=uploader, user_role=user_role)
+    def upload_video(file, title, uploader, description):
+        video = TutorialVideo(video_file=file, title=title, username=uploader, description=description)
         return video.save_video()  # Call entity method
     
 class DeleteVideoController:
@@ -82,12 +82,12 @@ class DeleteAvatarController:
         return Avatar.delete_avatar(avatar_id)  # Call entity method
 
 #This is for the admin to view multiple videos at once
-class AdminViewUploadedVideosController:
+class ViewUploadedVideosController:
     @staticmethod
     def view_uploaded_videos():
         return list(mongo.db.tutorialvideo.find({}))
 
-class AdminViewSingleTutorialController:
+class ViewSingleTutorialController:
     @staticmethod
     def view_tutorial(video_id):
         return TutorialVideo.find_by_id(video_id)
@@ -130,9 +130,22 @@ class ViewAssignmentController:
 
 class UploadMaterialController:
     @staticmethod
-    def upload_material(title, file, uploader, classroom_name, description):
-        material = Material(title, file, uploader, session.get('role'), description)
+    def upload_material(title, file, uploader, classroom_id, description):
+        # Create the Material entity and delegate the actual work to the entity's method
+        material = Material(title, file, uploader, description,classroom_id=classroom_id)
         return material.save_material()
+    
+class ViewMaterialController:
+    @staticmethod
+    def get_material(material_id):
+        material_data = Material.get_material_by_id(material_id)
+
+        if not material_data:
+            return None, None
+
+        material, file_data = material_data
+        return material, file_data
+
 
 class UploadQuizController:
     @staticmethod
@@ -201,15 +214,13 @@ class AttemptQuizController:
         }
 
 
-
-
-
 class UploadAssignmentController:
     @staticmethod
-    def upload_assignment(file, title, classroom_id, description, deadline, filename, file_path):
-        # Create Assignment object and save it
-        assignment = Assignment(title=title, file=file, classroom_id=classroom_id, description=description, 
-                                due_date=deadline, filename=filename, file_path=file_path)
+    def upload_assignment(title, classroom_id, description, deadline, filename):
+        assignment = Assignment(
+            title=title, classroom_id=classroom_id, description=description, 
+            due_date=deadline, filename=filename
+        )
         return assignment.save_assignment()
     
 class ViewUserDetailsController:

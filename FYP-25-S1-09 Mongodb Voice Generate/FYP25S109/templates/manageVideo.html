@@ -7,18 +7,18 @@
     <div class="video-grid">
         {% if videos %}
             {% for video in videos %}
-                <div class="video-card">
-                    <video controls>
-                        <source src="{{ url_for('static', filename='uploads/videos/' + video.video_name) }}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                    <h5>Name: {{ video.title }}</h5>
-                    <h5>Description: {{video.description}}</h5>
-                    <h5>Uploaded By: {{ video.username }}</h5>
-                    <form action="{{ url_for('boundary.delete_video',  video_name=video.video_name) }}" method="POST">
-                        <button type="submit" class="delete_video">Delete Video</button>
-                    </form>
-                </div>
+            <div class="video-card">
+                <video controls width="640" height="360">
+                    <source src="{{ url_for('boundary.serve_video', file_id=video.file_id) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <h5>Name: {{ video.title }}</h5>
+                <h5>Description: {{ video.description }}</h5>
+                <h5>Uploaded By: {{ video.username }}</h5>
+                <form action="{{ url_for('boundary.delete_video', video_name=video.video_name) }}" method="POST">
+                    <button type="submit" class="delete_video">Delete Video</button>
+                </form>
+            </div>            
             {% endfor %}
         {% else %}
             <p>No videos available.</p>

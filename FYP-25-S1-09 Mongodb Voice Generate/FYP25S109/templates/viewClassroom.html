@@ -40,7 +40,7 @@
                     <li>
                         <strong>{{ material.title }}</strong>: {{ material.description }}
                         <br>
-                        <a href="{{ url_for('boundary.view_material', filename=material.filename) }}" class="file-button">📄 View</a>
+                        <a href="{{ url_for('boundary.view_material', classroom_id=classroom._id, material_id = material._id) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}

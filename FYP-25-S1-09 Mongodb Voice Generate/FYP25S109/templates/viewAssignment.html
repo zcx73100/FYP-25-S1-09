@@ -18,12 +18,19 @@
 
         <!-- Display Assignment File -->
         <div class="assignment-frame">
-            {% if filename.endswith('.pdf') %}
-                <iframe src="{{ url_for('static', filename='uploads/assignments/' + filename) }}" 
+            {% if file_extension == "pdf" %}
+                <iframe src="data:application/pdf;base64,{{ file_base64 }}" 
                         width="100%" height="600px" frameborder="0"></iframe>
-            {% elif filename.endswith('.doc') or filename.endswith('.docx') %}
-                <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/assignments/' + filename, _external=True) }}&embedded=true"
+
+            {% elif file_extension in ["ppt", "pptx", "doc", "docx"] %}
+                <iframe src="https://docs.google.com/gview?url={{ url_for('boundary.download_material', material_id=material_id, _external=True) }}&embedded=true"
                         width="100%" height="600px" frameborder="0"></iframe>
+
+            {% elif file_extension in ["txt", "md"] %}
+                <div class="text-content">
+                    <pre>{{ text_content }}</pre>
+                </div>
+
             {% else %}
                 <p>Unsupported file format.</p>
             {% endif %}

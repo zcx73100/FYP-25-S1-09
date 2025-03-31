@@ -4,7 +4,17 @@
 
 {% block content %}
 <h2>Manage Users</h2>
-
+<!-- ✅ Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+    {% for category, message in messages %}
+        <div class="alert alert-{{ category if category in ['success', 'warning', 'danger', 'info'] else 'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endwith %}
 <!-- Search Form -->
 <form method="get" action="{{ url_for('boundary.search_user') }}">
     <input type="text" name="query" placeholder="Search by username or email" required>

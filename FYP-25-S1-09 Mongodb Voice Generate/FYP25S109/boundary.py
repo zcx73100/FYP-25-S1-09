@@ -44,16 +44,16 @@ class HomePage:
         teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
         teacher_videos = list(mongo.db.tutorialvideo.find(
             {"username": {"$in": teacher_users}},
-            {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
+            {}
         ))
 
         admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find(
             {"username": {"$in": admin_users}},
-            {"_id": 0, "title": 1, "video_name": 1, "file_path": 1, "username": 1}
+            {}
         ))
 
-        avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1,  "username": 1, 'upload_date': 1}))
+        avatars = list(mongo.db.avatar.find({}, {}))
         username = session.get("username", None)
         role = session.get("role", None)
 
@@ -641,34 +641,69 @@ class UploadTutorialBoundary:
         if 'username' not in session:
             flash("You must be logged in to upload a tutorial video.", category='error')
             return redirect(url_for('boundary.login'))
+
         if request.method == 'POST':
             file = request.files.get('file')
             title = request.form.get("title")
             username = session.get("username")
             description = request.form.get("description")
+
             if not title:
                 flash("Please provide a title for the video.", category='error')
                 return redirect(url_for('boundary.upload_tutorial'))
+
             if not file or file.filename == '':
                 flash("No file selected. Please upload a video file.", category='error')
                 return redirect(url_for('boundary.upload_tutorial'))
+
             if '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() not in UploadTutorialBoundary.ALLOWED_EXTENSIONS:
                 flash("Invalid file type. Please upload a valid video file.", category='error')
                 return redirect(url_for('boundary.upload_tutorial'))
-            video = TutorialVideo(
-                title=title,
-                video_name=file.filename,
-                video_file=file,
-                username=username,
-                description = description
-            )
-            result = video.save_video()
-            flash(result["message"], category="success" if result["success"] else "error")
-            return redirect(url_for('boundary.upload_tutorial'))
+            
+            video = UploadTutorialController.upload_video(file, title, username, description)
+
+            if video['success']:
+                flash("Video uploaded successfully!", category='success')
+                return redirect(url_for('boundary.view_uploaded_videos'))
+            else:
+                flash(f"Failed to upload video: {video['message']}", category='error')
+                return redirect(url_for('boundary.upload_tutorial'))
+
+        # 👇 Handle GET request (return the upload form)
         return render_template("uploadTutorial.html")
 
 # View Uploaded Videos (Multiple Videos at one time)
 class ViewUploadedVideosBoundary:
+    @boundary.route('/video/<file_id>')
+    def serve_video(file_id):
+        try:
+            grid_out = fs.get(ObjectId(file_id))
+            file_size = grid_out.length
+            range_header = request.headers.get('Range')
+
+            if range_header:
+                start, end = range_header.replace('bytes=', '').split('-')
+                start = int(start)
+                end = int(end) if end else file_size - 1
+                length = end - start + 1
+
+                grid_out.seek(start)  # Move to the requested byte position
+                data = grid_out.read(length)
+
+                response = Response(data, status=206, mimetype=grid_out.content_type)
+                response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+                response.headers.add('Accept-Ranges', 'bytes')
+                response.headers.add('Content-Length', str(length))
+                return response
+
+            # Full video response (if no Range header)
+            return Response(grid_out.read(), mimetype=grid_out.content_type)
+
+        except Exception as e:
+            logging.error(f"Failed to serve video: {str(e)}")
+            return "Video not found", 404
+        
+        
     @staticmethod
     @boundary.route('/uploadedVideos', methods=['GET'])
     def view_uploaded_videos():
@@ -677,7 +712,7 @@ class ViewUploadedVideosBoundary:
             return redirect(url_for('boundary.login'))
         admin_videos = list(mongo.db.tutorialvideo.find(
             {"username": session['username']},
-            {"_id": 0, "title": 1, "file_path": 1, "status": 1, "upload_date": 1, "description": 1, "username": 1, "video_name": 1}
+            {}
         ))
         return render_template("manageVideo.html", videos=admin_videos)
     
@@ -1198,23 +1233,14 @@ class TeacherManageMaterialBoundary:
         description = request.form.get('description')
         file = request.files.get('file')
 
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(file_path)
+        # Call the Controller to process the material upload
+        result = UploadMaterialController.upload_material(title, file, session.get('username'), classroom_id, description)
 
-            # Store metadata in MongoDB
-            mongo.db.materials.insert_one({
-                "classroom_id": ObjectId(classroom_id),
-                "filename": filename,
-                "title": title.strip() if title else "Untitled",
-                "description": description.strip() if description else "No description provided"
-            })
-
-            flash('Material uploaded successfully!', 'success')
+        if result["success"]:
+            flash(result["message"], 'success')
             return redirect(url_for('boundary.manage_materials', classroom_id=classroom_id))
         else:
-            flash('Invalid file type!', 'danger')
+            flash(result["message"], 'danger')
             return redirect(request.url)
 
     @boundary.route('/upload_material/<classroom_id>', methods=['GET'])
@@ -1223,8 +1249,9 @@ class TeacherManageMaterialBoundary:
     
     @boundary.route('/manage_materials/<classroom_id>', methods=['GET'])
     def manage_materials(classroom_id):
-        materials = list(mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)}))
-        return render_template('manageMaterials.html', materials=materials, classroom_id=classroom_id)
+        # Fetch the materials from the database for the specified classroom
+        materials = mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)})
+        return render_template("manageMaterials.html", materials=materials, classroom_id=classroom_id)
 
     @boundary.route('/delete_material/<classroom_id>/<filename>', methods=['POST'])
     def delete_material(classroom_id, filename):
@@ -1233,29 +1260,51 @@ class TeacherManageMaterialBoundary:
             os.remove(file_path)
         
         # Remove entry from MongoDB
-        mongo.db.materials.delete_one({"classroom_id": ObjectId(classroom_id), "filename": filename})
+        mongo.db.materials.delete_one({"classroom_id": ObjectId(classroom_id), "file_name": filename})
         
         flash('Material deleted successfully!', 'success')
         return redirect(url_for('boundary.manage_materials', classroom_id=classroom_id))
 
-    @boundary.route('/view_material/<filename>')
-    def view_material(filename):
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        
-        if not os.path.exists(file_path):
-            flash('File not found!', 'danger')
-            return redirect(url_for('boundary.manage_materials'))
+    @boundary.route('/view_material/<material_id>/<classroom_id>', methods=['GET'])
+    def view_material(material_id, classroom_id):
+            material_controller = ViewMaterialController()
+            material, file_data = material_controller.get_material(material_id)
 
-        text_content = None
-        if filename.endswith('.txt') or filename.endswith('.md'):
-            with open(file_path, 'r', encoding='utf-8') as file:
-                text_content = file.read()
+            if not material:
+                flash('Material not found!', 'danger')
+                return redirect(url_for('boundary.manage_materials', classroom_id=classroom_id))
 
-        return render_template('viewMaterial.html', filename=filename, text_content=text_content)
+            file_content = file_data.read()
+            file_extension = material['file_name'].split('.')[-1].lower()
 
-    
+            # Encode file content as base64 for embedding
+            file_base64 = base64.b64encode(file_content).decode('utf-8')
 
+            return render_template("viewMaterial.html",
+                                filename=material['file_name'],
+                                classroom_id=classroom_id,
+                                file_base64=file_base64,
+                                file_extension=file_extension,
+                                text_content=file_content.decode('utf-8') if file_extension in ['txt', 'md'] else None)
+    @boundary.route('/search_materials/<classroom_id>', methods=['GET'])
+    def search_materials(classroom_id):
+        search_query = request.args.get('search_query', '').strip()
 
+        # If a search query is provided, filter the materials by title or description
+        if search_query:
+            materials = mongo.db.materials.find({
+                "classroom_id": ObjectId(classroom_id),
+                "$or": [
+                    {"title": {"$regex": search_query, "$options": "i"}},  # Case-insensitive search for title
+                    {"description": {"$regex": search_query, "$options": "i"}}  # Case-insensitive search for description
+                ]
+            })
+        else:
+            # If no search query, show all materials
+            materials = mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)})
+
+        return render_template('manageMaterials.html', materials=materials, classroom_id=classroom_id)
+#---------------------------------------------------------------------------------------
 class TeacherViewQuizBoundary:
     @boundary.route('/teacher/view_quiz/<quiz_id>', methods=['GET'])
     def view_quiz(quiz_id):
@@ -1310,12 +1359,12 @@ class TeacherAssignmentBoundary:
             file_path = os.path.join('static/uploads/assignments', filename)
             file.save(file_path)
 
-            # Call the controller method to save assignment
+            # Call controller to save the assignment
             result = UploadAssignmentController.upload_assignment(
-                file, title, ObjectId(classroom_id), description, deadline, filename, file_path
+                title, ObjectId(classroom_id), description, deadline, filename
             )
             flash(result['message'], 'success' if result['success'] else 'danger')
-            return redirect(request.url) if result['success'] else redirect(request.url)
+            return redirect(request.url)
         else:
             flash('Invalid file type!', 'danger')
             return redirect(request.url)

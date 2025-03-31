@@ -8,7 +8,8 @@
             {% for video in videos %}
                 <div class="video-card">
                     <video controls>
-                        <source src="{{ url_for('static', filename='uploads/videos/' + video.video_name) }}" type="video/mp4">
+                        <!-- Update video source URL -->
+                        <source src="{{ url_for('boundary.serve_video', file_id=video.file_id) }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     <h5>{{ video.title }}</h5>  
@@ -26,7 +27,7 @@
         {% if avatars %}
             {% for avatar in avatars %}
                 <div class="avatar-card">
-                    <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}">
+                    <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
                     <h5>Uploaded by: {{ avatar.username }}</h5>
                 </div>
             {% endfor %}
@@ -143,88 +144,134 @@
         }
     
         /* ✅ Video & Avatar Grid Styles */
-        .video-grid, .avatar-grid, .classroom-container {
+        .video-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));  /* Adjust grid for responsiveness */
+            gap: 20px;
             padding: 20px;
             justify-content: center;
         }
-    
-        .video-card, .avatar-card, .classroom-card {
+
+        .video-card {
             background: white;
             padding: 15px;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
             text-align: center;
         }
-    
-        .video-card:hover, .avatar-card:hover, .classroom-card:hover {
+
+        .video-card:hover {
             transform: scale(1.05);
         }
-    
+
         .video-card video {
             width: 100%;
-            border-radius: 5px;
+            height: auto;
+            max-width: 640px;  /* Ensures the video doesn't stretch beyond a certain width */
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
-    
-        .avatar-card img {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-bottom: 10px;
+
+        .video-card h5 {
+            font-size: 18px;
+            margin-top: 10px;
+            color: #333;
         }
-    
+
+        .video-card p {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
         .no-content {
             text-align: center;
             font-size: 16px;
             color: gray;
             margin: 20px;
         }
+
     
         /* ✅ Classroom Styles */
         .classroom-container {
-            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));  /* Responsive grid */
+            gap: 20px;
+            padding: 20px;
+            justify-content: center;
         }
-    
+
         .classroom-card {
-            width: 350px;
             background: linear-gradient(to bottom, #ffffff, #f1f1f1);
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             text-align: left;
+            transition: transform 0.3s ease-in-out;
         }
-    
+
+        .classroom-card:hover {
+            transform: translateY(-5px); /* Slight lift on hover */
+        }
+
         .classroom-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
-    
+
         .classroom-header h4 {
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
         }
-    
-        .classroom-content {
+
+        .classroom-description {
+            font-size: 14px;
+            color: #666;
             margin-top: 10px;
+            line-height: 1.5;
         }
-    
+
         .classroom-section {
+            margin-top: 15px;
+        }
+
+        .classroom-section h5 {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
             margin-bottom: 10px;
         }
-    
+
         .classroom-section ul {
             list-style-type: none;
             padding: 0;
+            margin: 0;
         }
-    
+
         .classroom-section ul li {
             font-size: 14px;
+            color: #555;
             padding: 5px 0;
+            line-height: 1.4;
+        }
+
+        .classroom-section ul li a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .classroom-section ul li a:hover {
+            text-decoration: underline;
+        }
+
+        .separator {
+            height: 1px;
+            background: #ddd;
+            margin: 15px 0;
         }
     
         /* ✅ Announcement Box */

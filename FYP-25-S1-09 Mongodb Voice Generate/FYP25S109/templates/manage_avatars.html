@@ -8,7 +8,7 @@
     <ul class="avatar-grid">
         {% for avatar in avatars %}
             <li class="avatar-card">
-                <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="Avatar">
+                <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
                 <p>Uploaded on: {{ avatar.upload_date }}</p>
                 <form action="{{ url_for('boundary.delete_avatar', avatar_id=avatar._id) }}" method="POST" class="delete-form">
                     <button type="button" class="delete-btn" onclick="confirmDelete(this)">Delete</button>

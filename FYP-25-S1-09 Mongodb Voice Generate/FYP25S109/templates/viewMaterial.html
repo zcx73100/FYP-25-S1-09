@@ -5,23 +5,25 @@
         <h2>Viewing Material: {{ filename }}</h2>
 
         <div class="material-frame">
-            {% if filename.endswith('.pdf') %}
-                <iframe src="{{ url_for('static', filename='uploads/materials/' + filename) }}" 
+            {% if file_extension == "pdf" %}
+                <iframe src="data:application/pdf;base64,{{ file_base64 }}" 
                         width="100%" height="600px" frameborder="0"></iframe>
-            {% elif filename.endswith('.ppt') or filename.endswith('.pptx') or filename.endswith('.docx') or filename.endswith('.doc') %}
-                <iframe src="https://docs.google.com/gview?url={{ url_for('static', filename='uploads/materials/' + filename, _external=True) }}&embedded=true"
+
+            {% elif file_extension in ["ppt", "pptx", "doc", "docx"] %}
+                <iframe src="https://docs.google.com/gview?url={{ url_for('boundary.download_material', material_id=material_id, _external=True) }}&embedded=true"
                         width="100%" height="600px" frameborder="0"></iframe>
-            {% elif filename.endswith('.txt') or filename.endswith('.md') %}
+
+            {% elif file_extension in ["txt", "md"] %}
                 <div class="text-content">
                     <pre>{{ text_content }}</pre>
                 </div>
+
             {% else %}
                 <p>Unsupported file format.</p>
             {% endif %}
         </div>
 
         <div class="buttons">
-            <a href="{{ url_for('static', filename='uploads/materials/' + filename) }}" class="btn btn-primary" download>⬇️ Download</a>
             <button class="btn btn-secondary" onclick="window.history.back();">Return to Previous Classroom</button>
         </div>
     </div>

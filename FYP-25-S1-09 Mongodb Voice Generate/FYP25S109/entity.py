@@ -20,6 +20,9 @@ import shutil
 import base64
 import mimetypes
 from gtts import gTTS
+import gridfs
+fs = gridfs.GridFS(mongo.db)
+
 
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
@@ -172,39 +175,37 @@ class UserAccount:
             return False
 
 class TutorialVideo:
-    def __init__(self, title=None, video_name=None, video_file=None, username=None, description=None):
+    def __init__(self, title=None, video_file=None, username=None, description=None):
         self.title = title
-        self.video_name = video_name
         self.video_file = video_file
         self.username = username
         self.description = description
 
     def save_video(self):
         try:
-            if not self.video_file:
-                raise ValueError("No file selected for upload.")
+            if not self.video_file or '.' not in self.video_file.filename:
+                raise ValueError("Invalid or missing video file.")
 
-            # Generate a unique filename by adding a timestamp
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            filename = secure_filename(f"{timestamp}_{self.video_file.filename}")
-            file_path = os.path.join(UPLOAD_FOLDER_VIDEO, filename)
+            filename = secure_filename(self.video_file.filename)
+            file_ext = filename.rsplit('.', 1)[1].lower()
 
-            # Validate file extension
-            if filename.split('.')[-1].lower() not in ALLOWED_VIDEO_EXTENSIONS:
+            if file_ext not in ALLOWED_VIDEO_EXTENSIONS:
                 raise ValueError("Invalid video format.")
 
-            # Save the video file
-            self.video_file.save(file_path)
-            # Insert video information into MongoDB
+            # Save video to GridFS
+            file_id = fs.put(self.video_file, filename=filename, content_type=self.video_file.content_type)
+
+            # Save metadata
             mongo.db.tutorialvideo.insert_one({
                 'title': self.title,
                 'video_name': filename,
-                'file_path': file_path,
+                'file_id': file_id,
                 'username': self.username,
                 'upload_date': datetime.now(),
                 'description': self.description
             })
-            return {"success": True, "message": "Video uploaded successfully."}
+
+            return {"success": True, "message": "Video uploaded to database successfully."}
 
         except Exception as e:
             logging.error(f"Error saving video: {str(e)}")
@@ -213,10 +214,12 @@ class TutorialVideo:
     @staticmethod
     def delete_video(video_id):
         try:
-            video = mongo.db.tutorialvideo.find_one({"_id": video_id})
+            video = mongo.db.tutorialvideo.find_one({"_id": ObjectId(video_id)})
             if video:
-                os.remove(video['file_path'])
-                mongo.db.tutorialvideo.delete_one({"_id": video_id})
+                # Delete from GridFS
+                fs.delete(video['file_id'])
+                # Delete metadata
+                mongo.db.tutorialvideo.delete_one({"_id": ObjectId(video_id)})
                 return {"success": True, "message": "Video deleted successfully."}
             return {"success": False, "message": "Video not found."}
 
@@ -227,7 +230,6 @@ class TutorialVideo:
     @staticmethod
     def search_video(search_query):
         try:
-            # Use case-insensitive and partial matching
             videos = mongo.db.tutorialvideo.find({
                 "title": {"$regex": search_query, "$options": "i"}
             })
@@ -235,6 +237,7 @@ class TutorialVideo:
         except Exception as e:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
+    
 
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
@@ -255,89 +258,52 @@ class Avatar:
             if not self.allowed_file(filename):
                 raise ValueError("Invalid image format.")
 
-            file_path = os.path.join(UPLOAD_FOLDER_AVATAR, filename)
-            self.image_file.save(file_path)
+            # Read file content as binary
+            image_binary = self.image_file.read()
 
-            # Process image (e.g., remove background)
-            try:
-                with open(file_path, "rb") as f:
-                    output_image = remove(f.read())
-            except Exception as e:
-                logging.error(f"Error processing image: {str(e)}")
-                return {"success": False, "message": f"Error processing image: {str(e)}"}
+            # Remove background using rembg
+            image_no_bg = remove(image_binary)  # This removes the background
 
-            processed_filename = f"processed_{filename}"
-            processed_file_path = os.path.join(UPLOAD_FOLDER_AVATAR, processed_filename)
+            # Convert the processed image to Base64
+            image_base64 = base64.b64encode(image_no_bg).decode('utf-8')
 
-            try:
-                with open(processed_file_path, "wb") as f:
-                    f.write(output_image)
-            except Exception as e:
-                logging.error(f"Error saving processed image: {str(e)}")
-                return {"success": False, "message": f"Error saving processed image: {str(e)}"}
-
-            # Remove original uploaded file
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                logging.error(f"Error deleting original file: {str(e)}")
-                return {"success": False, "message": f"Error deleting original file: {str(e)}"}
-
-            # Add avatar to DB
-            add_result = self.add_avatar(self.avatarname, self.username, processed_file_path)
+            # Store in database
+            add_result = self.add_avatar(self.avatarname, self.username, image_base64)
             if not add_result:
                 return {"success": False, "message": "Failed to add avatar to database."}
 
-            return {"success": True, "message": "Avatar uploaded successfully.", "file_path": processed_file_path}
+            return {"success": True, "message": "Avatar uploaded and background removed successfully."}
 
         except Exception as e:
             logging.error(f"Error processing avatar: {str(e)}")
             return {"success": False, "message": f"Error processing avatar: {str(e)}"}
 
-    def add_avatar(self, avatarname, username, file_path):
+    def add_avatar(self, avatarname, username, image_data):
         try:
-            relative_path = file_path.split('static/')[-1]  # Ensure proper relative path handling
-
             mongo.db.avatar.insert_one({
                 'avatarname': avatarname,
                 'username': username,
-                'file_path': relative_path,
+                'image_data': image_data,  # Store Base64 image data
                 'upload_date': datetime.now()
             })
             return True
         except Exception as e:
             logging.error(f"Error adding avatar to database: {str(e)}")
             return False
-        
+
     @staticmethod
     def search_avatar(search_query):
         try:
-            # Search by both username and avatarname
             avatars = mongo.db.avatar.find({
                 "$or": [
-                    {"avatarname": {"$regex": search_query, "$options": "i"}}
+                    {"avatarname": {"$regex": search_query, "$options": "i"}},
+                    {"username": {"$regex": search_query, "$options": "i"}}
                 ]
             })
-            return list(avatars)  # Convert cursor to list
+            return list(avatars)
         except Exception as e:
             logging.error(f"Failed to search avatars: {str(e)}")
             return []
-
-    @staticmethod
-    def resize_avatar(image_path, size=(150, 150)):
-        try:
-            img = Image.open(image_path)
-            img = img.convert("RGB")
-            img.thumbnail(size)
-
-            img_io = BytesIO()
-            img.save(img_io, format="JPEG")
-            img_io.seek(0)
-
-            return img_io
-        except Exception as e:
-            logging.error(f"Failed to resize avatar: {str(e)}")
-            return None
 
     @staticmethod
     def find_by_id(avatar_id):
@@ -351,19 +317,11 @@ class Avatar:
     @staticmethod
     def delete_avatar(avatar_id):
         try:
-            avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
-            if avatar:
-                # Remove the file from storage
-                file_path = os.path.join("static", avatar["file_path"])
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-
-                # Delete the record from the database
-                mongo.db.avatar.delete_one({"_id": ObjectId(avatar_id)})
-                return True
+            mongo.db.avatar.delete_one({"_id": ObjectId(avatar_id)})
+            return True
         except Exception as e:
             logging.error(f"Error deleting avatar: {str(e)}")
-        return False
+            return False
 
 """
 class GenerateVideoEntity:
@@ -732,83 +690,82 @@ class Classroom:
             return []
     
 class Material:
-    UPLOAD_FOLDER_MATERIAL = 'FYP25S109/static/uploads/materials/'
     ALLOWED_MATERIAL_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'}
 
-    def __init__(self, title, file, username, user_role, description):
+    def __init__(self, title, file, username, description,classroom_id):
         self.title = title
         self.file = file
         self.username = username
-        self.user_role = user_role
         self.description = description
+        self.classroom_id = ObjectId(classroom_id)  # Ensure classroom_id is an ObjectId
 
-    def save_material(self): 
+    def save_material(self):
         try:
+            # Validate file type
             if not self.file or '.' not in self.file.filename:
                 raise ValueError("Invalid file or missing filename.")
 
-            # Validate file extension
             file_extension = self.file.filename.rsplit('.', 1)[1].lower()
             if file_extension not in self.ALLOWED_MATERIAL_EXTENSIONS:
                 raise ValueError("Invalid material format.")
 
+            # Secure the file name
             filename = secure_filename(self.file.filename)
-            file_path = os.path.join(self.UPLOAD_FOLDER_MATERIAL, filename)
 
-            # Save file to disk
-            self.file.save(file_path)
+            # Save file to GridFS
+            file_id = fs.put(self.file, filename=filename, content_type=self.file.content_type)
 
-            # Save to database
-            mongo.db.material.insert_one({
+            # Store material metadata in MongoDB
+            mongo.db.materials.insert_one({
                 'title': self.title,
+                'file_id': file_id,
                 'file_name': filename,
-                'file_path': file_path,
                 'username': self.username,
                 'upload_date': datetime.now(),
-                'description': self.description
+                'description': self.description,
+                'classroom_id': self.classroom_id  # Ensure classroom_id is saved
             })
-            return {"success": True, "message": "Material uploaded successfully."}
+
+            return {"success": True, "message": "Material uploaded to database successfully."}
 
         except Exception as e:
             logging.error(f"Error saving material: {str(e)}")
             return {"success": False, "message": str(e)}
+    @staticmethod
+    def get_material_by_id(material_id):
+        # Fetch material metadata from MongoDB
+        material = mongo.db.materials.find_one({"_id": ObjectId(material_id)})
+
+        if not material:
+            return None
+            
+        file_data = fs.get(material['file_id'])
+        return material, file_data
 
 class Assignment:
-    def __init__(self, title=None, file=None, classroom_id=None, description=None, due_date=None, filename=None, file_path=None):
+    def __init__(self, title=None, file=None, classroom_id=None, description=None, due_date=None, filename=None):
         self.title = title
         self.file = file
         self.classroom_id = classroom_id
         self.description = description
         self.due_date = due_date
         self.filename = filename
-        self.file_path = file_path
 
     def save_assignment(self):
-        UPLOAD_FOLDER_ASSIGNMENT = 'FYP25S109/static/uploads/materials/'
-        ALLOWED_ASSIGNMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'}
         try:
-            if not self.file:
-                raise ValueError("No file selected for upload.")
+            # Store file in GridFS
+            with open(self.file_path, "rb") as f:
+                file_id = fs.put(f, filename=self.filename, content_type=mimetypes.guess_type(self.filename)[0])
 
-            # Secure filename to prevent malicious filenames
-            filename = secure_filename(self.file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER_ASSIGNMENT, filename)
-
-            # Validate file extension
-            if filename.split('.')[-1].lower() not in ALLOWED_ASSIGNMENT_EXTENSIONS:
-                raise ValueError("Invalid assignment format.")
-
-            self.file.save(file_path)
-
-            # Insert assignment into MongoDB
+            # Insert assignment details into MongoDB
             mongo.db.assignments.insert_one({
                 'title': self.title,
                 'file_name': self.filename,
-                'file_path': self.file_path,
-                'classroom_id': self.classroom_id,  # Ensure classroom_id is saved
+                'classroom_id': self.classroom_id,
                 'upload_date': datetime.now(),
                 'description': self.description,
-                'due_date': self.due_date
+                'due_date': self.due_date,
+                'file_id': file_id,  # Store GridFS file ID
             })
             return {"success": True, "message": "Assignment uploaded successfully."}
 
@@ -833,7 +790,7 @@ class Assignment:
         try:
             assignment = mongo.db.assignments.find_one({"_id": assignment_id})
             if assignment:
-                os.remove(assignment['file_path'])
+                os.remove(assignment['file_name'])
         except Exception as e:
             logging.error(f"Error deleting assignment: {str(e)}")
             return {"success": False, "message": str(e)}
