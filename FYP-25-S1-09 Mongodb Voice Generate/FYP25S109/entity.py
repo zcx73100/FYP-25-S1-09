@@ -47,36 +47,48 @@ def setup_indexes():
     print("Unique index on 'username' field created.")
 
 class UserAccount:
-    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active'):
+    def __init__(self, username, password, name, surname, email, date_of_birth, role, status='active', profile_pic=None):
         self.username = username
-        self.password = password
+        self.password = password  # Raw password (will be hashed before insertion)
         self.name = name
         self.surname = surname
         self.email = email
         self.date_of_birth = date_of_birth
         self.role = role
         self.status = status
+        self.profile_pic = profile_pic  # File object (optional)
 
-    @staticmethod
-    def create_user_acc(user_acc):
+    def create_user_acc(self):
+        """Inserts user data into the database"""
         try:
-            logging.debug(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
+            logging.debug(f"Attempting to insert user: {self.username}, {self.email}, {self.role}")
 
-            existing_user = mongo.db.useraccount.find_one({"username": user_acc.username})
-            if existing_user:
+
+            # Check if username already exists
+            if mongo.db.useraccount.find_one({"username": self.username}):
                 logging.error("Username already exists.")
                 return False
 
+            hashed_password = generate_password_hash(self.password)
+
+            # Convert profile picture to Base64 if provided
+            profile_pic_data = None
+            if self.profile_pic:
+                profile_pic_data = base64.b64encode(self.profile_pic.read()).decode('utf-8')
+
+            # Insert into MongoDB
             mongo.db.useraccount.insert_one({
-                "username": user_acc.username,
-                "password": generate_password_hash(user_acc.password),
-                "name": user_acc.name,
-                "surname": user_acc.surname,
-                "email": user_acc.email,
-                "date_of_birth": user_acc.date_of_birth,
-                "role": user_acc.role,
-                "status": user_acc.status
+                "username": self.username,
+                "password": hashed_password,
+                "name": self.name,
+                "surname": self.surname,
+                "email": self.email,
+                "date_of_birth": self.date_of_birth,
+                "role": self.role,
+                "status": self.status,
+                "profile_pic": profile_pic_data
             })
+
             logging.info("User created successfully.")
             return True
         except DuplicateKeyError:

@@ -8,8 +8,8 @@
 
     <!-- ✅ Display Profile Picture (if available) -->
     <div class="text-center mb-3">
-        {% if user_info.profile_picture %}
-            <img src="{{ user_info.profile_picture }}" alt="Profile Picture" class="img-thumbnail rounded-circle" width="150">
+        {% if user.profile_pic %}
+            <img src="data:image/png;base64,{{ user.profile_pic }}" alt="Profile Picture" class="img-thumbnail rounded-circle" width="150">
         {% else %}
             <p><em>No profile picture uploaded.</em></p>
         {% endif %}
@@ -18,27 +18,27 @@
     <table class="table table-bordered">
         <tr>
             <th>Username</th>
-            <td>{{ user_info.username }}</td>
+            <td>{{ user.username }}</td>
         </tr>
         <tr>
             <th>First Name</th>
-            <td>{{ user_info.name if user_info.name else 'N/A' }}</td>
+            <td>{{ user.name if user.name else 'N/A' }}</td>
         </tr>
         <tr>
             <th>Last Name</th>
-            <td>{{ user_info.surname if user_info.surname else 'N/A' }}</td>
+            <td>{{ user.surname if user.surname else 'N/A' }}</td>
         </tr>
         <tr>
             <th>Date of Birth</th>
-            <td>{{ user_info.date_of_birth if user_info.date_of_birth else 'N/A' }}</td>
+            <td>{{ user.date_of_birth if user.date_of_birth else 'N/A' }}</td>
         </tr>
         <tr>
             <th>Email</th>
-            <td>{{ user_info.email if user_info.email }}</td>
+            <td>{{ user.email if user.email }}</td>
         </tr>
         <tr>
             <th>Role</th>
-            <td><strong class="text-primary">{{ user_info.role }}</strong></td>
+            <td><strong class="text-primary">{{ user.role }}</strong></td>
         </tr>
     </table>
 

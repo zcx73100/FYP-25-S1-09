@@ -13,8 +13,27 @@ class LoginController:
 
 class CreateUserAccController:
     @staticmethod
-    def createUserAcc(user_acc):
-        return UserAccount.create_user_acc(user_acc)  # Call entity method
+    def register_user(data):
+        """Receives user registration data and passes it to the Entity for insertion."""
+        try:
+            # Create UserAccount entity
+            user_acc = UserAccount(
+                username=data["username"],
+                password=data["password"],  # Password hashing handled in the Entity
+                name=data["name"],
+                surname=data["surname"],
+                email=data["email"],
+                date_of_birth=data["date_of_birth"],
+                role=data["role"],
+                profile_pic=data.get("profile_pic")  # Optional file upload
+            )
+
+            # Call the Entity to insert into DB
+            return user_acc.create_user_acc()
+
+        except Exception as e:
+            logging.error(f"Registration failed: {e}")
+            return False
 
 class DisplayUserDetailController:
     @staticmethod
@@ -30,6 +49,10 @@ class UpdateAccountDetailController:
     @staticmethod
     def update_account_detail(username, new_details):
         return UserAccount.update_account_detail(username, new_details)  # Call entity method
+    
+    @staticmethod
+    def get_user_by_username(username):
+        return UserAccount.find_by_username(username)  # Fetch user from entity
 
 class UpdatePasswordController:
     @staticmethod

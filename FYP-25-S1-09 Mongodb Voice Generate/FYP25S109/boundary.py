@@ -35,6 +35,7 @@ os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 
 def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        
 
 # Homepage
 class HomePage:
@@ -415,57 +416,35 @@ class CreateAccountBoundary:
             date_of_birth = request.form.get('date_of_birth')
             password1 = request.form.get('password1')
             password2 = request.form.get('password2')
-            role = "Student" if session.get('role') == "Teacher" else "User"
+            role = request.form.get('role', 'User')  # Default to 'User' if not specified
+            profile_pic = request.files.get('profile_pic')  # Get uploaded file
 
-            profile_pic = request.files.get('profile_pic')
-            profile_pic_path = ""
-
-            # Check if the username already exists
-            existing_user = mongo.db.useraccount.find_one({"username": username})
-            if existing_user:
-                flash('Username already taken. Please choose a different one.', category='error')
+            # Validate password
+            if password1 != password2:
+                flash('Passwords do not match.', category='error')
+                return render_template("createAccount.html")
+            if len(password1) < 7:
+                flash('Password must be at least 7 characters.', category='error')
                 return render_template("createAccount.html")
 
-            if len(email) < 4:
-                flash('Email must be greater than 3 characters.', category='error')
-            elif len(name) < 2:
-                flash('First name must be greater than 1 character.', category='error')
-            elif password1 != password2:
-                flash('Passwords do not match.', category='error')
-            elif len(password1) < 7:
-                flash('Password must be at least 7 characters.', category='error')
+            # Prepare data for Controller
+            user_data = {
+                "username": username,
+                "password": password1,
+                "name": name,
+                "surname": surname,
+                "email": email,
+                "date_of_birth": date_of_birth,
+                "role": role,
+                "profile_pic": profile_pic
+            }
+
+            # Call Controller
+            if CreateUserAccController.register_user(user_data):
+                flash('Account created successfully!', category='success')
+                return redirect(url_for('boundary.login'))  # Redirect to login page
             else:
-                try:
-                    date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
-                    formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
-                    hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
-
-                    # 📸 Save profile pic if uploaded
-                    if profile_pic and profile_pic.filename != "":
-                        filename = secure_filename(f"{username}_{profile_pic.filename}")
-                        profile_pic_path = os.path.join("uploads/profile_pics", filename)
-                        absolute_path = os.path.join("FYP25S109/static", profile_pic_path)
-                        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-                        profile_pic.save(absolute_path)
-
-                    # ✅ Insert into MongoDB
-                    mongo.db.useraccount.insert_one({
-                        "username": username,
-                        "password": hashed_password,
-                        "email": email,
-                        "role": role,
-                        "name": name,
-                        "surname": surname,
-                        "date_of_birth": formatted_date_of_birth,
-                        "status": "active",
-                        "profile_pic": profile_pic_path  # Save relative static path
-                    })
-
-                    flash(f'Account created successfully! Assigned Role: {role}', category='success')
-                    return redirect(url_for('boundary.login'))
-
-                except ValueError:
-                    flash('Invalid date format. Use YYYY-MM-DD.', category='error')
+                flash('Failed to create account. Username might be taken.', category='error')
 
         return render_template("createAccount.html")
 
@@ -479,41 +458,62 @@ class AccountDetailsBoundary:
             flash("You must be logged in to view account details.", category='error')
             return redirect(url_for('boundary.login'))
         username = session.get('username')
-        user_info = mongo.db.useraccount.find_one(
-            {"username": username},
-            {"_id": 0, "username": 1, "name": 1, "surname": 1, "date_of_birth": 1, "email": 1, "role": 1}
-        )
-        if not user_info:
+        user = DisplayUserDetailController.get_user_info(username)
+        if not user:
             flash("User details not found.", category='error')
             return redirect(url_for('boundary.home'))
-        return render_template("accountDetails.html", user_info=user_info)
+        
+        else:
+            return render_template("accountDetails.html", user=user)
 
 # Edit Account Details
-class UpdateAccountDetailsBoundary:
+class UpdateAccountBoundary:
     @staticmethod
-    @boundary.route('/updateAccDetail', methods=['GET', 'POST'])
+    @boundary.route('/update_account_detail', methods=['GET', 'POST'])
     def update_account_detail():
         if 'username' not in session:
-            flash("You must be logged in to update account details.", category='error')
+            flash("You must be logged in to update your account.", category='error')
             return redirect(url_for('boundary.login'))
+
         username = session['username']
-        if request.method == 'POST':
-            updated_data = {
-                "name": request.form.get("name"),
-                "surname": request.form.get("surname"),
-                "date_of_birth": request.form.get("date_of_birth"),
-            }
-            updated_data = {key: value for key, value in updated_data.items() if value}
-            if UpdateAccountDetailController.update_account_detail(username, updated_data):
-                flash("Account details updated successfully!", category='success')
-            else:
-                flash("Failed to update account details.", category='error')
+        user = UpdateAccountDetailController.get_user_by_username(username)
+
+        if not user:
+            flash("User not found.", category='error')
             return redirect(url_for('boundary.accDetails'))
-        user_info = DisplayUserDetailController.get_user_info(username)
-        if not user_info:
-            flash("User details not found.", category='error')
-            return redirect(url_for('boundary.home'))
-        return render_template("updateAccDetail.html", user_info=user_info)
+
+        if request.method == 'POST':
+            update_data = {}
+            
+            name = request.form.get("name")
+            surname = request.form.get("surname")
+            date_of_birth = request.form.get("date_of_birth")
+            profile_picture = request.files.get("profile_picture")
+
+            if name:
+                update_data["name"] = name
+            if surname:
+                update_data["surname"] = surname
+            if date_of_birth:
+                update_data["date_of_birth"] = date_of_birth
+
+            # Convert Profile Picture to Base64 and Store Directly
+            if profile_picture:
+                update_data["profile_pic"] = base64.b64encode(profile_picture.read()).decode('utf-8')
+
+            if update_data:  # Ensure update_data is not empty
+                success = UpdateAccountDetailController.update_account_detail(username, update_data)
+                if success:
+                    flash("Account updated successfully!", category='success')
+                else:
+                    flash("No changes detected.", category='info')
+            else:
+                flash("No data provided for update.", category='info')
+
+            return redirect(url_for('boundary.accDetails'))
+
+        return render_template("updateAccDetail.html", user=user)
+
 
 # Update Password
 class UpdatePasswordBoundary:
@@ -523,36 +523,48 @@ class UpdatePasswordBoundary:
         if 'username' not in session:
             flash("You must be logged in to change your password.", category='error')
             return redirect(url_for('boundary.login'))
+
         username = session['username']
+        user = mongo.db.useraccount.find_one({"username": username})
+
+        if not user:
+            flash("User not found.", category='error')
+            return redirect(url_for('boundary.accDetails'))
+
         if request.method == 'POST':
             old_password = request.form.get("old_password")
             new_password = request.form.get("new_password")
             confirm_password = request.form.get("confirm_password")
-            user = mongo.db.useraccount.find_one({"username": username})
-            if not user:
-                flash("User not found.", category='error')
-                return redirect(url_for('boundary.accDetails'))
+
             stored_hashed_password = user.get("password")
+
             if not check_password_hash(stored_hashed_password, old_password):
                 flash("Incorrect current password.", category='error')
                 return redirect(url_for('boundary.update_password'))
+
             if new_password != confirm_password:
                 flash("New passwords do not match.", category='error')
                 return redirect(url_for('boundary.update_password'))
+
             if len(new_password) < 7:
                 flash("New password must be at least 7 characters long.", category='error')
                 return redirect(url_for('boundary.update_password'))
+
             hashed_new_password = generate_password_hash(new_password)
             update_result = mongo.db.useraccount.update_one(
                 {"username": username},
                 {"$set": {"password": hashed_new_password}}
             )
+
             if update_result.modified_count > 0:
                 flash("Password updated successfully!", category='success')
                 return redirect(url_for('boundary.accDetails'))
             else:
                 flash("Failed to update password. Try again.", category='error')
-        return render_template("updatePassword.html")
+
+        # 🔥 FIX: Pass user to template
+        return render_template("updatePassword.html", user=user)
+
 
 class ResetPasswordBoundary:
     @staticmethod
@@ -1408,16 +1420,16 @@ class ViewUserDetailsBoundary:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        user_info = mongo.db.useraccount.find_one(
+        user = mongo.db.useraccount.find_one(
             {"username": username},
             {"_id": 0, "username": 1, "name": 1, "surname": 1, "date_of_birth": 1, "email": 1, "role": 1}
         )
 
-        if not user_info:
+        if not user:
             flash("User not found.", category='error')
             return redirect(url_for('boundary.home'))
 
-        return render_template("userDetails.html", user_info=user_info)
+        return render_template("userDetails.html", user=user)
     
 
 
