@@ -330,8 +330,16 @@ class StudentSendSubmissionController:
         except Exception as e:
             logging.error(f"Error in check_submission_exists: {str(e)}")
             return None
-
-
+        
+class StudentViewSubmissionController:
+    @staticmethod
+    def get_submission_by_student_and_id(student_username, submission_id):
+        return Submission.get_submission_by_student_and_id(student_username, submission_id)
+    
+class StudentDeleteSubmissionController:
+    @staticmethod
+    def delete_submission(submission_id):
+        return Submission.delete_submission(submission_id)
 
 class GenerateVideoController:
     @staticmethod

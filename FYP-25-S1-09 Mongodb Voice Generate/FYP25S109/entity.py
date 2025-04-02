@@ -986,6 +986,23 @@ class Submission:
         except Exception as e:
             logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
             return None
+    def delete_submission(submission_id):
+        """
+        Deletes the submission from the database and GridFS.
+        """
+        try:
+            # Find the submission to delete
+            submission = mongo.db.submissions.find_one({"_id": ObjectId(submission_id)})
+            if submission:
+                # Delete the file from GridFS
+                fs.delete(submission['file_id'])
+                # Delete the submission record from MongoDB
+                mongo.db.submissions.delete_one({"_id": ObjectId(submission_id)})
+                return {"success": True, "message": "Submission deleted successfully."}
+            return {"success": False, "message": "Submission not found."}
+        except Exception as e:
+            logging.error(f"Error deleting submission: {str(e)}")
+            return {"success": False, "message": str(e)}
         
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):

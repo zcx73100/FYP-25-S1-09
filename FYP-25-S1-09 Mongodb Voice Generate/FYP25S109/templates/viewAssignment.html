@@ -41,7 +41,9 @@
                 <p><strong>You have already submitted this assignment.</strong></p>
                 <a href="{{ url_for('boundary.student_view_submission', submission_id=student_submission._id) }}" class="btn btn-success">📄 View Submission</a>
                 <a href="{{ url_for('boundary.student_edit_submission', submission_id=student_submission._id) }}" class="btn btn-warning">✏️ Edit Submission</a>
-                <a href="{{ url_for('boundary.student_delete_submission', submission_id=student_submission._id) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete your submission?');">🗑️ Delete Submission</a>
+                <form action="{{ url_for('boundary.student_delete_submission', submission_id=student_submission._id, assignment_id=assignment._id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your submission?');">
+                    <button type="submit" class="btn btn-danger">🗑️ Delete Submission</button>
+                </form>
             {% else %}
                 <form action="{{ url_for('boundary.submit_assignment', assignment_id=assignment._id, filename=filename) }}" method="POST" enctype="multipart/form-data">
                     <input type="file" name="file">

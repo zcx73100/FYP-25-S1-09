@@ -1858,7 +1858,7 @@ class StudentAssignmentBoundary:
             return redirect(url_for('boundary.login'))  # Redirect to login page if not logged in
 
         # Fetch the submission from the database by submission_id and student username
-        submission = Submission.get_submission_by_student_and_id(student_username, submission_id)
+        submission = StudentViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
         
         if not submission:
             flash("Submission not found.", "danger")
@@ -1891,9 +1891,28 @@ class StudentAssignmentBoundary:
     def student_edit_submission(submission_id):
         pass
 
-    @boundary.route('/delete_submission/<submission_id>', methods=['POST'])
-    def student_delete_submission(submission_id):
-        pass
+    @boundary.route('/delete_submission/<submission_id>/<assignment_id>', methods=['GET','POST'])
+    def student_delete_submission(submission_id, assignment_id):
+        """Allows a student to delete their own submission."""
+        
+        student_username = session.get('username')
+        
+        if not student_username:
+            flash("Unauthorized action.", "danger")
+            return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))
+
+        result = StudentDeleteSubmissionController.delete_submission(submission_id)
+
+        if result["success"]:
+            flash("Submission deleted successfully!", "success")
+        else:
+            flash("Error Deleting Submission", "danger")
+
+        return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))
+
+        
+
+        
 
 
 
