@@ -21,7 +21,7 @@
             {% endwith %}
 
             <!-- Signup Form -->
-            <form action="{{ url_for('boundary.create_account_admin') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('boundary.create_account_admin') }}" method="POST">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
                     <input type="text" id="username" name="username" class="form-control" required>
@@ -49,28 +49,12 @@
 
                 <div class="mb-3">
                     <label for="password1" class="form-label">Password</label>
-                    <div class="input-group">
-                        <input type="password" id="password1" name="password1" class="form-control" required>
-                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password1')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
+                    <input type="password" id="password1" name="password1" class="form-control" required>
                 </div>
 
                 <div class="mb-3">
                     <label for="password2" class="form-label">Confirm Password</label>
-                    <div class="input-group">
-                        <input type="password" id="password2" name="password2" class="form-control" required>
-                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password2')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Profile Picture Upload -->
-                <div class="mb-3">
-                    <label for="profile_picture" class="form-label">Profile Picture (Optional)</label>
-                    <input type="file" id="profile_picture" name="profile_picture" class="form-control">
+                    <input type="password" id="password2" name="password2" class="form-control" required>
                 </div>
 
                 <!-- Role Selection (Only for Admin) -->
@@ -92,17 +76,5 @@
         </div>
     </div>
 </div>
-
-<!-- Password Toggle Script -->
-<script>
-    function togglePassword(id) {
-        var input = document.getElementById(id);
-        if (input.type === "password") {
-            input.type = "text";
-        } else {
-            input.type = "password";
-        }
-    }
-</script>
 
 {% endblock %}

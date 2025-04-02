@@ -46,9 +46,8 @@ def setup_indexes():
     mongo.db.useraccount.create_index("username", unique=True)
     print("Unique index on 'username' field created.")
 
-
 class UserAccount:
-    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active', profile_picture=None):
+    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active'):
         self.username = username
         self.password = password
         self.name = name
@@ -57,18 +56,17 @@ class UserAccount:
         self.date_of_birth = date_of_birth
         self.role = role
         self.status = status
-        self.profile_picture = profile_picture  # New field for profile picture
 
     @staticmethod
     def create_user_acc(user_acc):
         try:
-            print(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
-            # Check if the username already exists
+            logging.debug(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
+
             existing_user = mongo.db.useraccount.find_one({"username": user_acc.username})
             if existing_user:
                 logging.error("Username already exists.")
                 return False
-            
+
             mongo.db.useraccount.insert_one({
                 "username": user_acc.username,
                 "password": generate_password_hash(user_acc.password),
@@ -77,8 +75,7 @@ class UserAccount:
                 "email": user_acc.email,
                 "date_of_birth": user_acc.date_of_birth,
                 "role": user_acc.role,
-                "status": user_acc.status,
-                "profile_picture": user_acc.profile_picture # Store base64 image
+                "status": user_acc.status
             })
             logging.info("User created successfully.")
             return True
@@ -88,34 +85,6 @@ class UserAccount:
         except Exception as e:
             logging.error(f"Error creating user: {e}")
             return False
-
-    @staticmethod
-    def update_profile_picture(username, image_file):
-        try:
-            image_data = base64.b64encode(image_file.read()).decode("utf-8")
-
-            result = mongo.db.useraccount.update_one(
-                {"username": username},
-                {"$set": {"profile_picture": image_data}}
-            )
-            if result.modified_count == 0:
-                logging.warning(f"No user found to update profile picture for {username}.")
-                return False
-
-            logging.info(f"Profile picture updated for user: {username}.")
-            return True
-        except Exception as e:
-            logging.error(f"Error updating profile picture: {e}")
-            return False
-
-    @staticmethod
-    def get_profile_picture(username):
-        try:
-            user = mongo.db.useraccount.find_one({"username": username}, {"profile_picture": 1, "_id": 0})
-            return user["profile_picture"] if user and "profile_picture" in user else None
-        except Exception as e:
-            logging.error(f"Error retrieving profile picture: {e}")
-            return None
 
     @staticmethod
     def login(username, password):
@@ -269,7 +238,6 @@ class TutorialVideo:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
     
-
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
         self.image_file = image_file
@@ -293,28 +261,39 @@ class Avatar:
             image_binary = self.image_file.read()
 
             # Remove background using rembg
-            image_no_bg = remove(image_binary)  # This removes the background
+            image_no_bg = remove(image_binary)  # This returns binary image data
 
-            # Convert the processed image to Base64
-            image_base64 = base64.b64encode(image_no_bg).decode('utf-8')
+            # Save to disk
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            file_basename = f"{self.avatarname}_{timestamp}.png"
+            relative_path = f"uploads/avatar/{file_basename}"
+            absolute_path = os.path.join("FYP25S109/static", relative_path)
 
-            # Store in database
-            add_result = self.add_avatar(self.avatarname, self.username, image_base64)
-            if not add_result:
+            os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+            with open(absolute_path, "wb") as f:
+                f.write(image_no_bg)
+
+            # Also convert to Base64 (optional for preview or future use)
+            image_base64 = base64.b64encode(image_no_bg).decode("utf-8")
+
+            # Save to DB (both base64 and relative file_path)
+            success = self.add_avatar(self.avatarname, self.username, image_base64, relative_path)
+            if not success:
                 return {"success": False, "message": "Failed to add avatar to database."}
 
-            return {"success": True, "message": "Avatar uploaded and background removed successfully."}
+            return {"success": True, "message": "Avatar uploaded and saved successfully."}
 
         except Exception as e:
             logging.error(f"Error processing avatar: {str(e)}")
             return {"success": False, "message": f"Error processing avatar: {str(e)}"}
 
-    def add_avatar(self, avatarname, username, image_data):
+    def add_avatar(self, avatarname, username, image_data, file_path):
         try:
             mongo.db.avatar.insert_one({
                 'avatarname': avatarname,
                 'username': username,
-                'image_data': image_data,  # Store Base64 image data
+                'image_data': image_data,  # Base64 for previews or API
+                'file_path': file_path,    # Relative file path for video generation
                 'upload_date': datetime.now()
             })
             return True

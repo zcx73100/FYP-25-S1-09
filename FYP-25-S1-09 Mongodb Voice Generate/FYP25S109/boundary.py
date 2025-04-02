@@ -281,8 +281,16 @@ def proxy_progress():
 @boundary.route("/generate_video", methods=["GET", "POST"])
 def generate_video():
     try:
+        username = session.get("username")
+        if not username:
+            return redirect(url_for("login"))
+
         if request.method == "GET":
-            avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
+            # 🧠 Fetch avatars only uploaded by current user
+            avatars = list(mongo.db.avatar.find(
+                {"username": username},
+                {"_id": 0, "file_path": 1, "avatarname": 1}
+            ))
             return render_template("generateVideo.html", avatars=avatars)
 
         # POST — handle video generation request
@@ -298,7 +306,7 @@ def generate_video():
         if not all([text, avatar_path, audio_path]):
             return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-        # Rebuild absolute file paths from relative URLs
+        # Rebuild absolute file paths
         avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
         audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
 
@@ -319,6 +327,44 @@ def generate_video():
     except Exception as e:
         print(f"❌ Error in /generate_video route: {str(e)}")
         return jsonify({"success": False, "error": repr(e)}), 500
+
+# Save Video
+@boundary.route("/save_generated_video", methods=["POST"])
+def save_generated_video():
+    try:
+        username = session.get("username")
+        user = mongo.db.useraccount.find_one({"username": username})
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        # 🧠 Ensure role is treated case-insensitively
+        if user["role"].lower() not in ["teacher", "student"]:
+            return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
+
+        data = request.json
+        text = data.get("text")
+        video_url = data.get("video_url")
+        audio_url = data.get("audio_url")
+
+        if not all([text, video_url, audio_url]):
+            return jsonify({"success": False, "error": "Missing fields"}), 400
+
+        # ✅ Save to 'video' collection
+        mongo.db.video.insert_one({
+            "username": username,
+            "role": user["role"].lower(),
+            "text": text,
+            "video_url": video_url,
+            "audio_url": audio_url,
+            "created_at": datetime.now()
+        })
+
+        return jsonify({"success": True, "message": "Video saved successfully."})
+
+    except Exception as e:
+        logging.error(f"❌ Error saving video: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 # Log In
 class LoginBoundary:
@@ -367,60 +413,57 @@ class LogoutBoundary:
         return redirect(url_for('boundary.home'))
 
 # Create Account
-class CreateUserAccBoundary:
+class CreateAccountBoundary:
     @staticmethod
     @boundary.route('/createAccount', methods=['GET', 'POST'])
     def sign_up():
         if request.method == 'POST':
-            # Retrieve form data
             username = request.form.get('username')
-            password = request.form.get('password')
+            email = request.form.get('email')
             name = request.form.get('name')
             surname = request.form.get('surname')
-            email = request.form.get('email')
             date_of_birth = request.form.get('date_of_birth')
-            role = request.form.get('role')
-            profile_picture = request.files.get('profile_picture')
+            password1 = request.form.get('password1')
+            password2 = request.form.get('password2')
+            role = "Student" if session.get('role') == "Teacher" else "User"
 
-            # Debugging: Print received file data
-            print(f"Received profile picture: {profile_picture}")
+            # Check if the username already exists
+            existing_user = mongo.db.useraccount.find_one({"username": username})
+            if existing_user:
+                flash('Username already taken. Please choose a different one.', category='error')
+                return render_template("createAccount.html")
 
-            # Convert image to base64 if uploaded, otherwise leave as None
-            profile_picture_data = None
-            if profile_picture and profile_picture.filename:
+            if len(email) < 4:
+                flash('Email must be greater than 3 characters.', category='error')
+            elif len(name) < 2:
+                flash('First name must be greater than 1 character.', category='error')
+            elif password1 != password2:
+                flash('Passwords do not match.', category='error')
+            elif len(password1) < 7:
+                flash('Password must be at least 7 characters.', category='error')
+            else:
                 try:
-                    print(f"Reading file {profile_picture.filename}")
-                    # Read and encode the image file to base64
-                    profile_picture_data = base64.b64encode(profile_picture.read()).decode("utf-8")
-                except Exception as e:
-                    logging.error(f"Error processing the file: {e}")
-            else:
-                logging.info("No profile picture uploaded; profile picture will be None.")
+                    date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
+                    formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
+                    hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
+                    
+                    # Insert the new user if all checks pass
+                    mongo.db.useraccount.insert_one({
+                        "username": username,
+                        "password": hashed_password,
+                        "email": email,
+                        "role": role,
+                        "name": name,
+                        "surname": surname,
+                        "date_of_birth": formatted_date_of_birth,
+                        "status": "active"
+                    })
+                    flash(f'Account created successfully! Assigned Role: {role}', category='success')
+                    return redirect(url_for('boundary.login'))
+                except ValueError:
+                    flash('Invalid date format. Use YYYY-MM-DD.', category='error')
 
-            # Create a user object
-            user_acc = UserAccount(
-                username=username,
-                password=password,
-                name=name,
-                surname=surname,
-                email=email,
-                date_of_birth=date_of_birth,
-                role=role,
-                profile_picture=profile_picture_data  # Store None if no picture is uploaded
-            )
-            
-            # Call the controller to create the account
-            success = CreateUserAccController.createUserAcc(user_acc)
-
-            if success:
-                flash("User account created successfully!", "success")
-                return redirect(url_for('home'))  # Redirect to home or login page
-            else:
-                flash("Error: Username already exists or invalid input!", "danger")
-
-        return render_template('createAccount.html')  # Render registration page
-
-
+        return render_template("createAccount.html")
 
 # User Account Details
 class AccountDetailsBoundary:
@@ -1184,28 +1227,19 @@ class TeacherManageStudentsBoundary:
         return redirect(url_for('boundary.manage_students', classroom_id=classroom_id))
 
     @staticmethod
-    @boundary.route('/searchStudent/<classroom_id>', methods=['GET'])
+    @boundary.route('/teacher/searchStudent/<classroom_id>', methods=['GET'])
     def search_student(classroom_id):
-        query = request.args.get('query', '').strip()
-        
-        try:
-            classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
-        except Exception:
-            flash("Invalid classroom ID.", category='error')
-            return redirect(url_for('manage_classrooms'))
-        
+        query = request.args.get('query', '').strip()  # Get query from request parameters
+        # Retrieve classroom document using classroom_id
+        classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
         if not classroom:
             flash("Classroom not found.", category='error')
-            return redirect(url_for('manage_classrooms'))
-        
+            return redirect(url_for('boundary.manage_classrooms'))
+
+        # Get enrolled usernames from the classroom
         enrolled_usernames = set(classroom.get('student_list', []))
-        
-        # Get unenrolled students directly using MongoDB query
-        unenrolled_students = list(mongo.db.useraccount.find({
-            "role": "Student",
-            "username": {"$nin": list(enrolled_usernames)}
-        }))
-        
+        unenrolled_usernames = set(user['username'] for user in mongo.db.useraccount.find({"role": "Student"})) - enrolled_usernames
+
         # Fetch students that match the search query
         search_results = list(mongo.db.useraccount.find({
             "role": "Student",
@@ -1214,14 +1248,19 @@ class TeacherManageStudentsBoundary:
                 {"email": {"$regex": query, "$options": "i"}}
             ]
         }))
-        
+
+        # Separate enrolled and unenrolled students
         enrolled_students = []
+        unenrolled_students = []
         for student in search_results:
             student['_id'] = str(student['_id'])
             student['status'] = student.get('status', False)
             if student['username'] in enrolled_usernames:
                 enrolled_students.append(student)
-        
+            elif student['username'] in unenrolled_usernames:
+                unenrolled_students.append(student)
+
+        # Render the search results page
         return render_template(
             "searchResultsStudents.html",
             classroom=classroom,
@@ -1229,7 +1268,6 @@ class TeacherManageStudentsBoundary:
             unenrolled_students=unenrolled_students,
             query=query
         )
-
 
 
 #---------------------------------------------------------------------------------------
@@ -1892,6 +1930,7 @@ class StudentAssignmentBoundary:
             text_content=text_content,
             file_extension=file_extension
         )
+
 
 
     @boundary.route('/edit_submission/<submission_id>', methods=['GET', 'POST'])
