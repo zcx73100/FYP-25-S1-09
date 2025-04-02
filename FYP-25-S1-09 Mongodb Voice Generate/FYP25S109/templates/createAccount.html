@@ -21,7 +21,7 @@
             {% endwith %}
 
             <!-- Signup Form -->
-            <form action="{{ url_for('boundary.sign_up') }}" method="POST">
+            <form action="{{ url_for('boundary.sign_up') }}" method="POST" enctype="multipart/form-data">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
                     <input type="text" id="username" name="username" class="form-control" required>
@@ -57,14 +57,18 @@
                     <input type="password" id="password2" name="password2" class="form-control" required>
                 </div>
 
+                <!-- 📸 Profile Picture Upload -->
+                <div class="mb-4">
+                    <label for="profile_pic" class="form-label">Upload Profile Picture (optional)</label>
+                    <input type="file" name="profile_pic" accept="image/*" class="form-control">
+                </div>
 
                 <!-- Hidden Role Input -->
                 {% if session.get('role') == "Teacher" %}
-                <input type="hidden" name="role" value="Student">
+                    <input type="hidden" name="role" value="Student">
                 {% else %}
-                <input type="hidden" name="role" value="User">
+                    <input type="hidden" name="role" value="User">
                 {% endif %}
-
 
                 <button type="submit" class="btn btn-primary w-100">Create Account</button>
             </form>
@@ -75,5 +79,4 @@
         </div>
     </div>
 </div>
-
 {% endblock %}

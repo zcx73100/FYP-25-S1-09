@@ -41,80 +41,70 @@ class HomePage:
     @staticmethod
     @boundary.route('/')
     def home():
-        teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
-        teacher_videos = list(mongo.db.tutorialvideo.find(
-            {"username": {"$in": teacher_users}},
-            {}
-        ))
-
-        admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
-        admin_videos = list(mongo.db.tutorialvideo.find(
-            {"username": {"$in": admin_users}},
-            {}
-        ))
-
-        avatars = list(mongo.db.avatar.find({}, {}))
         username = session.get("username", None)
         role = session.get("role", None)
 
+        user = mongo.db.useraccount.find_one({"username": username}) if username else None
+
+        teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
+        teacher_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": teacher_users}}))
+
+        admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
+        admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
+
+        avatars = list(mongo.db.avatar.find({}))
+
         classrooms = []
-
         if role == "Teacher":
-            classrooms = list(mongo.db.classroom.find(
-                {"teacher": username},
-                {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
-
+            classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
         elif role == "Student":
-            classrooms = list(mongo.db.classroom.find(
-                {"student_list": username},
-                {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
-
+            classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
         elif role == "Admin":
-            classrooms = list(mongo.db.classroom.find(
-                {},  # ✅ No filter, Admins see all classrooms
-                {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({}, {"_id": 1, "classroom_name": 1, "description": 1}))
 
-        # ✅ Extract classroom _ids
         classroom_ids = [classroom["_id"] for classroom in classrooms]
 
-        # ✅ Fetch Classroom-Specific Announcements, Materials, Assignments, and Quizzes by _id
-        announcements = {classroom["_id"]: list(mongo.db.announcements.find(
-            {"classroom_id": classroom["_id"]},
-            {"_id": 1, "title": 1, "content": 1, "created_at": 1}
-        )) for classroom in classrooms}
+        announcements = {
+            classroom["_id"]: list(mongo.db.announcements.find(
+                {"classroom_id": classroom["_id"]},
+                {"_id": 1, "title": 1, "content": 1, "created_at": 1}
+            )) for classroom in classrooms
+        }
 
-        materials = {classroom["_id"]: list(mongo.db.materials.find(
-            {"classroom_id": classroom["_id"]}, # ✅ Filter by classroom_id
-            {"_id": 1, "title": 1}
-        )) for classroom in classrooms}
+        materials = {
+            classroom["_id"]: list(mongo.db.materials.find(
+                {"classroom_id": classroom["_id"]},
+                {"_id": 1, "title": 1}
+            )) for classroom in classrooms
+        }
 
-        assignments = {classroom["_id"]: list(mongo.db.assignments.find(
-            {"classroom_id": classroom["_id"]}, # ✅ Filter by classroom_id
-            {"_id": 1, "title": 1}
-        )) for classroom in classrooms}
+        assignments = {
+            classroom["_id"]: list(mongo.db.assignments.find(
+                {"classroom_id": classroom["_id"]},
+                {"_id": 1, "title": 1}
+            )) for classroom in classrooms
+        }
 
-        quizzes = {str(classroom["_id"]): list(mongo.db.quizzes.find(
-            {"classroom_id": ObjectId(classroom["_id"])},  # ✅ Filter by classroom_id
-            {"_id": 1, "title": 1}
-        )) for classroom in classrooms}
+        quizzes = {
+            str(classroom["_id"]): list(mongo.db.quizzes.find(
+                {"classroom_id": ObjectId(classroom["_id"])},
+                {"_id": 1, "title": 1}
+            )) for classroom in classrooms
+        }
 
         return render_template(
             "homepage.html",
-            videos=admin_videos + teacher_videos,  # ✅ Videos Restored
-            avatars=avatars,  # ✅ Avatars Restored
+            user=user,
             username=username,
+            videos=admin_videos + teacher_videos,
+            avatars=avatars,
             classrooms=classrooms,
-            announcements=announcements,  # ✅ Announcements Moved Inside Classroom Box
-            materials=materials,  # ✅ Materials first
-            assignments=assignments,  # ✅ Assignments second
-            quizzes=quizzes  # ✅ Quizzes last
+            announcements=announcements,
+            materials=materials,
+            assignments=assignments,
+            quizzes=quizzes
         )
 
-      
-        
 # Generate Video
 """
 video_progress = {}
@@ -427,6 +417,9 @@ class CreateAccountBoundary:
             password2 = request.form.get('password2')
             role = "Student" if session.get('role') == "Teacher" else "User"
 
+            profile_pic = request.files.get('profile_pic')
+            profile_pic_path = ""
+
             # Check if the username already exists
             existing_user = mongo.db.useraccount.find_one({"username": username})
             if existing_user:
@@ -446,8 +439,16 @@ class CreateAccountBoundary:
                     date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
                     formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
                     hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
-                    
-                    # Insert the new user if all checks pass
+
+                    # 📸 Save profile pic if uploaded
+                    if profile_pic and profile_pic.filename != "":
+                        filename = secure_filename(f"{username}_{profile_pic.filename}")
+                        profile_pic_path = os.path.join("uploads/profile_pics", filename)
+                        absolute_path = os.path.join("FYP25S109/static", profile_pic_path)
+                        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+                        profile_pic.save(absolute_path)
+
+                    # ✅ Insert into MongoDB
                     mongo.db.useraccount.insert_one({
                         "username": username,
                         "password": hashed_password,
@@ -456,14 +457,18 @@ class CreateAccountBoundary:
                         "name": name,
                         "surname": surname,
                         "date_of_birth": formatted_date_of_birth,
-                        "status": "active"
+                        "status": "active",
+                        "profile_pic": profile_pic_path  # Save relative static path
                     })
+
                     flash(f'Account created successfully! Assigned Role: {role}', category='success')
                     return redirect(url_for('boundary.login'))
+
                 except ValueError:
                     flash('Invalid date format. Use YYYY-MM-DD.', category='error')
 
         return render_template("createAccount.html")
+
 
 # User Account Details
 class AccountDetailsBoundary:
