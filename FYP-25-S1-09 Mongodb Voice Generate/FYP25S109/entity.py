@@ -912,40 +912,39 @@ class Submission:
         self.assignment_id = assignment_id
         self.student = student
         self.file = file
+        self.filename = file.filename  # Keep the original filename
         self.submission_date = submission_date or datetime.now()
 
     def save_submission(self):
-        """
-        Saves the submission to the database.
-        """
+        """Saves the file directly into MongoDB using GridFS."""
         try:
             if not self.file:
                 raise ValueError("No file selected for upload.")
 
-            # Secure the filename and define the file path
-            filename = secure_filename(self.file.filename)
-            file_path = os.path.join("FYP25S109/static/uploads/submissions/", filename)
-            student = self.student
-            print(student)
+            # Connect to MongoDB and GridFS
+            fs = gridfs.GridFS(mongo.db)
 
-            # Ensure the upload directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            # Store file in GridFS
+            file_id = fs.put(self.file, filename=self.filename, student=self.student)
 
-            # Save the file to the server
-            self.file.save(file_path)
-            submission= {
+            # Create submission record
+            submission_data = {
                 'assignment_id': ObjectId(self.assignment_id),
-                'student': student,
-                'file_name': filename,
-                'file_path': file_path,
-                'submission_date': self.submission_date
+                'student': self.student,
+                'file_id': file_id,  # Reference to GridFS
+                'file_name': self.filename,
+                'submission_date': self.submission_date,
+                'grade': 0,
+                'feedback': ''
             }
-            # Insert submission into MongoDB
-            mongo.db.submissions.insert_one(submission)
 
+            # Insert submission record into MongoDB
+            mongo.db.submissions.insert_one(submission_data)
+
+            # Update assignment with submission reference
             mongo.db.assignments.update_one(
                 {"_id": ObjectId(self.assignment_id)},
-                {"$push": {"submissions": submission}}
+                {"$push": {"submissions": submission_data}}
             )
 
             return {"success": True, "message": "Submission uploaded successfully."}
@@ -953,6 +952,40 @@ class Submission:
         except Exception as e:
             logging.error(f"Error saving submission: {str(e)}")
             return {"success": False, "message": str(e)}
+    @staticmethod
+    def get_submission_by_student_and_assignment(student_username, assignment_id):
+        """
+        Check if the student has already submitted the assignment.
+        Returns submission details if found, otherwise returns None.
+        """
+        submission = mongo.db.submissions.find_one({
+            'student': student_username,
+            'assignment_id': ObjectId(assignment_id)
+        })
+        return submission
+
+    def get_submission_by_student_and_id(student_username, submission_id):
+        """
+        Check if the student has already submitted the assignment.
+        Returns submission details if found, otherwise returns None.
+        """
+        submission = mongo.db.submissions.find_one({
+            'student': student_username,
+            '_id': ObjectId(submission_id)
+        })
+        return submission
+    def get_submission_file(file_id):
+        """
+        Retrieve the file from GridFS using the file_id.
+        Returns the file content.
+        """
+        try:
+            fs = gridfs.GridFS(mongo.db)
+            file_data = fs.get(ObjectId(file_id))
+            return file_data.read()  # Return file content
+        except Exception as e:
+            logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
+            return None
         
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):

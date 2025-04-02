@@ -279,44 +279,58 @@ class ViewAssignmentDetailsController:
 class StudentSendSubmissionController:
     @staticmethod
     def submit_assignment_logic(assignment_id, student_username, file):
-        """
-        Processes the assignment submission.
-        """
+        """Handles assignment submission and saves it in MongoDB."""
         try:
-            # Validate the file
-            if not file or file.filename == '':
-                return {"success": False, "message": "No file selected for upload."}
-
-            # Secure filename
-            filename_secure = secure_filename(file.filename)
-
-            # Define upload path (Ensure UPLOAD_FOLDER_SUBMISSIONS is correctly set)
-            upload_folder = "FYP25S109/static/uploads/submissions"
-            os.makedirs(upload_folder, exist_ok=True)  # Ensure directory exists
-
-            file_path = os.path.join(upload_folder, filename_secure)
-            file.save(file_path)  # Save the file
-
-            # Debugging log
-            print(f"File saved at: {file_path}")
-
-            # Store submission in database (Ensure submitted_at is always a datetime object)
-            submission_data = {
-                "assignment_id": ObjectId(assignment_id),
-                "student_username": student_username,
-                "filename": filename_secure,
-                "file_path": file_path,
-                "submitted_at": datetime.now(timezone.utc),  # ✅ Use timezone-aware UTC
-                "grade": None,
-                "feedback": ""
-            }
-            mongo.db.submissions.insert_one(submission_data)
-
-            return {"success": True, "message": "Submission successful!"}
-
+            submission = Submission(assignment_id, student_username, file)
+            result = submission.save_submission()
+            return result
         except Exception as e:
             logging.error(f"Error in submit_assignment_logic: {str(e)}")
             return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def get_submission(assignment_id, student_username):
+        """Retrieves the student's submission from MongoDB."""
+        try:
+            submission = mongo.db.submissions.find_one(
+                {"assignment_id": ObjectId(assignment_id), "student": student_username}
+            )
+            return submission
+        except Exception as e:
+            logging.error(f"Error in get_submission: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_submission_file(file_id):
+        """Retrieves the actual file from GridFS."""
+        try:
+            fs = gridfs.GridFS(mongo.db)
+            file = fs.get(ObjectId(file_id))
+            return file
+        except Exception as e:
+            logging.error(f"Error retrieving file: {str(e)}")
+            return None
+    @staticmethod
+    def check_submission_exists(assignment_id, student_username):
+        """
+        Check if a submission exists for the given student and assignment.
+        Returns the submission if found, otherwise None.
+        """
+        try:
+            # Ensure the assignment_id is in ObjectId format if necessary
+            assignment_id_obj = ObjectId(assignment_id)
+
+            # Query for the submission using both assignment_id and student_username
+            submission = mongo.db.submissions.find_one({
+                "assignment_id": assignment_id_obj,
+                "student": student_username
+            })
+
+            return submission  # Returns None if not found
+        except Exception as e:
+            logging.error(f"Error in check_submission_exists: {str(e)}")
+            return None
+
 
 
 class GenerateVideoController:

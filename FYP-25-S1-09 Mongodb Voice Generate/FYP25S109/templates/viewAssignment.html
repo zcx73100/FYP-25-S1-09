@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "base.html" %}  
+{% block content %} 
 
-{% block content %}
 <!-- Display Flash Messages -->
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
@@ -13,49 +13,48 @@
     </div>
 {% endif %}
 {% endwith %}
-    <div class="assignment-view-container">
-        <h2>Viewing Assignment: {{ filename }}</h2>
 
-        <!-- Display Assignment File -->
-        <div class="assignment-frame">
-            {% if file_extension == "pdf" %}
-                <iframe src="data:application/pdf;base64,{{ file_base64 }}" 
-                        width="100%" height="600px" frameborder="0"></iframe>
+<div class="assignment-view-container">
+    <h2>Viewing Assignment: {{ filename }}</h2>
 
-            {% elif file_extension in ["doc", "docx", "ppt", "pptx"] %}
-                <p>DOCX files cannot be previewed. Please download the file.</p>
-                <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" 
-                           class="btn btn-primary" download>⬇️ Download File</a>
-                    
+    <!-- Display Assignment File -->
+    <div class="assignment-frame">
+        {% if file_extension == "pdf" %}
+            <iframe src="data:application/pdf;base64,{{ file_base64 }}" width="100%" height="600px" frameborder="0"></iframe>
+        {% elif file_extension in ["doc", "docx", "ppt", "pptx"] %}
+            <p>DOCX files cannot be previewed. Please download the file.</p>
+            <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" class="btn btn-primary" download>⬇️ Download File</a>
+        {% elif file_extension in ["txt", "md"] %}
+            <div class="text-content">
+                <pre>{{ text_content }}</pre>
+            </div>
+        {% else %}
+            <p>Unsupported file format.</p>
+        {% endif %}
+    </div>
 
-            {% elif file_extension in ["txt", "md"] %}
-                <div class="text-content">
-                    <pre>{{ text_content }}</pre>
-                </div>
-
-            {% else %}
-                <p>Unsupported file format.</p>
-            {% endif %}
-        </div>
-
-        <!-- Submission Form (Only for Students) -->
-        {% if session['role'] == 'Student' %}
+    <!-- Submission Form or Actions (Only for Students) -->
+    {% if session['role'] == 'Student' %}
         <div class="submission-section">
             <h3>Submit Your Work</h3>
-            <form action="{{ url_for('boundary.submit_assignment', assignment_id = assignment._id, filename=filename) }}" 
-                  method="POST" enctype="multipart/form-data">
-                <input type="file" name="file">
-                <input type="hidden" name="assignment_filename" value="{{ filename }}">
-                <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
-                <input type="hidden" name="student_name" value="{{ session['username'] }}">
-                <button type="submit">Submit</button>
-            <p id="submission-status"></p>
+            {% if student_submission %}
+                <p><strong>You have already submitted this assignment.</strong></p>
+                <a href="{{ url_for('boundary.student_view_submission', submission_id=student_submission._id) }}" class="btn btn-success">📄 View Submission</a>
+                <a href="{{ url_for('boundary.student_edit_submission', submission_id=student_submission._id) }}" class="btn btn-warning">✏️ Edit Submission</a>
+                <a href="{{ url_for('boundary.student_delete_submission', submission_id=student_submission._id) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete your submission?');">🗑️ Delete Submission</a>
+            {% else %}
+                <form action="{{ url_for('boundary.submit_assignment', assignment_id=assignment._id, filename=filename) }}" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="file">
+                    <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
+                    <input type="hidden" name="student_username" value="{{ session['username'] }}">
+                    <button type="submit">Submit</button>
+                </form>
+            {% endif %}
         </div>
-        {% endif %}
+    {% endif %}
 
-
-        <!-- View Student Submissions-->
-        {% if session['role'] == 'Teacher' %}
+    <!-- View Student Submissions (Only for Teachers) -->
+    {% if session['role'] == 'Teacher' %}
         <div class="submissions">
             <h3>Student Submissions</h3>
             <ul>
@@ -71,71 +70,83 @@
                     <li>No submissions available.</li>
                 {% endif %}
             </ul>
-            {% endif %}
-            
-        <!-- Buttons -->
-        <div class="buttons">
-            <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
-            <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">Return Home</a>
         </div>
+    {% endif %}
+
+    <!-- Buttons -->
+    <div class="buttons">
+        <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
+        <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">Return Home</a>
     </div>
-    <style>
-        .assignment-view-container {
-            text-align: center;
-            padding: 20px;
-        }
+</div>
 
-        .assignment-frame {
-            margin: 20px auto;
-            width: 80%;
-            height: 600px;
-            border: 1px solid #ddd;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
+<style>
+    .assignment-view-container {
+        text-align: center;
+        padding: 20px;
+    }
 
-        .submission-section {
-            margin-top: 20px;
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-        }
+    .assignment-frame {
+        margin: 20px auto;
+        width: 80%;
+        height: 600px;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
 
-        .submissions {
-            margin-top: 20px;
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-        }
+    .submission-section {
+        margin-top: 20px;
+        background: #1e1e1e;
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+    }
 
-        .buttons {
-            margin-top: 20px;
-        }
+    .submissions {
+        margin-top: 20px;
+        background: #1e1e1e;
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+    }
 
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 5px;
-            text-decoration: none;
-            color: white;
-        }
+    .buttons {
+        margin-top: 20px;
+    }
 
-        .btn-primary {
-            background-color: #007bff;
-        }
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        text-decoration: none;
+        color: white;
+    }
 
-        .btn-secondary {
-            background-color: #6c757d;
-        }
+    .btn-primary {
+        background-color: #007bff;
+    }
 
-        .btn-success {
-            background-color: #28a745;
-        }
+    .btn-secondary {
+        background-color: #6c757d;
+    }
 
-        .btn:hover {
-            opacity: 0.9;
-        }
-    </style>
+    .btn-success {
+        background-color: #28a745;
+    }
+
+    .btn-warning {
+        background-color: #ffc107;
+        color: black;
+    }
+
+    .btn-danger {
+        background-color: #dc3545;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+</style>
+
 {% endblock %}

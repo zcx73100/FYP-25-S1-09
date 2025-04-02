@@ -1745,8 +1745,9 @@ class TeacherAnnouncementBoundary:
 
     
 class ViewAssignmentBoundary:
-    @boundary.route('/teacher/view_assignment/<assignment_id>')
+    @boundary.route('/view_assignment/<assignment_id>')
     def view_assignment(assignment_id):
+        # Retrieve assignment details
         assignment = Assignment.get_assignment(assignment_id)
 
         if not assignment:
@@ -1765,16 +1766,22 @@ class ViewAssignmentBoundary:
             file_base64 = None
             text_content = None
 
+        # Check if student has already submitted the assignment
+        student_username = session.get('username')  # Get the logged-in student's username
+        student_submission = Submission.get_submission_by_student_and_assignment(student_username, assignment_id)
+
+        # Pass the necessary data to the template
         return render_template("viewAssignment.html",
                             filename=assignment["file_name"],
                             file_extension=file_extension,
                             file_base64=file_base64,
                             text_content=text_content,
-                            assignment=assignment)
+                            assignment=assignment,
+                            student_submission=student_submission)  # Pass submission data to template
+
 
 
 class StudentAssignmentBoundary:
-    UPLOAD_FOLDER = "FYP25S109/static/uploads/submissions/"
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 
     @staticmethod
@@ -1784,40 +1791,113 @@ class StudentAssignmentBoundary:
         """
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in StudentAssignmentBoundary.ALLOWED_EXTENSIONS
 
+    
     @boundary.route('/view_assignment/<assignment_id>/<filename>', methods=['GET', 'POST'])
     def submit_assignment(assignment_id, filename):
+        """Handles assignment submission and displays the submission form."""
         try:
+            student_username = session.get('username')  # Get logged-in student's username
+            student_submission = None  # Default to no submission
+
             if request.method == 'POST':
-                # Get form data
-                student_username = request.form.get('student_name')
                 file = request.files.get('file')
 
-                # Validate the file
-                if not file or not StudentAssignmentBoundary.allowed_file(file.filename):
-                    flash('Invalid file type!', 'danger')
+                if not file:
+                    flash('No file uploaded!', 'danger')
                     return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
 
-                # Call the controller to process the submission
-                result = StudentSendSubmissionController.submit_assignment_logic(
-                    assignment_id, student_username, file
-                )
+                result = StudentSendSubmissionController.submit_assignment_logic(assignment_id, student_username, file)
 
                 if result['success']:
                     flash('Assignment submitted successfully!', 'success')
                 else:
                     flash(f"Submission failed: {result['message']}", 'danger')
 
-                # Stay on the same page after submission
                 return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
 
-            # Handle GET request (display the form)
-            return render_template('view_assignment.html', assignment_id=assignment_id, filename=filename)
+            # **Check if student has submitted**
+            student_submission = StudentSendSubmissionController.get_submission(assignment_id, student_username)
+
+            return render_template(
+                'view_assignment.html',
+                assignment_id=assignment_id,
+                filename=filename,
+                student_submission=student_submission
+            )
 
         except Exception as e:
             logging.error(f"Error in submit_assignment: {str(e)}")
             flash('An error occurred while submitting the assignment.', 'danger')
             return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
-    
+
+    @boundary.route('/download_submission/<file_id>')
+    def download_submission(file_id):
+        """Serves the student's submitted file."""
+        try:
+            file = StudentSendSubmissionController.get_submission_file(file_id)
+            if file:
+                return send_file(
+                    io.BytesIO(file.read()),
+                    attachment_filename=file.filename,
+                    as_attachment=True
+                )
+            else:
+                flash("File not found!", "danger")
+                return redirect(request.referrer)
+        except Exception as e:
+            logging.error(f"Error in download_submission: {str(e)}")
+            flash("An error occurred while downloading the file.", "danger")
+            return redirect(request.referrer)
+    @boundary.route('student/view_submission/<submission_id>', methods=['GET'])
+    def student_view_submission(submission_id):
+        """Allows a student to view their own submission."""
+        student_username = session.get('username')
+        
+        if not student_username:
+            flash("You need to be logged in to view your submission.", "danger")
+            return redirect(url_for('boundary.login'))  # Redirect to login page if not logged in
+
+        # Fetch the submission from the database by submission_id and student username
+        submission = Submission.get_submission_by_student_and_id(student_username, submission_id)
+        
+        if not submission:
+            flash("Submission not found.", "danger")
+            return redirect(url_for('boundary.home'))  # Redirect if the submission is not found
+
+        # Fetch the file content from the student's submission
+        file_data = Submission.get_submission_file(submission["file_id"])  # Correct method to get submission file
+        file_extension = submission["file_name"].split(".")[-1]  # Get file extension from student's submission file name
+        
+        # Handle different file types
+        if file_extension in ["pdf", "txt", "md"]:
+            file_base64 = base64.b64encode(file_data).decode("utf-8")
+            text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
+        else:
+            file_base64 = None
+            text_content = None
+
+        # Render the submission details page
+        return render_template(
+            "reviewSubmission.html",
+            submission=submission,
+            file_base64=file_base64,
+            text_content=text_content,
+            file_extension=file_extension
+        )
+
+
+
+    @boundary.route('/edit_submission/<submission_id>', methods=['GET', 'POST'])
+    def student_edit_submission(submission_id):
+        pass
+
+    @boundary.route('/delete_submission/<submission_id>', methods=['POST'])
+    def student_delete_submission(submission_id):
+        pass
+
+
+
+
 
 
 class AccessForumBoundary:
