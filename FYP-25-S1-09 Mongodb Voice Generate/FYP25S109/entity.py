@@ -46,8 +46,9 @@ def setup_indexes():
     mongo.db.useraccount.create_index("username", unique=True)
     print("Unique index on 'username' field created.")
 
+
 class UserAccount:
-    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active'):
+    def __init__(self, username=None, password=None, name=None, surname=None, email=None, date_of_birth=None, role=None, status='active', profile_picture=None):
         self.username = username
         self.password = password
         self.name = name
@@ -56,17 +57,18 @@ class UserAccount:
         self.date_of_birth = date_of_birth
         self.role = role
         self.status = status
+        self.profile_picture = profile_picture  # New field for profile picture
 
     @staticmethod
     def create_user_acc(user_acc):
         try:
-            logging.debug(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
-
+            print(f"Attempting to insert user: {user_acc.username}, {user_acc.email}, {user_acc.role}")
+            # Check if the username already exists
             existing_user = mongo.db.useraccount.find_one({"username": user_acc.username})
             if existing_user:
                 logging.error("Username already exists.")
                 return False
-
+            
             mongo.db.useraccount.insert_one({
                 "username": user_acc.username,
                 "password": generate_password_hash(user_acc.password),
@@ -75,7 +77,8 @@ class UserAccount:
                 "email": user_acc.email,
                 "date_of_birth": user_acc.date_of_birth,
                 "role": user_acc.role,
-                "status": user_acc.status
+                "status": user_acc.status,
+                "profile_picture": user_acc.profile_picture # Store base64 image
             })
             logging.info("User created successfully.")
             return True
@@ -85,6 +88,34 @@ class UserAccount:
         except Exception as e:
             logging.error(f"Error creating user: {e}")
             return False
+
+    @staticmethod
+    def update_profile_picture(username, image_file):
+        try:
+            image_data = base64.b64encode(image_file.read()).decode("utf-8")
+
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"profile_picture": image_data}}
+            )
+            if result.modified_count == 0:
+                logging.warning(f"No user found to update profile picture for {username}.")
+                return False
+
+            logging.info(f"Profile picture updated for user: {username}.")
+            return True
+        except Exception as e:
+            logging.error(f"Error updating profile picture: {e}")
+            return False
+
+    @staticmethod
+    def get_profile_picture(username):
+        try:
+            user = mongo.db.useraccount.find_one({"username": username}, {"profile_picture": 1, "_id": 0})
+            return user["profile_picture"] if user and "profile_picture" in user else None
+        except Exception as e:
+            logging.error(f"Error retrieving profile picture: {e}")
+            return None
 
     @staticmethod
     def login(username, password):

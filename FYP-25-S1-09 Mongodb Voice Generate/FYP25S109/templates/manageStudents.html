@@ -3,103 +3,148 @@
 {% block title %}Manage Students{% endblock %}
 
 {% block content %}
-<h1>Manage Students</h1>
-<!--This page is for teachers to search, suspend, enroll/unenroll students-->
-<!-- Flash Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
+<style>
+    .container {
+        max-width: 900px;
+        margin: auto;
+        padding: 20px;
+    }
+    .alert {
+        margin-top: 10px;
+    }
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .table th, .table td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: center;
+    }
+    .table th {
+        background-color: #f8f9fa;
+    }
+    .btn {
+        padding: 5px 10px;
+        margin: 2px;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    .btn-success {
+        background-color: #28a745;
+        color: white;
+    }
+    .btn:hover {
+        opacity: 0.8;
+    }
+</style>
+
+<div class="container">
+    {% if session.get('role') != "Student" %}
+    <h1>Manage Students</h1>
     {% endif %}
-{% endwith %}
 
-<!-- Search Form -->
-<h2>Search Students</h2>
-<form method="get" action="{{ url_for('boundary.search_student', classroom_id= classroom.classroom_id, query=query) }}">
-    <input type="hidden" name="classroom" value="{{ classroom.classroom_name }}">
-    <input type="text" name="query" placeholder="Search by username or email" required>
-    <button type="submit">Search</button>
-</form>
-
-
-<h2>{% if session.get('role') == "Student" %}Students in this classroom{% else %}Enrolled Students{% endif %}</h2>
-<table border="1">
-    <tr>
-        <th>Username</th>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Status</th>
-        {% if session.get('role') != "Student" %}
-        <th>Actions</th>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
         {% endif %}
-    </tr>
-    {% for student in enrolled_students %}
-    <tr>
-        <td>{{ student.username }}</td>
-        <td>{{ student.email }}</td>
-        <td>{{ student.role }}</td>
-        <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
-        {% if session.get('role') != "Student" %}
-        <td>
-            <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_id= classroom._id) }}" style="display:inline;">
+    {% endwith %}
+
+    <!-- Search Form -->
+    <h2>Search Students</h2>
+    <form method="get" action="{{ url_for('boundary.search_student', classroom_id=classroom._id, query=query) }}">
+        <input type="text" name="query" placeholder="Search by username or email" required>
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+
+    <h2>{% if session.get('role') == "Student" %}Students in this classroom{% else %}Enrolled Students{% endif %}</h2>
+    <table class="table">
+        <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            {% if session.get('role') != "Student" %}<th>Actions</th>{% endif %}
+        </tr>
+        {% for student in enrolled_students %}
+        <tr>
+            <td>{{ student.name }}</td>
+            <td>{{ student.surname }}</td>
+            <td>{{ student.username }}</td>
+            <td>{{ student.email }}</td>
+            <td>{{ student.role }}</td>
+            <td>{{ 'Suspended' if student.status == "suspended" else 'Active' }}</td>
+            {% if session.get('role') != "Student" %}
+            <td>
                 {% if student.status != "suspended" %}
-                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
-                    <input type="hidden" name="username" value="{{ student.username }}">
-                    <button type="submit">Suspend</button>
+                    <form method="post" action="{{ url_for('boundary.suspend_student', username=student.username, classroom_id=classroom._id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger">Suspend</button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_id=classroom._id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-success">Activate</button>
+                    </form>
                 {% endif %}
-            </form>
-            <form method="post" action="{{ url_for('boundary.unsuspend_student', username=student.username, classroom_id= classroom._id) }}" style="display:inline;">
-                {% if student.status == "suspended" %}
-                    <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
+                <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-primary">View Details</button>
+                </form>
+                <form method="post" action="{{ url_for('boundary.remove_student', classroom_id=classroom._id, username=student.username) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student?');">
                     <input type="hidden" name="username" value="{{ student.username }}">
-                    <button type="submit">Activate</button>
-                {% endif %}
-            </form>
-            <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
-                <button type="submit">View Details</button>
-            </form>
-            <form method="post" action="{{ url_for('boundary.remove_student', classroom_id= classroom._id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this student from the classroom?');">
-                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
-                <input type="hidden" name="username" value="{{ student.username }}">
-                <button type="submit">Remove from Classroom</button>
-            </form>
-        </td>
-        {% endif %}
-    </tr>
-    {% endfor %}
-</table>
+                    <button type="submit" class="btn btn-danger">Remove</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </table>
 
-{% if session.get('role') != "Student" %}
-<h2>Unenrolled Students</h2>
-<table border="1">
-    <tr>
-        <th>Username</th>
-        <th>Email</th>
-        <th>Actions</th>
-    </tr>
-    {% for student in unenrolled_students %}
-    <tr>
-        <td>{{ student.username }}</td>
-        <td>{{ student.email }}</td>
-        <td>
-            <form method="post" action="{{ url_for('boundary.enroll_student', classroom_id= classroom._id) }}" style="display:inline;">
-                <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
-                <input type="hidden" name="username" value="{{ student.username }}">
-                <button type="submit">Enroll</button>
-            </form>
-            <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
-                <button type="submit">View Details</button>
-            </form>
-        </td>
-    </tr>
-    {% endfor %}
-</table>
-{% endif %}
+    {% if session.get('role') != "Student" %}
+    <h2>Unenrolled Students</h2>
+    <table class="table">
+        <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Actions</th>
+        </tr>
+        {% for student in unenrolled_students %}
+        <tr>
+            <td>{{ student.first_name }}</td>
+            <td>{{ student.last_name }}</td>
+            <td>{{ student.username }}</td>
+            <td>{{ student.email }}</td>
+            <td>
+                <form method="post" action="{{ url_for('boundary.enroll_student', classroom_id=classroom._id, username=student.username) }}" style="display:inline;">
+                    <input type="hidden" name="username" value="{{ student.username }}">
+                    <button type="submit" class="btn btn-success">Enroll</button>
+                </form>
+                <form method="get" action="{{ url_for('boundary.view_user_details', username=student.username) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-primary">View Details</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
 
-<!-- Back to Classroom Button -->
-<form method="post" action="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}">
-    <button type="submit">Back to Classroom</button>
-</form>
-
+    <!-- Back to Classroom Button -->
+    <form method="post" action="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}">
+        <button type="submit" class="btn btn-secondary">Back to Classroom</button>
+    </form>
+</div>
 {% endblock %}
