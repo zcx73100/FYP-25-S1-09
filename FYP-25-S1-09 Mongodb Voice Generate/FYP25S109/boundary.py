@@ -34,33 +34,22 @@ os.makedirs(GENERATE_FOLDER_AUDIOS, exist_ok=True)
 os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 
 def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-        
-def set_profile_pic_in_session(username):
-    # Fetch user data from MongoDB
-    user_info = mongo.db.useraccount.find_one({"username": username})
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    if user_info and 'profile_image' in user_info:
-        # If profile image exists, encode it as base64 for embedding in HTML
-        profile_image = user_info['profile_image']
-        
-        # If the profile image is stored as Binary (e.g., MongoDB BLOB data)
-        if isinstance(profile_image, Binary):
-            profile_pic_base64 = base64.b64encode(profile_image).decode('utf-8')
-        else:
-            # If it's already base64 encoded as a string
-            profile_pic_base64 = profile_image
-        
-        session['profile_pic'] = profile_pic_base64
-    else:
-        session['profile_pic'] = None  # If no profile image exists
+def retrieve_profile_picture(username):
+    user_info = mongo.db.useraccount.find_one({"username": username}, {"profile_pic": 1})
+    print("DEBUG: Retrieved user_info:", user_info)  # Debugging
 
+    if user_info and "profile_pic" in user_info:
+        profile_pic_data = user_info["profile_pic"]
+        print("DEBUG: Retrieved profile_pic:", profile_pic_data)  # Debugging
 
-def store_profile_image(user_id, image_file):
-    with open(image_file, 'rb') as img:
-        img_data = img.read()
-        encoded_image = base64.b64encode(img_data).decode('utf-8')  # Encode image to base64
-        mongo.db.useraccount.update_one({"_id": user_id}, {"$set": {"profile_image": encoded_image}})
+        if isinstance(profile_pic_data, Binary):
+            return base64.b64encode(profile_pic_data).decode('utf-8')
+        if isinstance(profile_pic_data, str):
+            return profile_pic_data
+    return None
+
 # Homepage
 class HomePage:
     @staticmethod
@@ -69,7 +58,7 @@ class HomePage:
         username = session.get("username", None)
         role = session.get("role", None)
 
-        user_info = mongo.db.useraccount.find_one({"username": username}) if username else None
+        user_info = mongo.db.useraccount.find_one({"username": username},{}) if username else None
 
         teacher_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
         teacher_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": teacher_users}}))
@@ -116,6 +105,7 @@ class HomePage:
                 {"_id": 1, "title": 1}
             )) for classroom in classrooms
         }
+        print(session)
 
         return render_template(
             "homepage.html",
@@ -391,7 +381,7 @@ class LoginBoundary:
             password = request.form.get('password')
 
             # Fetch user_info from DB
-            user_info = mongo.db.useraccount.find_one({"username": username})
+            user_info = mongo.db.useraccount.find_one({"username": username},{})
 
             if user_info:
                 # Check user_info status
@@ -409,10 +399,6 @@ class LoginBoundary:
                     session['username'] = username
                     session['role'] = user_info['role']
                     session['user_authenticated'] = True
-
-                    # Set profile picture in session
-                    set_profile_pic_in_session(session['username'])
-
                     flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
                     return redirect(url_for('boundary.home'))
                 else:
@@ -421,6 +407,13 @@ class LoginBoundary:
                 flash('Username does not exist.', category='error')
 
         return render_template("login.html")
+    
+@boundary.route('/profile_pic/<username>')
+def get_profile_pic(username):
+    profile_pic = retrieve_profile_picture(username)
+    if profile_pic:
+        return send_file(BytesIO(base64.b64decode(profile_pic)), mimetype='image/jpeg')
+    return '', 404  # Not Found
 
 
 # Log Out
