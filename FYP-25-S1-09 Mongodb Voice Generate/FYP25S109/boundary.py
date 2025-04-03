@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
-from bson import ObjectId
+from bson import ObjectId, Binary
 from markupsafe import Markup
 import base64
 import mimetypes
@@ -36,7 +36,31 @@ os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
         
+def set_profile_pic_in_session(username):
+    # Fetch user data from MongoDB
+    user_info = mongo.db.useraccount.find_one({"username": username})
 
+    if user_info and 'profile_image' in user_info:
+        # If profile image exists, encode it as base64 for embedding in HTML
+        profile_image = user_info['profile_image']
+        
+        # If the profile image is stored as Binary (e.g., MongoDB BLOB data)
+        if isinstance(profile_image, Binary):
+            profile_pic_base64 = base64.b64encode(profile_image).decode('utf-8')
+        else:
+            # If it's already base64 encoded as a string
+            profile_pic_base64 = profile_image
+        
+        session['profile_pic'] = profile_pic_base64
+    else:
+        session['profile_pic'] = None  # If no profile image exists
+
+
+def store_profile_image(user_id, image_file):
+    with open(image_file, 'rb') as img:
+        img_data = img.read()
+        encoded_image = base64.b64encode(img_data).decode('utf-8')  # Encode image to base64
+        mongo.db.useraccount.update_one({"_id": user_id}, {"$set": {"profile_image": encoded_image}})
 # Homepage
 class HomePage:
     @staticmethod
@@ -45,12 +69,12 @@ class HomePage:
         username = session.get("username", None)
         role = session.get("role", None)
 
-        user = mongo.db.useraccount.find_one({"username": username}) if username else None
+        user_info = mongo.db.useraccount.find_one({"username": username}) if username else None
 
-        teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
+        teacher_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
         teacher_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": teacher_users}}))
 
-        admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
+        admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
 
         avatars = list(mongo.db.avatar.find({}))
@@ -95,7 +119,7 @@ class HomePage:
 
         return render_template(
             "homepage.html",
-            user=user,
+            user_info=user_info,
             username=username,
             videos=admin_videos + teacher_videos,
             avatars=avatars,
@@ -277,7 +301,7 @@ def generate_video():
             return redirect(url_for("login"))
 
         if request.method == "GET":
-            # 🧠 Fetch avatars only uploaded by current user
+            # 🧠 Fetch avatars only uploaded by current user_info
             avatars = list(mongo.db.avatar.find(
                 {"username": username},
                 {"_id": 0, "file_path": 1, "avatarname": 1}
@@ -324,12 +348,12 @@ def generate_video():
 def save_generated_video():
     try:
         username = session.get("username")
-        user = mongo.db.useraccount.find_one({"username": username})
-        if not user:
+        user_info = mongo.db.useraccount.find_one({"username": username})
+        if not user_info:
             return jsonify({"success": False, "error": "User not found"}), 404
 
         # 🧠 Ensure role is treated case-insensitively
-        if user["role"].lower() not in ["teacher", "student"]:
+        if user_info["role"].lower() not in ["teacher", "student"]:
             return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
 
         data = request.json
@@ -343,7 +367,7 @@ def save_generated_video():
         # ✅ Save to 'video' collection
         mongo.db.video.insert_one({
             "username": username,
-            "role": user["role"].lower(),
+            "role": user_info["role"].lower(),
             "text": text,
             "video_url": video_url,
             "audio_url": audio_url,
@@ -366,26 +390,30 @@ class LoginBoundary:
             username = request.form.get('username')
             password = request.form.get('password')
 
-            # Fetch user from DB
-            user = mongo.db.useraccount.find_one({"username": username})
+            # Fetch user_info from DB
+            user_info = mongo.db.useraccount.find_one({"username": username})
 
-            if user:
-                # Check user status
-                if user.get('status') == 'suspended':
+            if user_info:
+                # Check user_info status
+                if user_info.get('status') == 'suspended':
                     flash('Your account is suspended. Please contact admin.', category='error')
                     return redirect(url_for('boundary.login'))
-                elif user.get('status') == 'deleted':
+                elif user_info.get('status') == 'deleted':
                     flash('This account has been deleted.', category='error')
                     return redirect(url_for('boundary.login'))
 
                 # Validate password
-                stored_hashed_password = user["password"]
+                stored_hashed_password = user_info["password"]
                 if check_password_hash(stored_hashed_password, password):
                     # Successful login for active users only
                     session['username'] = username
-                    session['role'] = user['role']
+                    session['role'] = user_info['role']
                     session['user_authenticated'] = True
-                    flash(f'Login successful! You are logged in as {user["role"].capitalize()}.', category='success')
+
+                    # Set profile picture in session
+                    set_profile_pic_in_session(session['username'])
+
+                    flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
                     return redirect(url_for('boundary.home'))
                 else:
                     flash('Wrong password.', category='error')
@@ -393,6 +421,7 @@ class LoginBoundary:
                 flash('Username does not exist.', category='error')
 
         return render_template("login.html")
+
 
 # Log Out
 class LogoutBoundary:
@@ -458,13 +487,13 @@ class AccountDetailsBoundary:
             flash("You must be logged in to view account details.", category='error')
             return redirect(url_for('boundary.login'))
         username = session.get('username')
-        user = DisplayUserDetailController.get_user_info(username)
-        if not user:
+        user_info = DisplayUserDetailController.get_user_info(username)
+        if not user_info:
             flash("User details not found.", category='error')
             return redirect(url_for('boundary.home'))
         
         else:
-            return render_template("accountDetails.html", user=user)
+            return render_template("accountDetails.html", user_info=user_info)
 
 # Edit Account Details
 class UpdateAccountBoundary:
@@ -476,9 +505,9 @@ class UpdateAccountBoundary:
             return redirect(url_for('boundary.login'))
 
         username = session['username']
-        user = UpdateAccountDetailController.get_user_by_username(username)
+        user_info = UpdateAccountDetailController.get_user_by_username(username)
 
-        if not user:
+        if not user_info:
             flash("User not found.", category='error')
             return redirect(url_for('boundary.accDetails'))
 
@@ -512,7 +541,7 @@ class UpdateAccountBoundary:
 
             return redirect(url_for('boundary.accDetails'))
 
-        return render_template("updateAccDetail.html", user=user)
+        return render_template("updateAccDetail.html", user_info=user_info)
 
 
 # Update Password
@@ -525,9 +554,9 @@ class UpdatePasswordBoundary:
             return redirect(url_for('boundary.login'))
 
         username = session['username']
-        user = mongo.db.useraccount.find_one({"username": username})
+        user_info = mongo.db.useraccount.find_one({"username": username})
 
-        if not user:
+        if not user_info:
             flash("User not found.", category='error')
             return redirect(url_for('boundary.accDetails'))
 
@@ -536,7 +565,7 @@ class UpdatePasswordBoundary:
             new_password = request.form.get("new_password")
             confirm_password = request.form.get("confirm_password")
 
-            stored_hashed_password = user.get("password")
+            stored_hashed_password = user_info.get("password")
 
             if not check_password_hash(stored_hashed_password, old_password):
                 flash("Incorrect current password.", category='error')
@@ -562,8 +591,8 @@ class UpdatePasswordBoundary:
             else:
                 flash("Failed to update password. Try again.", category='error')
 
-        # 🔥 FIX: Pass user to template
-        return render_template("updatePassword.html", user=user)
+        # 🔥 FIX: Pass user_info to template
+        return render_template("updatePassword.html", user_info=user_info)
 
 
 class ResetPasswordBoundary:
@@ -936,7 +965,7 @@ class ManageUserBoundary:
             flash("You cannot delete your own account.", category='error')
             return redirect(url_for('ManageUserBoundary.manage_users'))
 
-        # Permanently delete user from DB
+        # Permanently delete user_info from DB
         result = mongo.db.useraccount.delete_one({"username": username})
 
         if result.deleted_count:
@@ -963,7 +992,7 @@ class ManageUserBoundary:
         if result.modified_count:
             flash(f"User {username} reactivated successfully.", category='success')
         else:
-            flash("Failed to reactivate user.", category='error')
+            flash("Failed to reactivate user_info.", category='error')
 
         return redirect(url_for('boundary.manage_users'))
     
@@ -1255,7 +1284,7 @@ class TeacherManageStudentsBoundary:
 
         # Get enrolled usernames from the classroom
         enrolled_usernames = set(classroom.get('student_list', []))
-        unenrolled_usernames = set(user['username'] for user in mongo.db.useraccount.find({"role": "Student"})) - enrolled_usernames
+        unenrolled_usernames = set(user_info['username'] for user_info in mongo.db.useraccount.find({"role": "Student"})) - enrolled_usernames
 
         # Fetch students that match the search query
         search_results = list(mongo.db.useraccount.find({
@@ -1420,16 +1449,16 @@ class ViewUserDetailsBoundary:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        user = mongo.db.useraccount.find_one(
+        user_info = mongo.db.useraccount.find_one(
             {"username": username},
-            {"_id": 0, "username": 1, "name": 1, "surname": 1, "date_of_birth": 1, "email": 1, "role": 1}
+            {}
         )
 
-        if not user:
+        if not user_info:
             flash("User not found.", category='error')
             return redirect(url_for('boundary.home'))
 
-        return render_template("userDetails.html", user=user)
+        return render_template("userDetails.html", user_info=user_info)
     
 
 

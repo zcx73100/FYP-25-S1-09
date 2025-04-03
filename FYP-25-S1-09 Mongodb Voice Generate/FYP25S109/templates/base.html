@@ -45,11 +45,12 @@
                 <!-- Profile Menu -->
                 <ul class="navbar-nav ms-auto">
                     {% if session.get('username') %}
-                    {% if user.profile_pic %}
-                        <img src="data:image/png;base64,{{ user.profile_pic }}" alt="Profile Picture" class="profile-pic">
+                    {% if session.get('profile_pic') %}
+                        <img src="data:image/jpeg;base64,{{ session.get('profile_pic') }}" alt="Profile Picture" class="profile-pic">
                     {% else %}
                         <img src="{{ url_for('static', filename='default_profile.png') }}" alt="Default Profile" class="profile-pic">
                     {% endif %}
+                
                 
 
                         <li class="nav-item dropdown d-flex align-items-center">
@@ -110,7 +111,7 @@
         width: 40px;  /* Set fixed width */
         height: 40px; /* Set fixed height */
         border-radius: 50%; /* Make it circular */
-        object-fit: cover; /* Ensure the image fills the area without distortion */
+        object-fit: contain; /* Ensure the image fills the area without distortion */
         border: 2px solid #fff; /* Optional: White border for visibility */
     }
 
