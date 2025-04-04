@@ -96,6 +96,23 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Chatbot UI -->
+    <div id="chatbot-container">
+        <div id="chat-header" onclick="toggleChat()">💬 Ask AI</div>
+        <div id="chat-box" style="display: none;">
+          <div id="chat-messages"></div>
+          <div id="status"></div>
+          <input type="text" id="chat-input" placeholder="Type a question..." onkeydown="sendOnEnter(event)">
+          <button id="expand-button" onclick="toggleSize()">🗖 Expand</button>
+        </div>
+      </div>
+    
+    <!-- Chatbot Scripts & Styles -->
+    <script src="{{ url_for('static', filename='chatbot.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='chatbot.css') }}">
+  
+  
 </body>
 </html>
 <style>
@@ -109,3 +126,16 @@
     }
 
 </style>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const chatBox = document.getElementById('chat-box');
+      const container = document.getElementById('chatbot-container');
+  
+      // ✅ Force chat to be minimized on first load
+      chatBox.style.display = 'none';
+      container.classList.remove('expanded');
+      container.style.height = 'auto';
+      container.style.width = '200px';
+    });
+  </script>

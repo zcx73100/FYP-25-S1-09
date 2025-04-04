@@ -2,6 +2,8 @@ from flask import Flask
 from flask_pymongo import PyMongo
 import sys
 import os
+from .chatbot import chatbot
+
 mongo = PyMongo()
 
 def create_app():
@@ -18,5 +20,9 @@ def create_app():
     # Register Blueprints
     from .boundary import boundary
     app.register_blueprint(boundary, url_prefix='/')
+
+    # ✅ Register Chatbot Blueprint
+    from .chatbot import chatbot
+    app.register_blueprint(chatbot, url_prefix='/')
 
     return app

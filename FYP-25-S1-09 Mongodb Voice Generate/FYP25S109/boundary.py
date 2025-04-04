@@ -960,12 +960,27 @@ class ManageUserBoundary:
             return redirect(url_for('ManageUserBoundary.manage_users'))
 
         # Permanently delete user_info from DB
+        user = mongo.db.useraccount.find_one({"username": username})
+        if not user:
+            flash("User not found.", category='error')
+            return redirect(url_for('boundary.manage_users'))
+
+        # Delete related avatars
+        mongo.db.avatar.delete_many({"username": username})
+
+        # Remove student from all classroom lists
+        mongo.db.classroom.update_many(
+            {"student_list": username},
+            {"$pull": {"student_list": username}}
+        )
+
+        # Finally, delete the user
         result = mongo.db.useraccount.delete_one({"username": username})
 
         if result.deleted_count:
-            flash(f"User {username} permanently deleted.", category='success')
+            flash(f"User {username} and their related data deleted.", category='success')
         else:
-            flash("User not found.", category='error')
+            flash("Failed to delete user.", category='error')
 
         return redirect(url_for('boundary.manage_users'))
 
