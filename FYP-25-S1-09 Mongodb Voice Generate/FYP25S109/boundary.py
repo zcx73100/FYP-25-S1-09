@@ -25,8 +25,8 @@ os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
-# API_URL = "https://vinthony-sadtalker.hf.space/--replicas/55zml"
-#client = Client(API_URL)
+API_URL = "https://vinthony-sadtalker.hf.space/"
+client = Client(API_URL)
 
 GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
 GENERATE_FOLDER_VIDEOS = 'FYP25S109/static/generated_videos'
@@ -247,128 +247,129 @@ def video_status():
     return jsonify({"success": True, "progress": progress, "time_left": time_left})
 """
 
-# Generate Video Local
-@boundary.route("/generate_voice", methods=["POST"])
-def generate_voice():
-    try:
-        data = request.get_json()
-        text = data.get("text")
+class GenerateVideoBoundary:
+    # Generate Video Local
+    @boundary.route("/generate_voice", methods=["POST"])
+    def generate_voice():
+        try:
+            data = request.get_json()
+            text = data.get("text")
 
-        if not text:
-            return jsonify({"success": False, "error": "Text is required"}), 400
+            if not text:
+                return jsonify({"success": False, "error": "Text is required"}), 400
 
-        voice_entity = GenerateVideoEntity(text)
-        audio_url = voice_entity.generate_voice()
+            voice_entity = GenerateVideoEntity(text)
+            audio_url = voice_entity.generate_voice()
 
-        if not audio_url:
-            return jsonify({"success": False, "error": "Voice generation failed"}), 500
+            if not audio_url:
+                return jsonify({"success": False, "error": "Voice generation failed"}), 500
 
-        return jsonify({"success": True, "audio_url": audio_url})
+            return jsonify({"success": True, "audio_url": audio_url})
 
-    except Exception as e:
-        return jsonify({"success": False, "error": repr(e)}), 500
+        except Exception as e:
+            return jsonify({"success": False, "error": repr(e)}), 500
 
-# Generate Talking Video
-@boundary.route("/status")
-def proxy_status():
-    return requests.get("http://127.0.0.1:7860/status").json()
+    # Generate Talking Video
+    @boundary.route("/status")
+    def proxy_status():
+        return requests.get("http://127.0.0.1:7860/status").json()
 
-@boundary.route("/progress")
-def proxy_progress():
-    try:
-        response = requests.get("http://127.0.0.1:7860/progress")
-        response.raise_for_status()  # 🚨 force error for non-200s
-        return jsonify(response.json())
-    except Exception as e:
-        print(f"Progress fetch failed: {e}")  # ✅ useful log
-        return jsonify({"progress": 0, "error": str(e)})
+    @boundary.route("/progress")
+    def proxy_progress():
+        try:
+            response = requests.get("http://127.0.0.1:7860/progress")
+            response.raise_for_status()  # 🚨 force error for non-200s
+            return jsonify(response.json())
+        except Exception as e:
+            print(f"Progress fetch failed: {e}")  # ✅ useful log
+            return jsonify({"progress": 0, "error": str(e)})
 
-@boundary.route("/generate_video", methods=["GET", "POST"])
-def generate_video():
-    try:
-        username = session.get("username")
-        if not username:
-            return redirect(url_for("login"))
+    @boundary.route("/generate_video", methods=["GET", "POST"])
+    def generate_video():
+        try:
+            username = session.get("username")
+            if not username:
+                return redirect(url_for("login"))
 
-        if request.method == "GET":
-            # 🧠 Fetch avatars only uploaded by current user_info
-            avatars = list(mongo.db.avatar.find(
-                {"username": username},
-                {"_id": 0, "file_path": 1, "avatarname": 1}
-            ))
-            return render_template("generateVideo.html", avatars=avatars)
+            if request.method == "GET":
+                # 🧠 Fetch avatars only uploaded by current user_info
+                avatars = list(mongo.db.avatar.find(
+                    {"username": username},
+                    {"_id": 0, "avatarname": 1, "image_data": 1}  # Include image data!
+                ))
+                return render_template("generateVideo.html", avatars=avatars)
 
-        # POST — handle video generation request
-        text = request.form.get("text")
-        avatar_path = request.form.get("avatar_path")
-        audio_path = request.form.get("audio_path")
+            # POST — handle video generation request
+            text = request.form.get("text")
+            avatar_path = request.form.get("avatar_path")
+            audio_path = request.form.get("audio_path")
 
-        print("📥 Incoming POST /generate_video:")
-        print("Text:", text)
-        print("Avatar Path:", avatar_path)
-        print("Audio Path:", audio_path)
+            print("📥 Incoming POST /generate_video:")
+            print("Text:", text)
+            print("Avatar Path:", avatar_path)
+            print("Audio Path:", audio_path)
 
-        if not all([text, avatar_path, audio_path]):
-            return jsonify({"success": False, "error": "Missing required parameters"}), 400
+            if not all([text, avatar_path, audio_path]):
+                return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-        # Rebuild absolute file paths
-        avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
-        audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
+            # Rebuild absolute file paths
+            avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
+            audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
 
-        if not os.path.exists(avatar_path):
-            return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
-        if not os.path.exists(audio_path):
-            return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
+            if not os.path.exists(avatar_path):
+                return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
+            if not os.path.exists(audio_path):
+                return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
 
-        # Generate the video
-        entity = GenerateVideoEntity(text, avatar_path, audio_path)
-        video_url = entity.generate_video()
+            # Generate the video
+            entity = GenerateVideoEntity(text, avatar_path, audio_path)
+            video_url = entity.generate_video()
 
-        if not video_url:
-            return jsonify({"success": False, "error": "Video generation failed"}), 500
+            if not video_url:
+                return jsonify({"success": False, "error": "Video generation failed"}), 500
 
-        return jsonify({"success": True, "video_url": video_url})
+            return jsonify({"success": True, "video_url": video_url})
 
-    except Exception as e:
-        print(f"❌ Error in /generate_video route: {str(e)}")
-        return jsonify({"success": False, "error": repr(e)}), 500
+        except Exception as e:
+            print(f"❌ Error in /generate_video route: {str(e)}")
+            return jsonify({"success": False, "error": repr(e)}), 500
 
-# Save Video
-@boundary.route("/save_generated_video", methods=["POST"])
-def save_generated_video():
-    try:
-        username = session.get("username")
-        user_info = mongo.db.useraccount.find_one({"username": username})
-        if not user_info:
-            return jsonify({"success": False, "error": "User not found"}), 404
+    # Save Video
+    @boundary.route("/save_generated_video", methods=["POST"])
+    def save_generated_video():
+        try:
+            username = session.get("username")
+            user_info = mongo.db.useraccount.find_one({"username": username})
+            if not user_info:
+                return jsonify({"success": False, "error": "User not found"}), 404
 
-        # 🧠 Ensure role is treated case-insensitively
-        if user_info["role"].lower() not in ["teacher", "student"]:
-            return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
+            # 🧠 Ensure role is treated case-insensitively
+            if user_info["role"].lower() not in ["teacher", "student"]:
+                return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
 
-        data = request.json
-        text = data.get("text")
-        video_url = data.get("video_url")
-        audio_url = data.get("audio_url")
+            data = request.json
+            text = data.get("text")
+            video_url = data.get("video_url")
+            audio_url = data.get("audio_url")
 
-        if not all([text, video_url, audio_url]):
-            return jsonify({"success": False, "error": "Missing fields"}), 400
+            if not all([text, video_url, audio_url]):
+                return jsonify({"success": False, "error": "Missing fields"}), 400
 
-        # ✅ Save to 'video' collection
-        mongo.db.video.insert_one({
-            "username": username,
-            "role": user_info["role"].lower(),
-            "text": text,
-            "video_url": video_url,
-            "audio_url": audio_url,
-            "created_at": datetime.now()
-        })
+            # ✅ Save to 'video' collection
+            mongo.db.video.insert_one({
+                "username": username,
+                "role": user_info["role"].lower(),
+                "text": text,
+                "video_url": video_url,
+                "audio_url": audio_url,
+                "created_at": datetime.now()
+            })
 
-        return jsonify({"success": True, "message": "Video saved successfully."})
+            return jsonify({"success": True, "message": "Video saved successfully."})
 
-    except Exception as e:
-        logging.error(f"❌ Error saving video: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        except Exception as e:
+            logging.error(f"❌ Error saving video: {str(e)}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
 # Log In

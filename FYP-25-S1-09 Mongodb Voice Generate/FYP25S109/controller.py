@@ -4,7 +4,14 @@ import requests
 import json
 from bson import ObjectId
 from datetime import datetime, timezone
-
+class GenerateVideoController:
+    @staticmethod
+    def generate_voice(text):
+        entity = GenerateVideoEntity(text=text, avatar_path=None)
+        return entity.generate_voice(text)
+    def generate_video(text, avatar_path):
+        entity = GenerateVideoEntity(text, avatar_path)
+        entity.generate_voice()  # Make sure audio is generated first
 
 class LoginController:
     @staticmethod

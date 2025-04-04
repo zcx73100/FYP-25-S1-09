@@ -25,11 +25,12 @@
                 {% if avatars %}
                     {% for avatar in avatars %}
                     <label class="avatar-option text-center">
-                        <input type="radio" name="avatar_path" value="/static/{{ avatar.file_path }}" required>
-                        <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}" class="img-thumbnail" width="150" height="150">
+                        <input type="radio" name="avatar_path" value="{{ avatar.image_data }}" required>
+                        <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
                         <p>{{ avatar.avatarname }}</p>
                     </label>
-                    {% endfor %}
+                {% endfor %}
+            
                 {% else %}
                     <p class="text-danger">No avatars available.</p>
                 {% endif %}
