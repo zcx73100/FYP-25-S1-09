@@ -956,7 +956,7 @@ class Submission:
                 'file_id': file_id,  # Reference to GridFS
                 'file_name': self.filename,
                 'submission_date': self.submission_date,
-                'grade': 0,
+                'grade': None,  # Initially set to None
                 'feedback': ''
             }
 
@@ -1025,6 +1025,23 @@ class Submission:
         except Exception as e:
             logging.error(f"Error deleting submission: {str(e)}")
             return {"success": False, "message": str(e)}
+    @staticmethod
+    def update_feedback(submission_id, student_username, feedback):
+        """
+        Update the feedback of a submission.
+        """
+        try:
+            result = mongo.db.submissions.update_one(
+                {"_id": ObjectId(submission_id)},
+                {"$set": {"feedback": feedback}}
+            )
+            if result.matched_count:
+                return {"success": True, "message": "Feedback updated successfully."}
+            return {"success": False, "message": "Submission not found."}
+        except Exception as e:
+            logging.error(f"Error updating feedback: {str(e)}")
+            return {"success": False, "message": str(e)}
+
         
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):

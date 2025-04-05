@@ -59,11 +59,22 @@
             {% if assignments %}
                 {% for assignment in assignments %}
                     <li>
-                        <strong>{{ assignment.title }}</strong>: {{ assignment.description }}
+                        <strong>{{ assignment.title }}</strong><br>
+                        <span>📅 Due: {{ assignment.due_date }}</span>
                         <br>
-                        <span>📅 Due: {{ assignment.due_date | default("Not specified") }}</span>
+                        <span style="font-weight: bold;">📌 Status: 
+                            {% if assignment.status == 'Graded' %}
+                                <span style="color: green;">Graded</span>
+                            {% elif assignment.status == 'Submitted' %}
+                                <span style="color: orange;">Submitted</span>
+                            {% elif assignment.status == 'Overdue' %}
+                                <span style="color: red;">Overdue</span>
+                            {% else %}
+                                <span style="color: gray;">Not Submitted</span>
+                            {% endif %}
+                        </span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name) }}" class="file-button">📄 View</a>
+                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name, classroom_id=classroom._id) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}
@@ -71,6 +82,8 @@
             {% endif %}
         </ul>
     </div>
+    
+    
 
     <div class="classroom-section">
         <h3>📝 Quizzes</h3>

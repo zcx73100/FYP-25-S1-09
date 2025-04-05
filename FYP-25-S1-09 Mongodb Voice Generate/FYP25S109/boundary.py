@@ -1047,8 +1047,6 @@ class TeacherAddClassroomBoundary:
 
         return render_template("addClassroom.html")
 
-from datetime import datetime
-
 class ViewClassRoomBoundary:
     @staticmethod
     @boundary.route('/viewClassroom/<classroom_id>', methods=['GET', 'POST'])
@@ -1057,42 +1055,59 @@ class ViewClassRoomBoundary:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
-        # Fetch the classroom details
         classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
 
-        # Role-based access control
-        username = session.get('username')
-        if session.get('role') == 'Student':
-            student_list = classroom.get('student_list', [])
-            if username.strip() not in [s.strip() for s in student_list]:
+        username = session.get('username', '').strip()
+        role = session.get('role')
+
+        if role == 'Student':
+            student_list = [s.strip() for s in classroom.get('student_list', [])]
+            if username not in student_list:
                 flash("You are not enrolled in this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
 
-        elif session.get('role') == 'Teacher':
-            if username.strip() != classroom.get('teacher', '').strip():
+        elif role == 'Teacher':
+            if username != classroom.get('teacher', '').strip():
                 flash("You are not the teacher of this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
-        # Fetch classroom data
+
         materials = list(mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)}))
         assignments = list(mongo.db.assignments.find({"classroom_id": ObjectId(classroom_id)}))
         quizzes = list(mongo.db.quizzes.find({"classroom_id": ObjectId(classroom_id)}))
-
-        # ✅ Fetch announcements for this classroom
         announcements = list(mongo.db.announcements.find(
             {"classroom_id": ObjectId(classroom_id)},
             {"_id": 0, "title": 1, "content": 1, "created_at": 1}
-        ))
+        ).sort("created_at", -1))
 
-        # Convert due_date to readable format
+        current_time = datetime.now()
+
         for assignment in assignments:
-            if "due_date" in assignment and assignment["due_date"]:
+            due_dt = None
+            if assignment.get("due_date"):
                 try:
-                    assignment["due_date"] = datetime.strptime(assignment["due_date"], "%Y-%m-%dT%H:%M").strftime("%d %b %Y, %I:%M %p")
+                    due_dt = datetime.strptime(assignment["due_date"], "%Y-%m-%dT%H:%M")
                 except ValueError:
-                    pass  # Keep as-is if conversion fails
+                    due_dt = None
+
+            assignment["due_date_obj"] = due_dt
+            assignment["due_date"] = due_dt.strftime("%d %b %Y, %I:%M %p") if due_dt else "Not specified"
+            assignment["status"] = "Not Submitted"
+
+            if role == 'Student':
+                submission = mongo.db.submissions.find_one({
+                    "assignment_id": ObjectId(assignment["_id"]),
+                    "student": username
+                })
+
+                if submission:
+                    assignment["status"] = "Graded" if submission.get("grade") is not None else "Submitted"
+                elif due_dt and current_time > due_dt:
+                    assignment["status"] = "Overdue"
+
+        assignments.sort(key=lambda a: a.get("due_date_obj") or datetime.max)
 
         return render_template(
             "viewClassroom.html",
@@ -1100,8 +1115,10 @@ class ViewClassRoomBoundary:
             materials=materials,
             assignments=assignments,
             quizzes=quizzes,
-            announcements=announcements
+            announcements=announcements,
+            current_time=current_time
         )
+
 
 class TeacherDeleteClassroomBoundary:
     @staticmethod
@@ -1677,6 +1694,22 @@ class TeacherAssignmentBoundary:
         # If file is not found, show an error
         flash("File not found!", "danger")
         return redirect(request.referrer)
+    
+    @boundary.route('/add_feedback/<submission_id>', methods=['POST'])
+    def add_feedback(submission_id):
+        """Adds feedback to a specific submission."""
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        feedback = request.form.get('feedback')
+        student_username = request.form.get('student_username')  # This should come from the form
+
+        result = AddFeedbackController.add_feedback(submission_id, student_username, feedback)
+
+        flash(result["message"], category="success" if result["success"] else "danger")
+        return redirect(request.referrer)
+
 
 
 class TeacherManageQuizBoundary:
@@ -1850,7 +1883,6 @@ class ViewAssignmentBoundary:
     def view_assignment(assignment_id):
         # Retrieve assignment details
         assignment = Assignment.get_assignment(assignment_id)
-
         if not assignment:
             flash("Assignment not found!", "danger")
             return redirect(url_for("boundary.home"))
@@ -1858,6 +1890,8 @@ class ViewAssignmentBoundary:
         # Get file content
         file_data = Assignment.get_assignment_file(assignment["file_id"])
         file_extension = assignment["file_name"].split(".")[-1]
+        classroom_id = assignment.get("classroom_id") if assignment else None
+
 
         # Convert to Base64 (for PDFs and text)
         if file_extension in ["pdf", "txt", "md"]:
@@ -1878,7 +1912,8 @@ class ViewAssignmentBoundary:
                             file_base64=file_base64,
                             text_content=text_content,
                             assignment=assignment,
-                            student_submission=student_submission)  # Pass submission data to template
+                            student_submission=student_submission,
+                            classroom_id= classroom_id)  # Pass submission data to template
 
 
 

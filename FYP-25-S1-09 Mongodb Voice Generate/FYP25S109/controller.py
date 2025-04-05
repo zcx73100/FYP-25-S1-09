@@ -305,6 +305,18 @@ class ViewAssignmentDetailsController:
         assignment = Assignment.get_assignment(assignment_id)
         return assignment
 
+class AddFeedbackController:
+    @staticmethod
+    def add_feedback(submission_id, student_username, feedback):
+        # Optional: verify if student matches (for security)
+        submission = Submission.get_submission_by_student_and_id(student_username, submission_id)
+        if not submission:
+            return {"success": False, "message": "Submission not found or unauthorized."}
+        
+        # Call the update_feedback method
+        return Submission.update_feedback(submission_id,student_username, feedback)
+
+         
 
 class StudentSendSubmissionController:
     @staticmethod
