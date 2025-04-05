@@ -3,7 +3,7 @@ import requests
 
 chatbot = Blueprint('chatbot', __name__)
 
-API_KEY = "INSERT API KEY HERE"
+API_KEY = "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"
 
 # Model:openchat
 MODEL = "openchat/openchat-7b:free"
@@ -20,12 +20,33 @@ def chat():
     }
 
     payload = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": "You are a helpful AI tutor."},
-            {"role": "user", "content": user_message}
-        ]
-    }
+    "model": MODEL,
+    "messages": [
+        {
+            "role": "system",
+            "content": """
+You are EduMate, the built-in virtual assistant for an AI-powered Learning Management System (LMS).
+This LMS is designed to enhance education through interactive face animation technology.
+Your job is to guide users—students and teachers—through the platform and help them make the most of its features.
+
+The LMS offers:
+- Animated AI avatars to make learning more engaging.
+- Teachers can create and deliver lessons through animated characters.
+- Students can access tutorials, take quizzes, and track their learning progress.
+- Built-in discussion boards for collaborative learning.
+- Face animation tech that mimics human expressions for more immersive online learning.
+
+When responding:
+- Speak like a friendly, clear, and helpful digital assistant.
+- Offer real guidance or suggestions like you would in a live LMS dashboard.
+- If you don’t know the answer, recommend the user contacts support or checks the help section.
+
+Stay professional, informative, and approachable — like a feature users would love to interact with every day.
+"""
+        },
+        {"role": "user", "content": user_message}
+    ]
+}
 
     try:
         response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
