@@ -50,6 +50,15 @@ def retrieve_profile_picture(username):
             return profile_pic_data
     return None
 
+#This is a helper function to send automated notifications to users
+def send_notification(message):
+    # This is a placeholder function. You can implement your notification logic here.
+    print(f"Notification: {message}")
+
+
+
+
+
 # Homepage
 class HomePage:
     @staticmethod
@@ -1676,24 +1685,78 @@ class TeacherAssignmentBoundary:
         return redirect(url_for('boundary.manage_assignments', classroom_id=classroom_id))
     
     
-    @boundary.route('/view_submitted_assignment/<filename>', methods=['GET'])
-    def view_submitted_assignment(filename):
-        """Serves student-submitted assignments for viewing."""
+    @boundary.route('/view-student-submission/<submission_id>/<filename>',methods=['GET','POST'])
+    def view_submitted_assignment(submission_id,filename):
+        """Allows a student to view their own submission."""
+        student_doc = mongo.db.submissions.find_one(
+            {"_id": ObjectId(submission_id)},
+            {"student": 1, "_id": 0, "assignment_id": 1}
+        )
         
-        # Ensure the correct absolute file path
-        file_path = os.path.join(os.getcwd(), "FYP25S109", "static", "uploads", "submissions", filename)
+        student_username = student_doc["student"] if student_doc else None
+        assignment_id = student_doc["assignment_id"] if student_doc else None
+
+        assignment_doc = mongo.db.assignments.find_one(
+            {"_id": ObjectId(assignment_id)},
+            {"classroom_id": 1, "_id": 0}
+        )
+        classroom_id = assignment_doc["classroom_id"] if assignment_doc else None
+
+        #This will be used to allow teachers to return to the submissions management page for the assignment.
+
+        # Fetch the submission from the database by submission_id and student username
+        submission = TeacherViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
         
-        # Debugging logs
-        print(f"Trying to open file: {file_path}")
+        if not submission:
+            flash("Submission not found.", "danger")
+            return redirect(url_for('boundary.home'))  # Redirect if the submission is not found
 
-        # Check if the file exists
-        if os.path.exists(file_path):
-            mime_type, _ = mimetypes.guess_type(file_path)  # Detect file type
-            return send_file(file_path, mimetype=mime_type, as_attachment=False)
+        # Fetch the file content from the student's submission
+        file_data = Submission.get_submission_file(submission["file_id"])  # Correct method to get submission file
+        file_extension = submission["file_name"].split(".")[-1]  # Get file extension from student's submission file name
+        
+        # Handle different file types
+        if file_extension in ["pdf", "txt", "md"]:
+            file_base64 = base64.b64encode(file_data).decode("utf-8")
+            text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
+        else:
+            file_base64 = None
+            text_content = None
 
-        # If file is not found, show an error
-        flash("File not found!", "danger")
-        return redirect(request.referrer)
+        # Render the submission details page
+        return render_template(
+            "viewStudentSubmission.html",
+            submission=submission,
+            file_base64=file_base64,
+            text_content=text_content,
+            file_extension=file_extension,
+            classroom_id=classroom_id,
+            assignment_id=assignment_id
+        )
+    
+
+    @boundary.route('/download-submission/<submission_id>/<filename>' ,methods=['GET'])
+    def download_submitted_assignment(submission_id, filename):
+        """Allows a teacher to download a submitted assignment."""
+        if 'role' not in session or session.get('role') != 'Teacher':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+
+        # Check if the file exists in GridFS
+        fs = gridfs.GridFS(mongo.db)
+        file_data = fs.find_one({"file_name": filename})
+
+        if not file_data:
+            flash("File not found!", "danger")
+            return redirect(request.referrer)
+
+        # Send the file as an attachment
+        return send_file(
+            io.BytesIO(file_data.read()),
+            mimetype=mimetypes.guess_type(filename)[0],
+            as_attachment=True,
+            download_name=filename
+        )
     
     @boundary.route('/add_feedback/<submission_id>', methods=['POST'])
     def add_feedback(submission_id):
@@ -1709,6 +1772,8 @@ class TeacherAssignmentBoundary:
 
         flash(result["message"], category="success" if result["success"] else "danger")
         return redirect(request.referrer)
+    
+        
 
 
 
@@ -1966,8 +2031,8 @@ class StudentAssignmentBoundary:
             flash('An error occurred while submitting the assignment.', 'danger')
             return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
 
-    @boundary.route('/download_submission/<file_id>')
-    def download_submission(file_id):
+    @boundary.route('/student_download_submission/<file_id>')
+    def student_download_submission(file_id):
         """Serves the student's submitted file."""
         try:
             file = StudentSendSubmissionController.get_submission_file(file_id)
@@ -2183,4 +2248,11 @@ class MessageBoundary:
             flash("Failed to update message.", "danger")
         return redirect(request.referrer)
     
-       
+
+
+class NotificationBoundary:
+    @boundary.route('notifications', methods=['GET'])
+    def view_notifications():
+        notifications = mongo.db.notifications.find({"role": "Teacher"}).sort("created_at", -1)
+        return render_template('Viewnotifications.html', notifications=notifications)
+    

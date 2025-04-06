@@ -377,6 +377,11 @@ class StudentViewSubmissionController:
     @staticmethod
     def get_submission_by_student_and_id(student_username, submission_id):
         return Submission.get_submission_by_student_and_id(student_username, submission_id)
+
+class TeacherViewSubmissionController:
+    @staticmethod
+    def get_submission_by_student_and_id(student_username, submission_id):
+        return Submission.get_submission_by_student_and_id(student_username, submission_id)
     
 class StudentDeleteSubmissionController:
     @staticmethod

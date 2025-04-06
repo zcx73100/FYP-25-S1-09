@@ -23,7 +23,7 @@
             <td class="table-data">{{ submission.student }}</td>
             <td class="table-data">
                 {% if submission.file_name and submission.file_name != "Not Available" %}
-                    <a href="{{ url_for('boundary.view_submitted_assignment', filename=submission.file_name) }}" target="_blank" class="view-link">View</a>
+                    <a href="{{ url_for('boundary.view_submitted_assignment', filename=submission.file_name, submission_id=submission._id) }}" class="view-link">View</a>
                 {% else %}
                     Not Available
                 {% endif %}

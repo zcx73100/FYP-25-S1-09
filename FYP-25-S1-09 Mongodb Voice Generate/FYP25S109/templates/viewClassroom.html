@@ -62,6 +62,7 @@
                         <strong>{{ assignment.title }}</strong><br>
                         <span>📅 Due: {{ assignment.due_date }}</span>
                         <br>
+                    {% if session['role'] == 'Student' %}
                         <span style="font-weight: bold;">📌 Status: 
                             {% if assignment.status == 'Graded' %}
                                 <span style="color: green;">Graded</span>
@@ -73,6 +74,7 @@
                                 <span style="color: gray;">Not Submitted</span>
                             {% endif %}
                         </span>
+                    {% endif %}
                         <br>
                         <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name, classroom_id=classroom._id) }}" class="file-button">📄 View</a>
                     </li>

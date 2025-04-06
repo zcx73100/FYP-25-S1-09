@@ -11,7 +11,7 @@
 
             {% elif file_extension in ["doc", "docx", "ppt", "pptx"] %}
                 <p>DOCX/PPT files cannot be previewed. Please download the file.</p>
-                <a href="{{ url_for('boundary.download_submission', submission_id=submission_id) }}" 
+                <a href="{{ url_for('boundary.student_download_submission', submission_id=submission_id) }}" 
                    class="btn btn-primary" download>⬇️ Download File</a>
 
             {% elif file_extension in ["txt", "md"] %}
