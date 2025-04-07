@@ -1197,3 +1197,53 @@ class Message:
             return False
 
 
+class Notification:
+    @staticmethod
+    def get_notification_by_username(username):
+        # Get all notifications for a specific teacher (username)
+        return mongo.db.notifications.find({"username": username}).sort("timestamp", -1)
+
+    @staticmethod
+    def search_notification(search_query):
+        # Search for notifications by title or description
+        return mongo.db.notifications.find({
+            "$or": [
+                {"title": {"$regex": search_query, "$options": "i"}},
+                {"description": {"$regex": search_query, "$options": "i"}}
+            ]
+        }).sort("timestamp", -1)
+
+    @staticmethod
+    def insert_notification(username, classroom_id, title, description, priority):
+        # Insert a new notification into the database
+        mongo.db.notifications.insert_one({
+            "username": username,
+            "classroom_id": ObjectId(classroom_id),
+            "title": title.strip(),
+            "description": description.strip(),
+            "is_read": False,
+            "priority": int(priority),
+            "timestamp": datetime.now()
+        })
+
+    @staticmethod
+    def delete_notification(notification_id):
+        # Delete a notification by its ID
+        mongo.db.notifications.delete_one({"_id": ObjectId(notification_id)})
+    
+    @staticmethod
+    def get_notification_by_id(notification_id):
+        # Get a specific notification by its ID
+        return mongo.db.notifications.find_one({"_id": ObjectId(notification_id)})
+    @staticmethod
+    def update_notification(notification_id, title,description, priority):
+        # Update notification details
+        mongo.db.notifications.update_one(
+            {"_id": ObjectId(notification_id)},
+            {"$set": {
+                "title": title.strip(),
+                "description": description.strip(),
+                "priority": int(priority)
+            }}
+        )
+    

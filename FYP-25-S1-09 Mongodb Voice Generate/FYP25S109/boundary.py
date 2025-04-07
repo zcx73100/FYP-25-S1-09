@@ -12,6 +12,7 @@ import threading
 import time
 from datetime import timedelta,datetime
 from flask import Flask, send_file, Response
+from bson.regex import Regex
 from gradio_client import Client
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
@@ -1933,6 +1934,11 @@ class TeacherAnnouncementBoundary:
 
         flash("Announcement deleted successfully!", category='success')
         return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
+    
+    def get_announcements(classroom_id):
+        announcements = list(mongo.db.announcements.find({"classroom_id": ObjectId(classroom_id)}))
+        
+        return render_template("viewAnnouncements.html", announcements=announcements, classroom_id=classroom_id)
 
     
 class ViewAssignmentBoundary:
@@ -2251,18 +2257,67 @@ class MessageBoundary:
         return redirect(request.referrer)
     
 
-
 class NotificationBoundary:
-    @boundary.route('notifications', methods=['GET'])
+    @boundary.route('/notifications', methods=['GET'])
     def view_notifications():
-        notifications = mongo.db.notifications.find({"role": "Teacher"}).sort("created_at", -1)
-        return render_template('Viewnotifications.html', notifications=notifications)
-    @boundary.route('send_notification', methods=['GET'])
+        query = request.args.get('q', '').strip()
+        username = session.get('username')
+        role = session.get('role')
+
+        notifications = None
+
+        if role == "Teacher":
+            notifications = ViewNotificationsController.view_notifications(username)
+
+        if query:
+            notifications = SearchNotificationController.search_notification(query)
+
+        return render_template('viewNotifications.html', notifications=notifications)
+
+    @boundary.route('/send_notification', methods=['GET', 'POST'])
     def send_notification():
-        pass
-    @boundary.route('delete_notification', methods=['GET'])
-    def delete_notification():
-        pass
-    @boundary.route('edit_notification', methods=['GET'])
-    def edit_notification():
-        pass
+        if request.method == 'POST':
+            username = session.get('username')
+            title = request.form.get('title')
+            description = request.form.get('description')
+            priority = request.form.get('priority')
+            classroom_id = request.form.get('classroom_id')
+
+            if not title or not description:
+                flash("Title and description cannot be empty.", category='error')
+                return redirect(request.referrer)
+
+            # Call the insert_notification method from the Notification entity
+            Notification.insert_notification(username, classroom_id, title, description, priority)
+
+            flash("Notification sent successfully!", category='success')
+            return redirect(request.referrer)
+
+    @boundary.route('/delete_notification/<notification_id>', methods=['POST'])
+    def delete_notification(notification_id):
+        # Call the delete_notification method from the Notification entity
+        DeleteNotificationController.delete_notification(notification_id)
+
+        flash("Notification deleted successfully!", category='success')
+        return redirect(request.referrer)
+
+    @boundary.route('/edit_notification/<notification_id>', methods=['GET', 'POST'])
+    def edit_notification(notification_id):
+        notification = Notification.get_notification_by_id(notification_id)
+        
+        if request.method == 'POST':
+            title = request.form.get('title')
+            description = request.form.get('description')
+            priority = request.form.get('priority')
+
+            if not title or not description:
+                flash("Title and description cannot be empty.", category='error')
+                return redirect(request.referrer)
+
+            # Call the method to update the notification (you can add update method in Notification entity)
+            Notification.update_notification(notification_id, title, description, priority)
+
+            flash("Notification updated successfully!", category='success')
+            return redirect(request.referrer)
+
+        return render_template('editNotification.html', notification=notification)

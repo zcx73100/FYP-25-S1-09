@@ -453,3 +453,18 @@ class RetrieveMessageController:
     @staticmethod
     def get_all_messages(discussion_room_id):
         return Message.get_all_messages(discussion_room_id)
+    
+class ViewNotificationsController:
+    @staticmethod
+    def view_notifications(username):
+        return Notification.get_notification_by_username(username)
+
+class SearchNotificationController:
+    @staticmethod
+    def search_notification(search_query):
+        return Notification.search_notification(search_query)
+
+class DeleteNotificationController:
+    @staticmethod
+    def delete_notification(notification_id):
+        return Notification.delete_notification(notification_id)

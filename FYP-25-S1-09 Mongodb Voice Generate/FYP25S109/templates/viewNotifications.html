@@ -16,6 +16,41 @@
         {% endif %}
     {% endwith %}
 
+    <!-- ✍️ Toggle Create Notification (Teacher Only) -->
+    {% if session['role'] == 'Teacher' %}
+        <button class="btn btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#notificationForm" aria-expanded="false" aria-controls="notificationForm">
+            + Add Notification
+        </button>
+
+        <div class="collapse mb-5" id="notificationForm">
+            <div class="card card-body">
+                <h4 class="mb-3">Send Notification</h4>
+                <form action="{{ url_for('boundary.send_notification') }}" method="post">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Notification Title:</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description:</label>
+                        <textarea class="form-control" name="description" required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Priority (1 - Low, 2 - Medium, 3 - High):</label>
+                        <select class="form-select" name="priority" required>
+                            <option value="1">1 - Low</option>
+                            <option value="2">2 - Medium</option>
+                            <option value="3">3 - High</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Add Notification</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
     <!-- 🔍 Search Notifications -->
     <form method="get" action="{{ url_for('boundary.view_notifications') }}" class="mb-4">
         <div class="input-group">
@@ -30,16 +65,17 @@
             {% for notif in notifications %}
                 <li class="list-group-item d-flex justify-content-between align-items-start">
                     <div>
-                        <strong>{{ notif.title }}</strong><br>
+                        <strong>{{ notif.title }}</strong>
+                        <span class="badge bg-primary ms-2">Priority: {{ notif.priority }}</span><br>
                         <small>{{ notif.description }}</small>
                     </div>
 
                     {% if session['role'] == 'Teacher' %}
                         <!-- Edit Notification Button -->
-                        <a href="{{ url_for('boundary.edit_notification', id=notif.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                        <a href="{{ url_for('boundary.edit_notification', notification_id=notif._id|string) }}" class="btn btn-sm btn-warning">Edit</a>
                         
                         <!-- Delete Notification Form -->
-                        <form method="post" action="{{ url_for('boundary.delete_notification', id=notif.id) }}" class="d-inline">
+                        <form method="post" action="{{ url_for('boundary.delete_notification', notification_id=notif._id|string) }}" class="d-inline">
                             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                         </form>
                     {% endif %}
@@ -48,25 +84,6 @@
         </ul>
     {% else %}
         <p>No notifications found.</p>
-    {% endif %}
-
-    <!-- ✍️ Create Notification (Teacher Only) -->
-    {% if session['role'] == 'Teacher' %}
-        <h3 class="mt-5 mb-3">Send Notification</h3>
-        <!-- Add Notification Form -->
-        <form action="{{ url_for('boundary.send_notification') }}" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="title" class="form-label">Notification Title:</label>
-                <input type="text" class="form-control" name="title" required>
-            </div>
-
-            <div class="mb-3">
-                <label for="description" class="form-label">Description:</label>
-                <textarea class="form-control" name="description" required></textarea>
-            </div>
-
-            <button type="submit" class="btn btn-success">Add Notification</button> <!-- This is the "Add" button -->
-        </form>
     {% endif %}
 </div>
 {% endblock %}
