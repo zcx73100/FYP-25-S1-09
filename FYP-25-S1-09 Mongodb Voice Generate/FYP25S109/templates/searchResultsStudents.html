@@ -97,7 +97,7 @@
 {% endif %}
 
 <!-- Back to Classroom Button -->
-<form method="post" action="{{ url_for('boundary.view_classroom', classroom_name=classroom.classroom_name) }}">
+<form method="post" action="{{ url_for('boundary.view_classroom', classroom_id=classroom._id) }}">
     <button type="submit">Back to Classroom</button>
 </form>
 

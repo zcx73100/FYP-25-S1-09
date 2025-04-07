@@ -68,9 +68,12 @@
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_classrooms') }}">Manage Classrooms</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">Manage Notifications</a></li>
 
                                 {% elif session.get('role') == "Student" %}
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.get_list_of_classrooms')}}">View Classrooms</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">View Notifications</a></li>
                                 {% endif %}
 
                                 <li><hr class="dropdown-divider"></li>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+
 {% block content %}
 <h2>Manage Notifications</h2>
 
@@ -17,7 +18,10 @@
 
     <!-- 🔍 Search Notifications -->
     <form method="get" action="{{ url_for('boundary.view_notifications') }}" class="mb-4">
-        <input type="text" name="q" class="form-control" placeholder="Search notifications..." value="{{ request.args.get('q', '') }}">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search notifications..." value="{{ request.args.get('q', '') }}">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+        </div>
     </form>
 
     <!-- 📋 Notification List -->
@@ -29,8 +33,13 @@
                         <strong>{{ notif.title }}</strong><br>
                         <small>{{ notif.description }}</small>
                     </div>
-                    {% if session['role'] == 'teacher' %}
-                        <form method="post" action="{{ url_for('boundary.delete_notification', id=notif.id) }}">
+
+                    {% if session['role'] == 'Teacher' %}
+                        <!-- Edit Notification Button -->
+                        <a href="{{ url_for('boundary.edit_notification', id=notif.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                        
+                        <!-- Delete Notification Form -->
+                        <form method="post" action="{{ url_for('boundary.delete_notification', id=notif.id) }}" class="d-inline">
                             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                         </form>
                     {% endif %}
@@ -42,8 +51,9 @@
     {% endif %}
 
     <!-- ✍️ Create Notification (Teacher Only) -->
-    {% if session['role'] == 'teacher' %}
+    {% if session['role'] == 'Teacher' %}
         <h3 class="mt-5 mb-3">Send Notification</h3>
+        <!-- Add Notification Form -->
         <form action="{{ url_for('boundary.send_notification') }}" method="post" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="title" class="form-label">Notification Title:</label>
@@ -55,7 +65,7 @@
                 <textarea class="form-control" name="description" required></textarea>
             </div>
 
-            <button type="submit" class="btn btn-primary">Send Notification</button>
+            <button type="submit" class="btn btn-success">Add Notification</button> <!-- This is the "Add" button -->
         </form>
     {% endif %}
 </div>

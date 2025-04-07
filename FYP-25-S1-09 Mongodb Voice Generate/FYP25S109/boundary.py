@@ -10,6 +10,7 @@ import base64
 import mimetypes
 import threading
 import time
+from datetime import timedelta,datetime
 from flask import Flask, send_file, Response
 from gradio_client import Client
 from FYP25S109.controller import *
@@ -49,15 +50,6 @@ def retrieve_profile_picture(username):
         if isinstance(profile_pic_data, str):
             return profile_pic_data
     return None
-
-#This is a helper function to send automated notifications to users
-def send_notification(message):
-    # This is a placeholder function. You can implement your notification logic here.
-    print(f"Notification: {message}")
-
-
-
-
 
 # Homepage
 class HomePage:
@@ -1979,8 +1971,18 @@ class ViewAssignmentBoundary:
                             assignment=assignment,
                             student_submission=student_submission,
                             classroom_id= classroom_id)  # Pass submission data to template
-
-
+    
+#This function facilitates student to view the list of classrooms he/she is enrolled in.
+class StudentViewClassroomsBoundary:
+    @staticmethod
+    @boundary.route('/student/viewClassrooms', methods=['GET'])
+    def get_list_of_classrooms():
+        if 'role' not in session or session.get('role') != 'Student':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+        username = session.get('username')
+        classrooms = list(mongo.db.classroom.find({"student_list": username}))
+        return render_template("manageClassrooms.html", classrooms=classrooms)
 
 class StudentAssignmentBoundary:
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
@@ -2255,4 +2257,12 @@ class NotificationBoundary:
     def view_notifications():
         notifications = mongo.db.notifications.find({"role": "Teacher"}).sort("created_at", -1)
         return render_template('Viewnotifications.html', notifications=notifications)
-    
+    @boundary.route('send_notification', methods=['GET'])
+    def send_notification():
+        pass
+    @boundary.route('delete_notification', methods=['GET'])
+    def delete_notification():
+        pass
+    @boundary.route('edit_notification', methods=['GET'])
+    def edit_notification():
+        pass
