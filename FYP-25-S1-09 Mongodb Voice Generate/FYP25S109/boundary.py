@@ -64,7 +64,8 @@ class HomePage:
 
         admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
-        avatars = list(mongo.db.avatar.find({"username": {"$in": admin_users}}))
+
+        avatars = list(mongo.db.avatar.find({}))
 
         classrooms = []
         if role == "Teacher":
@@ -2270,3 +2271,48 @@ class NotificationBoundary:
             return redirect(request.referrer)
 
         return render_template('editNotification.html', notification=notification)
+    
+    @boundary.route('/get_notifications', methods=['GET'])
+    def get_notifications():
+        username = session.get('username')
+        if not username:
+            return jsonify([])
+
+        notifications = mongo.db.notifications.find({
+            "username": username,
+            "is_read": False
+        }).sort("timestamp", -1)
+
+        notif_list = [{
+            "title": n.get("title"),
+            "description": n.get("description"),
+            "priority": n.get("priority"),
+            "timestamp": n.get("timestamp").strftime("%Y-%m-%d %H:%M:%S")
+        } for n in notifications]
+
+        return jsonify(notif_list)
+
+    from flask import Blueprint, request, session, jsonify
+    from .entity import Notification
+
+    boundary = Blueprint('boundary', __name__)
+    
+@boundary.route('/get_notifications_count', methods=['GET'])
+def get_notifications_count():
+        username = session.get("username")
+        if not username:
+            return jsonify({"count": 0})
+        count = mongo.db.notifications.count_documents({"username": username, "is_read": False})
+        return jsonify({"count": count})
+
+@boundary.route("/mark_notifications_read", methods=["POST"])
+def mark_notifications_read():
+    username = session.get("username")
+    if username:
+        result = mongo.db.notifications.update_many(
+            {"username": username, "is_read": False},
+            {"$set": {"is_read": True}}
+        )
+        print(f"{result.modified_count} notifications marked as read.")
+        return jsonify({"status": "success"})
+    return jsonify({"status": "not_logged_in"}), 
