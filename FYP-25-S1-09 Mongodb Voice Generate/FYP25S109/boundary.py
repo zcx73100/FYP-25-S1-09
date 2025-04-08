@@ -64,8 +64,7 @@ class HomePage:
 
         admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
-
-        avatars = list(mongo.db.avatar.find({}))
+        avatars = list(mongo.db.avatar.find({"username": {"$in": admin_users}}))
 
         classrooms = []
         if role == "Teacher":
