@@ -12,7 +12,6 @@ import threading
 import time
 from datetime import timedelta,datetime
 from flask import Flask, send_file, Response
-from bson.regex import Regex
 from gradio_client import Client
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
@@ -27,8 +26,6 @@ os.makedirs(ASSIGNMENT_UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
 
 YOUR_DOMAIN = "http://localhost:5000"
-API_URL = "https://vinthony-sadtalker.hf.space/"
-client = Client(API_URL)
 
 GENERATE_FOLDER_AUDIOS = 'FYP25S109/static/generated_audios'
 GENERATE_FOLDER_VIDEOS = 'FYP25S109/static/generated_videos'
@@ -123,9 +120,6 @@ class HomePage:
         )
 
 # Generate Video
-"""
-video_progress = {}
-
 @boundary.route("/generate_voice", methods=["POST"])
 def generate_voice():
     try:
@@ -133,247 +127,137 @@ def generate_voice():
         text = data.get("text")
 
         if not text:
-            print("❌ Error: No text received!")
             return jsonify({"success": False, "error": "Text is required"}), 400
 
-        print(f"📝 Received text for voice generation: {text}")
-
-        # ✅ Generate voice
         voice_entity = GenerateVideoEntity(text)
         audio_url = voice_entity.generate_voice()
 
-        # ✅ Debugging: Ensure file exists
-        audio_filename = os.path.basename(audio_url)
-        audio_path = os.path.join("FYP25S109", "static", "generated_audios", audio_filename)
-        print(f"🔍 Checking if audio file exists: {audio_path}")
+        if not audio_url:
+            return jsonify({"success": False, "error": "Voice generation failed"}), 500
 
-        if not os.path.exists(audio_path):
-            print(f"❌ ERROR: Audio file was NOT saved at {audio_path}")
-            return jsonify({"success": False, "error": "Failed to save audio file"}), 500
-
-        print(f"✅ Audio file saved successfully: {audio_path}")
         return jsonify({"success": True, "audio_url": audio_url})
 
     except Exception as e:
-        print(f"❌ Server error: {e}")
-        return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
+        return jsonify({"success": False, "error": repr(e)}), 500
+
+# Generate Talking Video
+@boundary.route("/status")
+def proxy_status():
+    return requests.get("http://127.0.0.1:7860/status").json()
+
+@boundary.route("/progress")
+def proxy_progress():
+    try:
+        response = requests.get("http://127.0.0.1:7860/progress")
+        response.raise_for_status()  # 🚨 force error for non-200s
+        return jsonify(response.json())
+    except Exception as e:
+        print(f"Progress fetch failed: {e}")  # ✅ useful log
+        return jsonify({"progress": 0, "error": str(e)})
 
 @boundary.route("/generate_video", methods=["GET", "POST"])
 def generate_video():
     try:
+        username = session.get("username")
+        role = session.get("role")
+        if not username:
+            return redirect(url_for("login"))
+
         if request.method == "GET":
-            print("📄 GET request received → Loading generate video page...")
-            avatars = list(mongo.db.avatar.find({}, {"_id": 0, "file_path": 1, "avatarname": 1}))
-            return render_template("generateVideo.html", avatars=avatars)  # Load the page
+            classroom_id = request.args.get("classroom_id")
+            assignment_id = request.args.get("assignment_id")  # ✅ Add this line
+            source = request.args.get("source")
 
-        elif request.method == "POST":
-            print("📥 POST request received → Generating video...")
-            data = request.get_json()
+            if role == "Teacher" and source == "assignment" and not classroom_id:
+                flash("Missing classroom context for assignment video.", "danger")
+                return redirect(url_for("boundary.home"))
 
-            if not data:
-                print("❌ Error: No data received!")
-                return jsonify({"success": False, "error": "No data received"}), 400
+            avatars = list(mongo.db.avatar.find(
+                {"username": username},
+                {"_id": 0, "file_path": 1, "avatarname": 1}
+            ))
 
-            print(f"🔹 Request Data: {data}")
+            return render_template(
+                "generateVideo.html",
+                avatars=avatars,
+                classroom_id=classroom_id if source == "assignment" else None,
+                assignment_id=assignment_id if assignment_id else None,  # ✅ only pass if provided
+                source=source
+            )
 
-            text = data.get("text")
-            avatar_path = os.path.join("FYP25S109/static", data.get("selected_avatar")).replace("\\", "/")
-            audio_path = os.path.join("FYP25S109", data.get("audio_path").lstrip("/")).replace("\\", "/")
+        # POST — handle video generation request
+        text = request.form.get("text")
+        avatar_path = request.form.get("avatar_path")
+        audio_path = request.form.get("audio_path")
 
-            if not text or not avatar_path or not audio_path:
-                print("❌ Missing required parameters!")
-                return jsonify({"success": False, "error": "Text, avatar, and audio are required!"}), 400
+        print("📥 Incoming POST /generate_video:")
+        print("Text:", text)
+        print("Avatar Path:", avatar_path)
+        print("Audio Path:", audio_path)
 
-            print(f"🖼️ Avatar URL: {avatar_path}")
-            print(f"🔊 Audio URL: {audio_path}")
+        if not all([text, avatar_path, audio_path]):
+            return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-            # ✅ Call the entity to generate video
-            video_entity = GenerateVideoEntity(text, avatar_path)
-            video_url = video_entity.generate_video()  # No need to pass audio_path here
+        # Rebuild absolute file paths
+        avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
+        audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
 
-            if not video_url:
-                print("❌ Video generation failed!")
-                return jsonify({"success": False, "error": "Failed to generate video"}), 500
+        if not os.path.exists(avatar_path):
+            return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
+        if not os.path.exists(audio_path):
+            return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
 
-            print(f"✅ Video generated: {video_url}")
-            return jsonify({"success": True, "video_url": video_url})
+        # 🎬 Generate the video
+        entity = GenerateVideoEntity(text, avatar_path, audio_path)
+        video_url = entity.generate_video()
+
+        if not video_url:
+            return jsonify({"success": False, "error": "Video generation failed"}), 500
+
+        return jsonify({"success": True, "video_url": video_url})
 
     except Exception as e:
-        print(f"❌ Server error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        print(f"❌ Error in /generate_video route: {str(e)}")
+        return jsonify({"success": False, "error": repr(e)}), 500
 
 
-
-def process_video(video_id, text, avatar_path, audio_path):
+# Save Video
+@boundary.route("/save_generated_video", methods=["POST"])
+def save_generated_video():
     try:
-        for i in range(0, 101, 10):
-            video_progress[video_id] = i
-            time.sleep(3)  # Simulate processing time
+        username = session.get("username")
+        user = mongo.db.useraccount.find_one({"username": username})
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
 
-        print(f"🎬 Sending request to SadTalker API with Avatar: {avatar_path} and Audio: {audio_path}")
-        result = client.predict(avatar_path, audio_path, "crop", True, True, 0, "256", 0, fn_index=0)
+        # 🧠 Ensure role is treated case-insensitively
+        if user["role"].lower() not in ["teacher", "student"]:
+            return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
 
-        if not result:
-            print("❌ SadTalker API failed to return a video URL!")
-            video_progress[video_id] = -1
-            return None  # Return None on failure
+        data = request.json
+        text = data.get("text")
+        video_url = data.get("video_url")
+        audio_url = data.get("audio_url")
 
-        # ✅ Extract video path and update progress
-        video_filename = os.path.basename(result)
-        video_path = f"/static/generated_videos/{video_filename}"
-        video_progress[video_id] = 100
-        print(f"✅ Video Processing Complete: {video_path}")
-        return video_path  
+        if not all([text, video_url, audio_url]):
+            return jsonify({"success": False, "error": "Missing fields"}), 400
+
+        # ✅ Save to 'video' collection
+        mongo.db.video.insert_one({
+            "username": username,
+            "role": user["role"].lower(),
+            "text": text,
+            "video_url": video_url,
+            "audio_url": audio_url,
+            "created_at": datetime.now()
+        })
+
+        return jsonify({"success": True, "message": "Video saved successfully."})
 
     except Exception as e:
-        print(f"❌ Error in video processing: {e}")
-        video_progress[video_id] = -1
-        return None
-
-
-@boundary.route("/video_status", methods=["GET"])
-def video_status():
-    video_id = request.args.get("video_id")
-
-    if video_id not in video_progress:
-        return jsonify({"success": False, "error": "Invalid video ID"}), 400
-
-    progress = video_progress[video_id]
-
-    # Handle errors if video processing failed
-    if progress == -1:
-        return jsonify({"success": False, "error": "Video processing failed!"}), 500
-
-    time_left = (100 - progress) // 10 * 3
-
-    return jsonify({"success": True, "progress": progress, "time_left": time_left})
-"""
-
-class GenerateVideoBoundary:
-    # Generate Video Local
-    @boundary.route("/generate_voice", methods=["POST"])
-    def generate_voice():
-        try:
-            data = request.get_json()
-            text = data.get("text")
-
-            if not text:
-                return jsonify({"success": False, "error": "Text is required"}), 400
-
-            voice_entity = GenerateVideoEntity(text)
-            audio_url = voice_entity.generate_voice()
-
-            if not audio_url:
-                return jsonify({"success": False, "error": "Voice generation failed"}), 500
-
-            return jsonify({"success": True, "audio_url": audio_url})
-
-        except Exception as e:
-            return jsonify({"success": False, "error": repr(e)}), 500
-
-    # Generate Talking Video
-    @boundary.route("/status")
-    def proxy_status():
-        return requests.get("http://127.0.0.1:7860/status").json()
-
-    @boundary.route("/progress")
-    def proxy_progress():
-        try:
-            response = requests.get("http://127.0.0.1:7860/progress")
-            response.raise_for_status()  # 🚨 force error for non-200s
-            return jsonify(response.json())
-        except Exception as e:
-            print(f"Progress fetch failed: {e}")  # ✅ useful log
-            return jsonify({"progress": 0, "error": str(e)})
-
-    @boundary.route("/generate_video", methods=["GET", "POST"])
-    def generate_video():
-        try:
-            username = session.get("username")
-            if not username:
-                return redirect(url_for("login"))
-
-            if request.method == "GET":
-                # 🧠 Fetch avatars only uploaded by current user_info
-                avatars = list(mongo.db.avatar.find(
-                    {"username": username},
-                    {"_id": 0, "avatarname": 1, "image_data": 1}  # Include image data!
-                ))
-                return render_template("generateVideo.html", avatars=avatars)
-
-            # POST — handle video generation request
-            text = request.form.get("text")
-            avatar_path = request.form.get("avatar_path")
-            audio_path = request.form.get("audio_path")
-
-            print("📥 Incoming POST /generate_video:")
-            print("Text:", text)
-            print("Avatar Path:", avatar_path)
-            print("Audio Path:", audio_path)
-
-            if not all([text, avatar_path, audio_path]):
-                return jsonify({"success": False, "error": "Missing required parameters"}), 400
-
-            # Rebuild absolute file paths
-            avatar_path = os.path.join("FYP25S109", avatar_path.replace("/static/", "static/"))
-            audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
-
-            if not os.path.exists(avatar_path):
-                return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
-            if not os.path.exists(audio_path):
-                return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
-
-            # Generate the video
-            entity = GenerateVideoEntity(text, avatar_path, audio_path)
-            video_url = entity.generate_video()
-
-            if not video_url:
-                return jsonify({"success": False, "error": "Video generation failed"}), 500
-
-            return jsonify({"success": True, "video_url": video_url})
-
-        except Exception as e:
-            print(f"❌ Error in /generate_video route: {str(e)}")
-            return jsonify({"success": False, "error": repr(e)}), 500
-
-    # Save Video
-    @boundary.route("/save_generated_video", methods=["POST"])
-    def save_generated_video():
-        try:
-            username = session.get("username")
-            user_info = mongo.db.useraccount.find_one({"username": username})
-            if not user_info:
-                return jsonify({"success": False, "error": "User not found"}), 404
-
-            # 🧠 Ensure role is treated case-insensitively
-            if user_info["role"].lower() not in ["teacher", "student"]:
-                return jsonify({"success": False, "error": "Only teachers and students can save videos."}), 403
-
-            data = request.json
-            text = data.get("text")
-            video_url = data.get("video_url")
-            audio_url = data.get("audio_url")
-
-            if not all([text, video_url, audio_url]):
-                return jsonify({"success": False, "error": "Missing fields"}), 400
-
-            # ✅ Save to 'video' collection
-            mongo.db.video.insert_one({
-                "username": username,
-                "role": user_info["role"].lower(),
-                "text": text,
-                "video_url": video_url,
-                "audio_url": audio_url,
-                "created_at": datetime.now()
-            })
-
-            return jsonify({"success": True, "message": "Video saved successfully."})
-
-        except Exception as e:
-            logging.error(f"❌ Error saving video: {str(e)}")
-            return jsonify({"success": False, "error": str(e)}), 500
-
-
+        logging.error(f"❌ Error saving video: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 # Log In
 class LoginBoundary:
     @staticmethod
@@ -410,7 +294,8 @@ class LoginBoundary:
                 flash('Username does not exist.', category='error')
 
         return render_template("login.html")
-    
+
+# Profile Pic    
 @boundary.route('/profile_pic/<username>')
 def get_profile_pic(username):
     profile_pic = retrieve_profile_picture(username)
@@ -441,38 +326,63 @@ class CreateAccountBoundary:
             date_of_birth = request.form.get('date_of_birth')
             password1 = request.form.get('password1')
             password2 = request.form.get('password2')
-            role = request.form.get('role', 'User')  # Default to 'User' if not specified
-            profile_pic = request.files.get('profile_pic')  # Get uploaded file
+            role = request.form.get('role')  # ✅ capture selected role
+            profile_pic = request.files.get('profile_pic')
+            profile_pic_path = ""
 
-            # Validate password
+            # ✅ Default role if not submitted (e.g. from student self-registration)
+            if not role:
+                if session.get('role') == 'Teacher':
+                    role = 'Student'
+                else:
+                    role = 'User'
+
+            # ✅ Validation
+            if mongo.db.useraccount.find_one({"username": username}):
+                flash('Username already taken.', 'error')
+                return redirect(url_for('boundary.sign_up'))
+            if mongo.db.useraccount.find_one({"email": email}):
+                flash('Email already registered.', 'error')
+                return redirect(url_for('boundary.sign_up'))
             if password1 != password2:
-                flash('Passwords do not match.', category='error')
-                return render_template("createAccount.html")
+                flash('Passwords do not match.', 'error')
+                return redirect(url_for('boundary.sign_up'))
             if len(password1) < 7:
-                flash('Password must be at least 7 characters.', category='error')
-                return render_template("createAccount.html")
+                flash('Password must be at least 7 characters.', 'error')
+                return redirect(url_for('boundary.sign_up'))
 
-            # Prepare data for Controller
-            user_data = {
-                "username": username,
-                "password": password1,
-                "name": name,
-                "surname": surname,
-                "email": email,
-                "date_of_birth": date_of_birth,
-                "role": role,
-                "profile_pic": profile_pic
-            }
+            # ✅ Save profile picture if uploaded
+            if profile_pic and profile_pic.filename != "":
+                filename = secure_filename(f"{username}_{profile_pic.filename}")
+                profile_pic_path = os.path.join("uploads/profile_pics", filename)
+                abs_path = os.path.join("FYP25S109/static", profile_pic_path)
+                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+                profile_pic.save(abs_path)
 
-            # Call Controller
-            if CreateUserAccController.register_user(user_data):
-                flash('Account created successfully!', category='success')
-                return redirect(url_for('boundary.login'))  # Redirect to login page
-            else:
-                flash('Failed to create account. Username might be taken.', category='error')
+            try:
+                dob_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
+                hashed_pw = generate_password_hash(password1)
 
-        return render_template("createAccount.html")
+                mongo.db.useraccount.insert_one({
+                    "username": username,
+                    "password": hashed_pw,
+                    "email": email,
+                    "name": name,
+                    "surname": surname,
+                    "date_of_birth": dob_obj.strftime('%Y-%m-%d'),
+                    "role": role,
+                    "status": "active",
+                    "profile_pic": profile_pic_path
+                })
 
+                flash(f'Account created successfully with role: {role}', 'success')
+                return redirect(url_for('boundary.login'))
+
+            except Exception as e:
+                flash(f"Error creating account: {str(e)}", "error")
+
+        is_admin = session.get("role") == "Admin"
+        return render_template("createAccount.html", is_admin=is_admin)
 
 # User Account Details
 class AccountDetailsBoundary:
@@ -539,7 +449,6 @@ class UpdateAccountBoundary:
 
         return render_template("updateAccDetail.html", user_info=user_info)
 
-
 # Update Password
 class UpdatePasswordBoundary:
     @staticmethod
@@ -590,7 +499,7 @@ class UpdatePasswordBoundary:
         # 🔥 FIX: Pass user_info to template
         return render_template("updatePassword.html", user_info=user_info)
 
-
+# Reset Password
 class ResetPasswordBoundary:
     @staticmethod
     @boundary.route('/resetPassword', methods=['GET', 'POST'])
@@ -607,7 +516,6 @@ class ResetPasswordBoundary:
                 flash("Failed to reset password. Ensure the username exists.", category="error")
             return redirect(url_for("boundary.reset_password"))
         return render_template("resetPassword.html")
-
 
 # Search     
 class SearchBoundary:
@@ -641,52 +549,6 @@ class SearchBoundary:
 
 
 # -------------------------------------------------------------ADMIN-----------------------------------------------
-# Admin Create Account
-class CreateAccountAdminBoundary:
-    @staticmethod
-    @boundary.route('/createAccountAdmin', methods=['GET', 'POST'])
-    def create_account_admin():
-        if session.get("role") != "Admin":
-            flash("Unauthorized access! Only admins can create users.", category="error")
-            return redirect(url_for("boundary.home"))
-        if request.method == 'POST':
-            username = request.form.get('username')
-            email = request.form.get('email')
-            name = request.form.get('name')
-            surname = request.form.get('surname')
-            date_of_birth = request.form.get('date_of_birth')
-            password1 = request.form.get('password1')
-            password2 = request.form.get('password2')
-            role = request.form.get('role')
-            if password1 != password2:
-                flash("Passwords do not match.", category="error")
-                return redirect(url_for("boundary.create_account_admin"))
-            valid_roles = ["Admin", "Teacher", "Student"]
-            if role not in valid_roles:
-                flash("Invalid role selection.", category="error")
-                return redirect(url_for("boundary.create_account_admin"))
-            hashed_password = generate_password_hash(password1, method='pbkdf2:sha256')
-            try:
-                date_of_birth_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
-                formatted_date_of_birth = date_of_birth_obj.strftime('%Y-%m-%d')
-                mongo.db.useraccount.insert_one({
-                    "username": username,
-                    "password": hashed_password,
-                    "email": email,
-                    "role": role,
-                    "name": name,
-                    "surname": surname,
-                    "date_of_birth": formatted_date_of_birth,
-                    "status": "active"
-                })
-                flash(f"Account created successfully! Assigned Role: {role}", category="success")
-                return redirect(url_for("boundary.home"))
-            except ValueError:
-                flash("Invalid date format. Use YYYY-MM-DD.", category="error")
-                return redirect(url_for("boundary.create_account_admin"))
-        return render_template("createAccountAdmin.html")
-
-
 # Admin Confirm Teacher
 class ConfirmTeacherBoundary:
     @staticmethod
@@ -885,7 +747,8 @@ class AddAvatarBoundary:
             return redirect(url_for('boundary.create_avatar'))
 
         return render_template("admin_add_avatar.html")
-    
+
+# Delete Avatar    
 class DeleteAvatarBoundary:
     @staticmethod
     @boundary.route('/admin_delete_avatar/<avatar_id>', methods=['POST'])
@@ -1020,6 +883,7 @@ class TeacherManageClassroomsBoundary:
         classrooms = list(mongo.db.classroom.find({"teacher": username}))
         return render_template("manageClassrooms.html", classrooms=classrooms)
 
+# Add Classroom
 class TeacherAddClassroomBoundary:
     @staticmethod
     @boundary.route('/teacher/addClassroom', methods=['GET', 'POST'])
@@ -1049,6 +913,7 @@ class TeacherAddClassroomBoundary:
 
         return render_template("addClassroom.html")
 
+# View Classroom
 class ViewClassRoomBoundary:
     @staticmethod
     @boundary.route('/viewClassroom/<classroom_id>', methods=['GET', 'POST'])
@@ -1057,59 +922,42 @@ class ViewClassRoomBoundary:
             flash("Unauthorized access.", category='error')
             return redirect(url_for('boundary.home'))
 
+        # Fetch the classroom details
         classroom = mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)})
         if not classroom:
             flash("Classroom not found.", category='error')
             return redirect(url_for('boundary.manage_classrooms'))
 
-        username = session.get('username', '').strip()
-        role = session.get('role')
-
-        if role == 'Student':
-            student_list = [s.strip() for s in classroom.get('student_list', [])]
-            if username not in student_list:
+        # Role-based access control
+        username = session.get('username')
+        if session.get('role') == 'Student':
+            student_list = classroom.get('student_list', [])
+            if username.strip() not in [s.strip() for s in student_list]:
                 flash("You are not enrolled in this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
 
-        elif role == 'Teacher':
-            if username != classroom.get('teacher', '').strip():
+        elif session.get('role') == 'Teacher':
+            if username.strip() != classroom.get('teacher', '').strip():
                 flash("You are not the teacher of this classroom.", category='error')
                 return redirect(url_for('boundary.home'))
-
+        # Fetch classroom data
         materials = list(mongo.db.materials.find({"classroom_id": ObjectId(classroom_id)}))
         assignments = list(mongo.db.assignments.find({"classroom_id": ObjectId(classroom_id)}))
         quizzes = list(mongo.db.quizzes.find({"classroom_id": ObjectId(classroom_id)}))
+
+        # ✅ Fetch announcements for this classroom
         announcements = list(mongo.db.announcements.find(
             {"classroom_id": ObjectId(classroom_id)},
             {"_id": 0, "title": 1, "content": 1, "created_at": 1}
-        ).sort("created_at", -1))
+        ))
 
-        current_time = datetime.now()
-
+        # Convert due_date to readable format
         for assignment in assignments:
-            due_dt = None
-            if assignment.get("due_date"):
+            if "due_date" in assignment and assignment["due_date"]:
                 try:
-                    due_dt = datetime.strptime(assignment["due_date"], "%Y-%m-%dT%H:%M")
+                    assignment["due_date"] = datetime.strptime(assignment["due_date"], "%Y-%m-%dT%H:%M").strftime("%d %b %Y, %I:%M %p")
                 except ValueError:
-                    due_dt = None
-
-            assignment["due_date_obj"] = due_dt
-            assignment["due_date"] = due_dt.strftime("%d %b %Y, %I:%M %p") if due_dt else "Not specified"
-            assignment["status"] = "Not Submitted"
-
-            if role == 'Student':
-                submission = mongo.db.submissions.find_one({
-                    "assignment_id": ObjectId(assignment["_id"]),
-                    "student": username
-                })
-
-                if submission:
-                    assignment["status"] = "Graded" if submission.get("grade") is not None else "Submitted"
-                elif due_dt and current_time > due_dt:
-                    assignment["status"] = "Overdue"
-
-        assignments.sort(key=lambda a: a.get("due_date_obj") or datetime.max)
+                    pass  # Keep as-is if conversion fails
 
         return render_template(
             "viewClassroom.html",
@@ -1117,11 +965,11 @@ class ViewClassRoomBoundary:
             materials=materials,
             assignments=assignments,
             quizzes=quizzes,
-            announcements=announcements,
-            current_time=current_time
+            announcements=announcements
         )
 
 
+# Delete Classroom
 class TeacherDeleteClassroomBoundary:
     @staticmethod
     @boundary.route('/teacher/deleteClassroom/<classroom_id>', methods=['POST'])
@@ -1173,6 +1021,7 @@ class TeacherUpdateClassroomBoundary:
 
         return render_template("updateClassroom.html", classroom=classroom)
 
+# Search Classroom
 class TeacherSearchClassroomBoundary:
     @staticmethod
     @boundary.route('/teacher/searchClassroom', methods=['GET', 'POST'])
@@ -1182,6 +1031,7 @@ class TeacherSearchClassroomBoundary:
 
         return render_template("ClassroomSearchResult.html", classrooms=classrooms, query=query)
 
+# Manage Student
 class TeacherManageStudentsBoundary:
     @staticmethod
     @boundary.route('/teacher/manageStudents/<classroom_id>', methods=['GET', 'POST'])
@@ -1343,8 +1193,7 @@ class TeacherManageStudentsBoundary:
             query=query
         )
 
-
-#---------------------------------------------------------------------------------------
+# Manage Material
 class TeacherManageMaterialBoundary:
     @boundary.route('/upload_material', methods=['POST'])
     def upload_material():
@@ -1451,9 +1300,7 @@ class TeacherManageMaterialBoundary:
             flash(f"Error downloading file: {str(e)}", "danger")
             return redirect(url_for("boundary.home"))
 
-        
-
-#---------------------------------------------------------------------------------------
+# View Quiz        
 class TeacherViewQuizBoundary:
     @boundary.route('/teacher/view_quiz/<quiz_id>', methods=['GET'])
     def view_quiz(quiz_id):
@@ -1468,7 +1315,8 @@ class TeacherViewQuizBoundary:
             return redirect(url_for('boundary.manage_quizzes'))
 
         return render_template("viewQuiz.html", quiz=quiz)
-            
+
+# View User Detail            
 class ViewUserDetailsBoundary:
     @staticmethod
     @boundary.route('/userDetails/<username>', methods=['GET'])
@@ -1489,12 +1337,14 @@ class ViewUserDetailsBoundary:
         return render_template("userDetails.html", user_info=user_info)
     
 
-
 # ------------------------------------------------------------------------------------------------------- Upload Assignment
 class TeacherAssignmentBoundary:
-    @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['GET'])
-    def upload_assignment_page(classroom_id):
-        return render_template("uploadAssignment.html", classroom_id=classroom_id)
+    @boundary.route("/upload_assignment", methods=["GET"])
+    def upload_assignment_form():
+        classroom_id = request.args.get("classroom_id")
+        video_url = session.get("stashed_video_url")  
+
+        return render_template("uploadAssignment.html", classroom_id=classroom_id, video_url=video_url)
 
     @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['POST'])
     def upload_assignment(classroom_id):
@@ -1503,19 +1353,48 @@ class TeacherAssignmentBoundary:
         deadline = request.form.get('deadline')
         file = request.files.get('file')
 
+        video_url = session.pop('stashed_video_url', None) 
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)  # Secure the filename
+            filename = secure_filename(file.filename)
 
-            # Call controller to upload directly to MongoDB
             result = UploadAssignmentController.upload_assignment(
-                title, ObjectId(classroom_id), description, deadline, file, filename
+                title, ObjectId(classroom_id), description, deadline, file, filename, video_url
             )
-            
-            flash(result['message'], 'success' if result['success'] else 'danger')
-            return redirect(request.url)
+
+            if result['success']:
+                flash(result['message'], 'success')
+                new_assignment_id = str(result['assignment_id'])
+                return redirect(url_for('boundary.generate_video', classroom_id=classroom_id, source='assignment', assignment_id=new_assignment_id))
+            else:
+                flash(result['message'], 'danger')
+                return redirect(request.url)
         else:
             flash('Invalid file type!', 'danger')
             return redirect(request.url)
+
+    
+       
+    @boundary.route('/publish_assignment_video', methods=['POST'])
+    def publish_assignment_video():
+        video_url = request.form.get("video_url")
+        classroom_id = request.form.get("classroom_id")
+
+        # ✅ Optional: Validate user role
+        if session.get("role") != "Teacher":
+            flash("Only teachers can publish assignment videos.", "danger")
+            return redirect(url_for("boundary.home"))
+
+        # 🛑 Safety check: Ensure required fields are present
+        if not video_url or not classroom_id:
+            flash("Missing video or classroom context.", "danger")
+            return redirect(url_for("boundary.home"))
+
+        # 💾 Stash the video path in session (used in next route)
+        session["stashed_video_url"] = video_url
+        print("🎬 [DEBUG] Stashed video_url in session:", video_url)
+
+        # 🔁 Redirect to upload page where the video will be linked to assignment
+        return redirect(url_for("boundary.upload_assignment_form", classroom_id=classroom_id)) 
 
 
     @staticmethod
@@ -1765,11 +1644,8 @@ class TeacherAssignmentBoundary:
 
         flash(result["message"], category="success" if result["success"] else "danger")
         return redirect(request.referrer)
-    
-        
 
-
-
+# Manage Quiz
 class TeacherManageQuizBoundary:
     UPLOAD_FOLDER_QUIZ = 'FYP25S109/static/uploads/quiz/'
 
@@ -1934,29 +1810,28 @@ class TeacherAnnouncementBoundary:
 
         flash("Announcement deleted successfully!", category='success')
         return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
-    
-    def get_announcements(classroom_id):
-        announcements = list(mongo.db.announcements.find({"classroom_id": ObjectId(classroom_id)}))
-        
-        return render_template("viewAnnouncements.html", announcements=announcements, classroom_id=classroom_id)
 
     
 class ViewAssignmentBoundary:
     @boundary.route('/view_assignment/<assignment_id>')
     def view_assignment(assignment_id):
-        # Retrieve assignment details
         assignment = Assignment.get_assignment(assignment_id)
+
         if not assignment:
             flash("Assignment not found!", "danger")
             return redirect(url_for("boundary.home"))
 
-        # Get file content
+        # ✅ Ensure due_date is datetime
+        if isinstance(assignment["due_date"], str):
+            try:
+                assignment["due_date"] = datetime.fromisoformat(assignment["due_date"])
+            except ValueError:
+                pass
+
+        # ✅ Get file content
         file_data = Assignment.get_assignment_file(assignment["file_id"])
         file_extension = assignment["file_name"].split(".")[-1]
-        classroom_id = assignment.get("classroom_id") if assignment else None
 
-
-        # Convert to Base64 (for PDFs and text)
         if file_extension in ["pdf", "txt", "md"]:
             file_base64 = base64.b64encode(file_data).decode("utf-8")
             text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
@@ -1964,19 +1839,32 @@ class ViewAssignmentBoundary:
             file_base64 = None
             text_content = None
 
-        # Check if student has already submitted the assignment
-        student_username = session.get('username')  # Get the logged-in student's username
-        student_submission = Submission.get_submission_by_student_and_assignment(student_username, assignment_id)
+        # ✅ Determine current session user
+        username = session.get('username')
+        role = session.get('role')
 
-        # Pass the necessary data to the template
+        # ✅ Fetch classroom for enrolled students + teacher
+        classroom = mongo.db.classroom.find_one({"_id": assignment.get("classroom_id")})
+        enrolled_students = classroom.get("student_list", []) if classroom else []
+        teacher_username = classroom.get("teacher") if classroom else None
+
+        # ✅ Attach to assignment for Jinja access
+        assignment["teacher_username"] = teacher_username
+
+        # ✅ Get student submission if student
+        student_submission = None
+        if role == "Student":
+            student_submission = Submission.get_submission_by_student_and_assignment(username, assignment_id)
+
         return render_template("viewAssignment.html",
-                            filename=assignment["file_name"],
-                            file_extension=file_extension,
-                            file_base64=file_base64,
-                            text_content=text_content,
-                            assignment=assignment,
-                            student_submission=student_submission,
-                            classroom_id= classroom_id)  # Pass submission data to template
+                               assignment=assignment,
+                               filename=assignment["file_name"],
+                               file_extension=file_extension,
+                               file_base64=file_base64,
+                               text_content=text_content,
+                               student_submission=student_submission,
+                               enrolled_students=enrolled_students) 
+
     
 #This function facilitates student to view the list of classrooms he/she is enrolled in.
 class StudentViewClassroomsBoundary:
@@ -1990,6 +1878,8 @@ class StudentViewClassroomsBoundary:
         classrooms = list(mongo.db.classroom.find({"student_list": username}))
         return render_template("manageClassrooms.html", classrooms=classrooms)
 
+
+# Student Assignment
 class StudentAssignmentBoundary:
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 
@@ -2057,6 +1947,7 @@ class StudentAssignmentBoundary:
             logging.error(f"Error in download_submission: {str(e)}")
             flash("An error occurred while downloading the file.", "danger")
             return redirect(request.referrer)
+    
     @boundary.route('student/view_submission/<submission_id>', methods=['GET'])
     def student_view_submission(submission_id):
         """Allows a student to view their own submission."""
@@ -2064,41 +1955,86 @@ class StudentAssignmentBoundary:
         
         if not student_username:
             flash("You need to be logged in to view your submission.", "danger")
-            return redirect(url_for('boundary.login'))  # Redirect to login page if not logged in
+            return redirect(url_for('boundary.login'))
 
-        # Fetch the submission from the database by submission_id and student username
+        # Fetch the submission from the database
         submission = StudentViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
-        
+
         if not submission:
             flash("Submission not found.", "danger")
-            return redirect(url_for('boundary.home'))  # Redirect if the submission is not found
+            return redirect(url_for('boundary.home'))
 
-        # Fetch the file content from the student's submission
-        file_data = Submission.get_submission_file(submission["file_id"])  # Correct method to get submission file
-        file_extension = submission["file_name"].split(".")[-1]  # Get file extension from student's submission file name
-        
-        # Handle different file types
-        if file_extension in ["pdf", "txt", "md"]:
-            file_base64 = base64.b64encode(file_data).decode("utf-8")
-            text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
-        else:
-            file_base64 = None
-            text_content = None
+        file_name = submission.get("file_name")
+        file_id = submission.get("file_id")
+        video_url = submission.get("video_url")
 
-        # Render the submission details page
+        file_extension = file_name.split(".")[-1].lower() if file_name else None
+        file_base64 = None
+        text_content = None
+
+        # Handle file preview only if there's a file
+        if file_id and file_extension:
+            try:
+                file_data = Submission.get_submission_file(file_id)
+                if file_extension in ["pdf", "txt", "md"]:
+                    file_base64 = base64.b64encode(file_data).decode("utf-8")
+                    if file_extension in ["txt", "md"]:
+                        text_content = file_data.decode("utf-8")
+            except Exception as e:
+                logging.error(f"Error reading submission file: {e}")
+                flash("There was a problem loading your file.", "danger")
+
         return render_template(
             "reviewSubmission.html",
             submission=submission,
             file_base64=file_base64,
             text_content=text_content,
-            file_extension=file_extension
+            file_extension=file_extension,
+            filename=file_name,
+            video_url=video_url
         )
 
 
 
     @boundary.route('/edit_submission/<submission_id>', methods=['GET', 'POST'])
     def student_edit_submission(submission_id):
-        pass
+        student_username = session.get("username")
+        if not student_username:
+            flash("Please log in to edit your submission.", "danger")
+            return redirect(url_for("boundary.login"))
+
+        submission = StudentViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
+        if not submission:
+            flash("Submission not found.", "danger")
+            return redirect(url_for("boundary.home"))
+
+        file_name = submission.get("file_name")
+        file_extension = file_name.split(".")[-1].lower() if file_name else None
+        video_url = submission.get("video_url")
+
+        file_base64 = None
+        text_content = None
+
+        if file_extension in ["pdf", "txt", "md"] and submission.get("file_id"):
+            try:
+                file_data = Submission.get_submission_file(submission["file_id"])
+                file_base64 = base64.b64encode(file_data).decode("utf-8")
+                if file_extension in ["txt", "md"]:
+                    text_content = file_data.decode("utf-8")
+            except Exception as e:
+                logging.error(f"[Edit Submission] Failed to read file: {e}")
+                flash("Unable to load file for editing.", "danger")
+
+        return render_template(
+            "editSubmission.html",
+            submission=submission,
+            file_extension=file_extension,
+            file_base64=file_base64,
+            text_content=text_content,
+            filename=file_name,
+            video_url=video_url
+        )
+
 
     @boundary.route('/delete_submission/<submission_id>/<assignment_id>', methods=['GET','POST'])
     def student_delete_submission(submission_id, assignment_id):
@@ -2119,22 +2055,36 @@ class StudentAssignmentBoundary:
 
         return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))
 
-        
+    @boundary.route('/submit_video_assignment', methods=['POST'])
+    def submit_video_assignment():
+        video_url = request.form.get("video_url")
+        assignment_id = request.form.get("assignment_id")
+        student_username = request.form.get("student_username")
+
+        if not (video_url and assignment_id and student_username):
+            flash("Missing required data for video submission.", "danger")
+            return redirect(url_for("boundary.home"))
+
+        result = StudentSendSubmissionController.submit_video_assignment_logic(
+            assignment_id, student_username, video_url
+        )
+
+        if result["success"]:
+            flash("🎥 Video submitted successfully!", "success")
+        else:
+            flash(f"❌ Failed to submit video: {result['message']}", "danger")
+
+        return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))        
 
         
-
-
-
-
-
-
+# Access Forum
 class AccessForumBoundary:
     @staticmethod
     @boundary.route('/forum/<classroom_id>', methods=['GET','POST'])
     def access_forum(classroom_id):
         return render_template("forum.html", classroom_id=classroom_id, discussion_rooms=RetrieveDiscussionRoomController.get_all_discussion_rooms_by_classroom_id(classroom_id))
 
-
+# Discussion Room
 class DiscussionRoomBoundary:
     @staticmethod
     @boundary.route('/forum/<classroom_id>/create', methods=['POST'])
@@ -2223,7 +2173,7 @@ class DiscussionRoomBoundary:
 
             return redirect(url_for('boundary.access_forum', classroom_id=classroom_id))
 
-
+# Message 
 class MessageBoundary:
     @staticmethod
     @boundary.route('/discussion_room/<discussion_room_id>/message', methods=['POST'])
@@ -2256,7 +2206,7 @@ class MessageBoundary:
             flash("Failed to update message.", "danger")
         return redirect(request.referrer)
     
-
+# Notification 
 class NotificationBoundary:
     @boundary.route('/notifications', methods=['GET'])
     def view_notifications():

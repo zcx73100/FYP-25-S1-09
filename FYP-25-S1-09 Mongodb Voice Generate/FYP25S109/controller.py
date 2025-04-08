@@ -246,10 +246,15 @@ class AttemptQuizController:
 
 class UploadAssignmentController:
     @staticmethod
-    def upload_assignment(title, classroom_id, description, deadline, file, filename):
+    def upload_assignment(title, classroom_id, description, deadline, file, filename, video_path=None):
         assignment = Assignment(
-            title=title, classroom_id=classroom_id, description=description, 
-            due_date=deadline, file=file, filename=filename  # Pass file directly
+            title=title,
+            classroom_id=classroom_id,
+            description=description,
+            due_date=deadline,
+            file=file,
+            filename=filename,
+            video_path=video_path  
         )
         return assignment.save_assignment()
 
@@ -373,6 +378,48 @@ class StudentSendSubmissionController:
             logging.error(f"Error in check_submission_exists: {str(e)}")
             return None
         
+        # Inside StudentSendSubmissionController
+    @staticmethod
+    def update_submission_file(submission_id, new_file):
+        try:
+            # Replace file logic in DB and GridFS
+            updated_file_id = Submission.update_submission_file(submission_id, new_file)
+            return {"success": True, "file_id": str(updated_file_id)}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+        
+    @staticmethod
+    def submit_video_assignment_logic(assignment_id, student_username, video_url):
+        try:
+            submission = {
+                "assignment_id": ObjectId(assignment_id),
+                "student": student_username,
+                "video_url": video_url,
+                "submitted_at": datetime.now(),
+                "file_name": None,  # Since it's a video submission
+                "file_id": None,
+                "grade": None
+            }
+
+            # Either insert or update existing submission
+            existing = mongo.db.submissions.find_one({
+                "assignment_id": ObjectId(assignment_id),
+                "student": student_username
+            })
+
+            if existing:
+                mongo.db.submissions.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": submission}
+                )
+            else:
+                mongo.db.submissions.insert_one(submission)
+
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+        
+        
 class StudentViewSubmissionController:
     @staticmethod
     def get_submission_by_student_and_id(student_username, submission_id):
@@ -467,4 +514,4 @@ class SearchNotificationController:
 class DeleteNotificationController:
     @staticmethod
     def delete_notification(notification_id):
-        return Notification.delete_notification(notification_id)
+        return Notification.delete_notification(notification_id)    

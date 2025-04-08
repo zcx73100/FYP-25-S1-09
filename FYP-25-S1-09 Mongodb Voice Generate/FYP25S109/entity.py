@@ -345,83 +345,6 @@ class Avatar:
             logging.error(f"Error deleting avatar: {str(e)}")
             return False
 
-"""
-class GenerateVideoEntity:
-    def __init__(self, text, avatar_path=None):
-        self.text = text
-        self.avatar_path = avatar_path
-        self.audio_filename = f"{hash(self.text)}.wav"
-        self.audio_path = os.path.join("FYP25S109/static/generated_audios", self.audio_filename).replace("\\", "/")
-        self.video_filename = f"{hash(self.text)}.mp4"
-        self.video_path = os.path.join("FYP25S109/static/generated_videos", self.video_filename).replace("\\", "/")
-
-    def generate_voice(self):
-        try:
-            os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 150)
-            engine.setProperty("volume", 1.0)
-            engine.save_to_file(self.text, self.audio_path)
-            engine.runAndWait()
-
-            if os.path.exists(self.audio_path):
-                return f"/static/generated_audios/{self.audio_filename}"
-            else:
-                raise Exception("❌ Failed to generate audio file.")
-        except Exception as e:
-            print(f"❌ Error generating voice: {str(e)}")
-            return None
-
-    def generate_video(self):
-            try:
-                # Ensure required files exist
-                if not os.path.exists(self.audio_path):
-                    raise Exception(f"❌ Audio file not found: {self.audio_path}")
-                if not os.path.exists(self.avatar_path):
-                    raise Exception(f"❌ Avatar file not found: {self.avatar_path}")
-
-                print(f"🎬 Sending files to SadTalker API:")
-                print(f"🖼️ Avatar: {self.avatar_path}")
-                print(f"🔊 Audio: {self.audio_path}")
-
-                # Initialize client with the SadTalker API URL
-                client = Client("https://vinthony-sadtalker.hf.space/--replicas/55zml/")
-
-                # Prepare parameters for the prediction (SadTalker API call)
-                result = client.predict(
-                    self.avatar_path,         # Avatar file path
-                    self.audio_path,          # Audio file path
-                    "crop",                   # Preprocess option
-                    True,                     # Still mode option
-                    True,                     # Face enhancement option
-                    0,                        # Batch size
-                    "256",                    # Resolution
-                    0,                        # Pose style
-                    "facevid2vid",            # Face render option
-                    0,                        # Expression scale
-                    True,                     # Use reference video
-                    None,                     # Reference video (optional)
-                    "pose",                   # Pose reference option
-                    True,                     # Use idle animation
-                    5,                        # Length of generated video (seconds)
-                    True,                     # Use eye blink
-                    fn_index=2               # Specify function index (this may vary based on your API setup)
-                )
-
-                # Check the result and save the generated video
-                if result:
-                    with open(self.video_path, "wb") as f:
-                        f.write(result)  # Write the video to a file
-                    print(f"✅ Video generated successfully: {self.video_path}")
-                    return f"/static/generated_videos/{self.video_filename}"
-                else:
-                    raise Exception("❌ No result returned from SadTalker API.")
-
-            except Exception as e:
-                print(f"❌ Error generating video: {str(e)}")
-                return None
-"""
-
 class GenerateVideoEntity:
     def __init__(self, text, avatar_path=None, audio_path=None):
         self.text = text
@@ -523,7 +446,6 @@ class GenerateVideoEntity:
         except Exception as e:
             print(f"❌ Error during SadTalker call: {e}")
             return None
-
 
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):
@@ -765,74 +687,91 @@ class Material:
         return material, file_data
 
 class Assignment:
-    def __init__(self, title=None, file=None, classroom_id=None, description=None, due_date=None, filename=None):
+    def __init__(self, title=None, file=None, classroom_id=None, description=None,
+                 due_date=None, filename=None, video_path=None):
         self.title = title
         self.file = file
         self.classroom_id = classroom_id
         self.description = description
         self.due_date = due_date
         self.filename = filename
+        self.video_path = video_path
 
     def save_assignment(self):
         try:
-            # Store file in GridFS
-            file_id = fs.put(self.file, filename=self.filename, content_type=mimetypes.guess_type(self.filename)[0])
+            file_id = None
 
-            # Insert assignment details into MongoDB
-            mongo.db.assignments.insert_one({
-                'title': self.title,
-                'file_name': self.filename,
-                'classroom_id': self.classroom_id,
-                'upload_date': datetime.now(),
-                'description': self.description,
-                'due_date': self.due_date,
-                'file_id': file_id,  # Store GridFS file ID
-            })
-            return {"success": True, "message": "Assignment uploaded successfully."}
+            # ✅ Handle optional file upload
+            if self.file:
+                # Ensure the filename is secure
+                safe_name = secure_filename(self.filename or self.file.filename)
+                file_id = fs.put(self.file, filename=safe_name, content_type=self.file.content_type)
+
+            # ✅ Prepare assignment data
+            assignment_data = {
+                "title": self.title,
+                "description": self.description,
+                "due_date": self.due_date,
+                "file_id": file_id,
+                "file_name": self.filename,         # Save the original or secure name
+                "classroom_id": ObjectId(self.classroom_id),
+                "video_path": self.video_path,
+                "created_at": datetime.now()
+            }
+
+            # ✅ Insert into MongoDB
+            result = mongo.db.assignments.insert_one(assignment_data)
+
+            return {
+                "success": True,
+                "message": "Assignment saved.",
+                "assignment_id": str(result.inserted_id)  # Return the new ID
+            }
 
         except Exception as e:
-            logging.error(f"Error saving assignment: {str(e)}")
-            return {"success": False, "message": str(e)}
-
+            return {
+                "success": False,
+                "message": str(e)
+            }
 
     @staticmethod
     def search_assignment(search_query):
         try:
-            # Use case-insensitive and partial matching
             assignments = mongo.db.assignments.find({
                 "title": {"$regex": search_query, "$options": "i"}
             })
             return list(assignments)
         except Exception as e:
-            logging.error(f"Failed to search assignments: {str(e)}")
+            logging.error(f"❌ Failed to search assignments: {str(e)}")
             return []
 
     @staticmethod
     def delete_assignment(assignment_id):
         try:
-            assignment = mongo.db.assignments.find_one({"_id": assignment_id})
-            if assignment:
-                os.remove(assignment['file_name'])
+            assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+            if assignment and assignment.get("file_id"):
+                fs.delete(ObjectId(assignment["file_id"]))
+                mongo.db.assignments.delete_one({"_id": ObjectId(assignment_id)})
+                return {"success": True, "message": "Assignment deleted."}
         except Exception as e:
-            logging.error(f"Error deleting assignment: {str(e)}")
+            logging.error(f"❌ Error deleting assignment: {str(e)}")
             return {"success": False, "message": str(e)}
 
     @staticmethod
     def get_assignment(assignment_id):
         try:
-            assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
-            return assignment
+            return mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
         except Exception as e:
-            logging.error(f"Failed to find assignment by ID: {str(e)}")
+            logging.error(f"❌ Failed to get assignment: {str(e)}")
             return None
-        
+
     @staticmethod
     def get_assignment_file(file_id):
         try:
-            file = fs.get(ObjectId(file_id))  # Retrieve from GridFS
-            return file.read()  # Return file content
+            file = fs.get(ObjectId(file_id))
+            return file.read()
         except Exception as e:
-            logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
+            logging.error(f"❌ Failed to retrieve file: {str(e)}")
             return None
         
 class Quiz:
@@ -927,7 +866,6 @@ class Quiz:
         except Exception as e:
             logging.error(f"Error attempting quiz: {str(e)}")
             return {"success": False, "message": str(e)}
-
         
 class Submission:
     def __init__(self, assignment_id, student, file, submission_date=None):
@@ -1041,8 +979,7 @@ class Submission:
         except Exception as e:
             logging.error(f"Error updating feedback: {str(e)}")
             return {"success": False, "message": str(e)}
-
-        
+      
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
         self.classroom_id = classroom_id
@@ -1246,4 +1183,3 @@ class Notification:
                 "priority": int(priority)
             }}
         )
-    

@@ -52,31 +52,18 @@
     <div class="classroom-section">
         <h3>📄 Assignments</h3>
         {% if session['role'] == 'Teacher' %}
-            <a href="{{ url_for('boundary.upload_assignment_page', classroom_id=classroom._id) }}" class="btn btn-primary">Upload Assignment</a>
+            <a href="{{ url_for('boundary.upload_assignment_form', classroom_id=classroom._id) }}" class="btn btn-primary">Upload Assignment</a>
             <a href="{{ url_for('boundary.manage_assignments', classroom_id=classroom._id) }}" class="btn btn-secondary">Manage Assignments</a>
         {% endif %}
         <ul>
             {% if assignments %}
                 {% for assignment in assignments %}
                     <li>
-                        <strong>{{ assignment.title }}</strong><br>
-                        <span>📅 Due: {{ assignment.due_date }}</span>
+                        <strong>{{ assignment.title }}</strong>: {{ assignment.description }}
                         <br>
-                    {% if session['role'] == 'Student' %}
-                        <span style="font-weight: bold;">📌 Status: 
-                            {% if assignment.status == 'Graded' %}
-                                <span style="color: green;">Graded</span>
-                            {% elif assignment.status == 'Submitted' %}
-                                <span style="color: orange;">Submitted</span>
-                            {% elif assignment.status == 'Overdue' %}
-                                <span style="color: red;">Overdue</span>
-                            {% else %}
-                                <span style="color: gray;">Not Submitted</span>
-                            {% endif %}
-                        </span>
-                    {% endif %}
+                        <span>📅 Due: {{ assignment.due_date | default("Not specified") }}</span>
                         <br>
-                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name, classroom_id=classroom._id) }}" class="file-button">📄 View</a>
+                        <a href="{{ url_for('boundary.view_assignment', assignment_id=assignment._id, filename=assignment.file_name) }}" class="file-button">📄 View</a>
                     </li>
                 {% endfor %}
             {% else %}
@@ -84,8 +71,6 @@
             {% endif %}
         </ul>
     </div>
-    
-    
 
     <div class="classroom-section">
         <h3>📝 Quizzes</h3>
@@ -119,7 +104,7 @@
             <input type="hidden" name="classroom_id" value="{{ classroom._id }}">
             <button type="submit" class="btn btn-primary">See Students in this Classroom</button>
         </form>
-    </div>    
+    </div>  
 
     <style>
         .file-button {

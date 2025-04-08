@@ -8,7 +8,7 @@
         <div class="col-md-6">
             <h2 class="text-center">Create an Account</h2>
 
-            <!-- Flash messages for errors/success -->
+            <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=True) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -20,7 +20,7 @@
                 {% endif %}
             {% endwith %}
 
-            <!-- Signup Form -->
+            <!-- Sign Up Form -->
             <form action="{{ url_for('boundary.sign_up') }}" method="POST" enctype="multipart/form-data">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
@@ -57,15 +57,23 @@
                     <input type="password" id="password2" name="password2" class="form-control" required>
                 </div>
 
-                <!-- 📸 Profile Picture Upload -->
                 <div class="mb-4">
                     <label for="profile_pic" class="form-label">Upload Profile Picture (optional)</label>
                     <input type="file" name="profile_pic" accept="image/*" class="form-control">
                 </div>
 
-                <!-- Hidden Role Input -->
+                <!-- Dynamic Role Assignment -->
                 {% if session.get('role') == "Teacher" %}
                     <input type="hidden" name="role" value="Student">
+                {% elif is_admin %}
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Select Role</label>
+                        <select id="role" name="role" class="form-select" required>
+                            <option value="Admin">Admin</option>
+                            <option value="Teacher">Teacher</option>
+                            <option value="Student">Student</option>
+                        </select>
+                    </div>
                 {% else %}
                     <input type="hidden" name="role" value="User">
                 {% endif %}

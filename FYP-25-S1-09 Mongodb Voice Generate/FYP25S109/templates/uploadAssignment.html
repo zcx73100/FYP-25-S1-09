@@ -1,23 +1,53 @@
-{% extends "base.html" %}  
+{% extends "base.html" %}
 
-{% block content %} 
-<h2 class="upload-title">Upload Assignment</h2>  
+{% block content %}
+<h2 class="upload-title">Upload Assignment</h2>
 
 <form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}" 
-      method="POST" enctype="multipart/form-data" class="upload-form">  
-    <p>Assignment Title:</p>
-    <input type="text" name="title" placeholder="Assignment Title" class="input-field">  
-    <p>Assignment Description:</p>
-    <input type="text" name="description" placeholder="Assignment Description" class="input-field">
-    <p>Deadline:</p>
-    <input type="datetime-local" name="deadline" class="input-field">  
-    <p>Upload File:</p>
-    <input type="file" name="file" class="file-input">  
+      method="POST" enctype="multipart/form-data" class="upload-form">
 
-    <button type="submit" class="upload-button">Upload Assignment</button>  
-</form>  
-<!-- Use an anchor tag for the return button -->
-<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary">Return</a>
+    <!-- Assignment Title -->
+    <p>Assignment Title:</p>
+    <input type="text" name="title" placeholder="Assignment Title" class="input-field" required>
+
+    <!-- Description + Generate Video -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label>Assignment Description:</label>
+        <a href="{{ url_for('boundary.generate_video', classroom_id=classroom_id, source='assignment') }}"
+           class="btn btn-sm btn-outline-primary">
+            🎬 Generate Assignment Video
+        </a>
+    </div>
+
+    <input type="text" name="description" placeholder="Assignment Description" class="input-field">
+
+    <!-- 🎥 Show Generated Video if Available -->
+    {% if video_url %}
+    <div class="video-preview mt-3">
+        <p><strong>Generated Instructional Video:</strong></p>
+        <video controls width="100%" class="mb-3 rounded shadow-sm">
+            <source src="{{ video_url }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    {% endif %}
+
+    <!-- Deadline -->
+    <p>Deadline:</p>
+    <input type="datetime-local" name="deadline" class="input-field" required>
+
+    <!-- File Upload -->
+    <p>Upload File:</p>
+    <input type="file" name="file" class="file-input" required>
+
+    <!-- Submit -->
+    <button type="submit" class="upload-button">📤 Upload Assignment</button>
+</form>
+
+<!-- Return Button -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary mt-3">
+    ⬅️ Return to Classroom
+</a>
 
 <style>
   /* Container for the form */

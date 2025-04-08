@@ -55,7 +55,7 @@
                                 <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
 
                                 {% if session.get('role') == "Admin" %}
-                                    <li><a class="dropdown-item" href="{{ url_for('boundary.create_account_admin') }}">Create Account</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Create Account</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.confirm_teacher_page') }}">Confirm Teacher Account</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
