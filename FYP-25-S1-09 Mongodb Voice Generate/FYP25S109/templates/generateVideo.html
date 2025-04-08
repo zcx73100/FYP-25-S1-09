@@ -25,11 +25,12 @@
                 {% if avatars %}
                     {% for avatar in avatars %}
                     <label class="avatar-option text-center">
-                        <input type="radio" name="avatar_path" value="/static/{{ avatar.file_path }}" required>
-                        <img src="{{ url_for('static', filename=avatar.file_path) }}" alt="{{ avatar.avatarname }}" class="img-thumbnail" width="150" height="150">
+                        <input type="radio" name="avatar_path" value="{{ avatar.image_data }}" required>
+                        <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
                         <p>{{ avatar.avatarname }}</p>
                     </label>
-                    {% endfor %}
+                {% endfor %}
+            
                 {% else %}
                     <p class="text-danger">No avatars available.</p>
                 {% endif %}
@@ -53,31 +54,7 @@
     <!-- Output Video -->
     <div id="video-preview" class="text-center mt-5"></div>
 
-    <!-- 📎 Publish to Assignment (Teacher) -->
-    {% if session['role'] == 'Teacher' and source == 'assignment' and classroom_id %}
-    <div id="publish-section" class="text-center mt-3" style="display: none;">
-        <form action="/publish_assignment_video" method="POST">
-            <input type="hidden" name="video_url" id="publishedVideoURL">
-            <input type="hidden" name="classroom_id" value="{{ classroom_id }}">
-            <input type="hidden" name="assignment_id" value="{{ assignment_id }}">
-            <button type="submit" class="btn btn-primary">📎 Publish to Assignment</button>
-        </form>
-    </div>
-    {% endif %}
-
-    <!-- 🎓 Student Video Submission -->
-    {% if session['role'] == 'Student' and source == 'submission' and assignment_id %}
-    <div id="student-submit-section" class="text-center mt-3" style="display: none;">
-        <form action="{{ url_for('boundary.submit_video_assignment') }}" method="POST">
-            <input type="hidden" name="video_url" id="studentVideoURL">
-            <input type="hidden" name="assignment_id" value="{{ assignment_id }}">
-            <input type="hidden" name="student_username" value="{{ session['username'] }}">
-            <button type="submit" class="btn btn-success">📤 Submit Video Answer</button>
-        </form>
-    </div>
-    {% endif %}
-
-    <!-- 💾 Save to My Videos -->
+    <!-- Save Button -->
     <div id="save-section" class="text-center mt-3" style="display: none;">
         <button id="saveVideoBtn" class="btn btn-success">💾 Save to My Videos</button>
         <div id="saveMessage" class="mt-2 text-info"></div>
@@ -96,10 +73,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const saveSection = document.getElementById("save-section");
     const saveButton = document.getElementById("saveVideoBtn");
     const saveMessage = document.getElementById("saveMessage");
-    const publishSection = document.getElementById("publish-section");
-    const publishInput = document.getElementById("publishedVideoURL");
-    const studentSubmitSection = document.getElementById("student-submit-section");
-    const studentVideoInput = document.getElementById("studentVideoURL");
 
     let lastVideoURL = "";
     let lastText = "";
@@ -133,7 +106,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // 🎬 Generate Video
+    // 🎬 Submit Video Generation Form
     generateVideoForm.addEventListener("submit", function (event) {
         event.preventDefault();
 
@@ -147,7 +120,6 @@ document.addEventListener("DOMContentLoaded", function () {
             errorMsg.style.display = "block";
             return;
         }
-
         errorMsg.style.display = "none";
         lastText = text;
 
@@ -156,7 +128,7 @@ document.addEventListener("DOMContentLoaded", function () {
         formData.append("avatar_path", avatarPath);
         formData.append("audio_path", audioPath);
 
-        // Show progress
+        // Reset progress UI
         document.getElementById("progress-container").style.display = "block";
         progressBar.style.width = "0%";
         progressBar.setAttribute("aria-valuenow", 0);
@@ -164,6 +136,7 @@ document.addEventListener("DOMContentLoaded", function () {
         progressBar.className = "progress-bar bg-danger";
         statusLabel.textContent = "⏳ Starting...";
 
+        // Start video generation
         fetch("/generate_video", {
             method: "POST",
             body: formData
@@ -178,11 +151,16 @@ document.addEventListener("DOMContentLoaded", function () {
                         progressBar.style.width = percent + "%";
                         progressBar.setAttribute("aria-valuenow", percent);
                         progressBar.textContent = percent + "%";
-                        progressBar.className = percent < 50 ? "progress-bar bg-danger"
-                                               : percent < 100 ? "progress-bar bg-warning"
-                                               : "progress-bar bg-success";
 
-                        if (percent >= 100) clearInterval(pollProgress);
+                        progressBar.className = "progress-bar";
+                        if (percent < 50) {
+                            progressBar.classList.add("bg-danger");
+                        } else if (percent < 100) {
+                            progressBar.classList.add("bg-warning");
+                        } else {
+                            progressBar.classList.add("bg-success");
+                            clearInterval(pollProgress);
+                        }
                     });
 
                 fetch("/status", { cache: "no-store" })
@@ -207,15 +185,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 saveMessage.innerText = "";
                 saveButton.disabled = false;
 
-                if (publishSection && publishInput) {
-                    publishInput.value = videoURL;
-                    publishSection.style.display = "block";
-                }
-
-                if (studentSubmitSection && studentVideoInput) {
-                    studentVideoInput.value = videoURL;
-                    studentSubmitSection.style.display = "block";
-                }
             } else {
                 errorMsg.innerText = "❌ Error: " + (data.error || "Video generation failed.");
                 errorMsg.style.display = "block";

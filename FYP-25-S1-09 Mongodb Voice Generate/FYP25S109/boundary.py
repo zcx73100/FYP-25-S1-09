@@ -65,7 +65,7 @@ class HomePage:
         admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
 
-        avatars = list(mongo.db.avatar.find({}))
+        avatars = list(mongo.db.avatar.find({"username": {"$in":admin_users}}, {})) #Show only admin-uploaded avatars
 
         classrooms = []
         if role == "Teacher":
@@ -174,7 +174,7 @@ def generate_video():
 
             avatars = list(mongo.db.avatar.find(
                 {"username": username},
-                {"_id": 0, "file_path": 1, "avatarname": 1}
+                {}
             ))
 
             return render_template(
@@ -2213,16 +2213,22 @@ class NotificationBoundary:
         query = request.args.get('q', '').strip()
         username = session.get('username')
         role = session.get('role')
+        classroom = list(mongo.db.classroom.find({"teacher": username}))  # Corrected access
 
         notifications = None
 
         if role == "Teacher":
-            notifications = ViewNotificationsController.view_notifications(username)
+            if query:
+                notifications = SearchNotificationController.search_notification(query)
+            else:
+                # Fetch notifications by classroom_id if provided
+                classroom_id = request.args.get('classroom_id')
+                if classroom_id:
+                    notifications = mongo.db.notifications.find({"teacher": username, "classroom_id": classroom_id})
+                else:
+                    notifications = ViewNotificationsController.view_notifications(username)
 
-        if query:
-            notifications = SearchNotificationController.search_notification(query)
-
-        return render_template('viewNotifications.html', notifications=notifications)
+        return render_template('viewNotifications.html', notifications=notifications, classroom=classroom)
 
     @boundary.route('/send_notification', methods=['GET', 'POST'])
     def send_notification():
@@ -2271,3 +2277,44 @@ class NotificationBoundary:
             return redirect(request.referrer)
 
         return render_template('editNotification.html', notification=notification)
+    
+    @boundary.route('/get_notifications', methods=['GET'])
+    def get_notifications():
+            username = session.get('username')
+            if not username:
+                return jsonify([])
+
+            notifications = mongo.db.notifications.find({
+                "username": username,
+                "is_read": False
+            }).sort("timestamp", -1)
+
+            notif_list = [{
+                "title": n.get("title"),
+                "description": n.get("description"),
+                "priority": n.get("priority"),
+                "timestamp": n.get("timestamp").strftime("%Y-%m-%d %H:%M:%S")
+            } for n in notifications]
+
+            return jsonify(notif_list)
+ 
+        
+    @boundary.route('/get_notifications_count', methods=['GET'])
+    def get_notifications_count():
+            username = session.get("username")
+            if not username:
+                return jsonify({"count": 0})
+            count = mongo.db.notifications.count_documents({"username": username, "is_read": False})
+            return jsonify({"count": count})
+
+    @boundary.route("/mark_notifications_read", methods=["POST"])
+    def mark_notifications_read():
+            username = session.get("username")
+            if username:
+                result = mongo.db.notifications.update_many(
+                    {"username": username, "is_read": False},
+                    {"$set": {"is_read": True}}
+                )
+                print(f"{result.modified_count} notifications marked as read.")
+                return jsonify({"status": "success"})
+            return jsonify({"status": "not_logged_in"})

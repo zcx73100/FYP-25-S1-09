@@ -816,7 +816,14 @@ class Quiz:
         try:
             quiz = mongo.db.quizzes.find_one({"_id": quiz_id})
             if quiz:
-                os.remove(quiz['file_path'])
+                # Delete quiz attempts if any
+                for attempt in quiz.get("attempts", []):
+                    if attempt.get("file_id"):
+                        fs.delete(ObjectId(attempt["file_id"]))
+
+                # Delete the quiz itself
+                mongo.db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
+                return {"success": True, "message": "Quiz deleted successfully."}
         except Exception as e:
             logging.error(f"Error deleting quiz: {str(e)}")
             return {"success": False, "message": str(e)}
@@ -1153,9 +1160,11 @@ class Notification:
     @staticmethod
     def insert_notification(username, classroom_id, title, description, priority):
         # Insert a new notification into the database
+        classroom_name = str(mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)},{"classroom_name": 1, '_id': 0}))
         mongo.db.notifications.insert_one({
             "username": username,
-            "classroom_id": ObjectId(classroom_id),
+            "classroom_id": classroom_id,
+            "classroom_name": classroom_name,
             "title": title.strip(),
             "description": description.strip(),
             "is_read": False,
