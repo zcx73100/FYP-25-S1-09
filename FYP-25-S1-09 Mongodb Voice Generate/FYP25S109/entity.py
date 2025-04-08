@@ -1192,3 +1192,10 @@ class Notification:
                 "priority": int(priority)
             }}
         )
+
+    @staticmethod
+    def mark_notifications_as_read(username):
+        mongo.db.notifications.update_many(
+            {"username": username, "is_read": False},
+            {"$set": {"is_read": True}}
+        )
