@@ -76,12 +76,12 @@ def send_assignment_notification():
 
     logger.debug("Finished sending assignment notifications.")
 
-# Initialize APScheduler to schedule tasks in the background
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=send_assignment_notification, trigger="cron", hour=15, minute=10)  # Run at 3:00 PM every day
-logger.debug("Scheduler job for sending notifications has been added.")
-scheduler.start()
 
 if __name__ == '__main__':
     logger.info("Starting the Flask app...")
+    # Initialize APScheduler to schedule tasks in the background
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(func=send_assignment_notification, trigger="cron", hour=15, minute=10)  # Run at 3:00 PM every day
+    logger.debug("Scheduler job for sending notifications has been added.")
+    scheduler.start()
     app.run(debug=True)
