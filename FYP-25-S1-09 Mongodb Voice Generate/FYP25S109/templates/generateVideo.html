@@ -25,12 +25,11 @@
                 {% if avatars %}
                     {% for avatar in avatars %}
                     <label class="avatar-option text-center">
-                        <input type="radio" name="avatar_path" value="{{ avatar.image_data }}" required>
-                        <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
+                        <input type="radio" name="avatar_id" value="{{ avatar._id }}" required>
+                        <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}" class="img-thumbnail" style="width:100px; height:100px;">
                         <p>{{ avatar.avatarname }}</p>
                     </label>
-                {% endfor %}
-            
+                    {% endfor %}
                 {% else %}
                     <p class="text-danger">No avatars available.</p>
                 {% endif %}
@@ -54,10 +53,15 @@
     <!-- Output Video -->
     <div id="video-preview" class="text-center mt-5"></div>
 
-    <!-- Save Button -->
+    <!-- Save/Publish Buttons -->
     <div id="save-section" class="text-center mt-3" style="display: none;">
         <button id="saveVideoBtn" class="btn btn-success">💾 Save to My Videos</button>
         <div id="saveMessage" class="mt-2 text-info"></div>
+
+        {% if session["role"] == "Admin" %}
+        <button id="publishBtn" class="btn btn-dark mt-2">📢 Publish to Homepage</button>
+        <div id="publishMessage" class="mt-2 text-success"></div>
+        {% endif %}
     </div>
 </div>
 
@@ -73,9 +77,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const saveSection = document.getElementById("save-section");
     const saveButton = document.getElementById("saveVideoBtn");
     const saveMessage = document.getElementById("saveMessage");
+    const publishButton = document.getElementById("publishBtn");
+    const publishMessage = document.getElementById("publishMessage");
 
     let lastVideoURL = "";
     let lastText = "";
+    let selectedAvatarId = "";
 
     // 🎤 Generate Voice
     document.getElementById("generateVoice").addEventListener("click", function () {
@@ -111,11 +118,11 @@ document.addEventListener("DOMContentLoaded", function () {
         event.preventDefault();
 
         const text = document.getElementById("text").value.trim();
-        const avatarRadio = document.querySelector("input[name='avatar_path']:checked");
-        const avatarPath = avatarRadio ? avatarRadio.value : null;
+        const avatarRadio = document.querySelector("input[name='avatar_id']:checked");
+        selectedAvatarId = avatarRadio ? avatarRadio.value : null;
         const audioPath = audioPathInput.value.trim();
 
-        if (!text || !avatarPath || !audioPath) {
+        if (!text || !selectedAvatarId || !audioPath) {
             errorMsg.innerText = "❌ Please enter text, select an avatar, and generate voice.";
             errorMsg.style.display = "block";
             return;
@@ -125,7 +132,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const formData = new FormData();
         formData.append("text", text);
-        formData.append("avatar_path", avatarPath);
+        formData.append("avatar_id", selectedAvatarId);
         formData.append("audio_path", audioPath);
 
         // Reset progress UI
@@ -184,6 +191,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 saveSection.style.display = "block";
                 saveMessage.innerText = "";
                 saveButton.disabled = false;
+                if (publishButton) publishButton.disabled = false;
 
             } else {
                 errorMsg.innerText = "❌ Error: " + (data.error || "Video generation failed.");
@@ -206,14 +214,14 @@ document.addEventListener("DOMContentLoaded", function () {
             body: JSON.stringify({
                 text: lastText,
                 video_url: lastVideoURL,
-                audio_url: audioPathInput.value.trim()
+                audio_url: audioPathInput.value.trim(),
+                avatar_id: selectedAvatarId
             })
         })
         .then(res => res.json())
         .then(result => {
             if (result.success) {
                 saveMessage.innerText = "✅ Video saved successfully!";
-                saveButton.disabled = true;
             } else {
                 saveMessage.innerText = "❌ Failed to save: " + result.error;
                 saveButton.disabled = false;
@@ -224,6 +232,34 @@ document.addEventListener("DOMContentLoaded", function () {
             saveButton.disabled = false;
         });
     };
+
+    // 📢 Publish to Homepage (Admins Only)
+    if (publishButton) {
+        publishButton.onclick = function () {
+            publishButton.disabled = true;
+
+            fetch("/publish_to_homepage", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    video_url: lastVideoURL
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    publishMessage.innerText = "✅ Video published to homepage!";
+                } else {
+                    publishMessage.innerText = "❌ Publish failed: " + result.error;
+                    publishButton.disabled = false;
+                }
+            })
+            .catch(err => {
+                publishMessage.innerText = "❌ Error: " + err.message;
+                publishButton.disabled = false;
+            });
+        };
+    }
 });
 </script>
 {% endblock %}

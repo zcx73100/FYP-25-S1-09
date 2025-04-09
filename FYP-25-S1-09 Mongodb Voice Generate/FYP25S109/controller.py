@@ -4,6 +4,7 @@ import requests
 import json
 from bson import ObjectId
 from datetime import datetime, timezone
+
 class GenerateVideoController:
     @staticmethod
     def generate_voice(text):
@@ -12,6 +13,25 @@ class GenerateVideoController:
     def generate_video(text, avatar_path):
         entity = GenerateVideoEntity(text, avatar_path)
         entity.generate_voice()  # Make sure audio is generated first
+
+class VideoController:
+    @staticmethod
+    def save_video(username, role, text, video_url, audio_url, avatar_id):
+        try:
+            mongo.db.video.insert_one({
+                "username": username,
+                "role": role,
+                "text": text,
+                "video_url": video_url,
+                "audio_url": audio_url,
+                "avatar_id": ObjectId(avatar_id),
+                "created_at": datetime.now()
+            })
+            return {"success": True}
+        except Exception as e:
+            logging.error(f"Error saving video: {str(e)}")
+            return {"success": False, "message": str(e)}
+
 
 class LoginController:
     @staticmethod

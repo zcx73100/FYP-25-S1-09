@@ -21,20 +21,26 @@
         {% endif %}
     </div>
 
-    <!-- ✅ Avatars Section -->
-    <h3 class="section-subtitle">Avatars</h3>
+    <!-- ✅ Admin Avatars with Published Videos -->
+    <h3 class="section-subtitle">🎥 AI-Powered Admin Avatars</h3>
     <div class="avatar-grid">
-        {% if avatars %}
-        <div class="trackbar">
-            {% for avatar in avatars %}
-                <div class="avatar-card">
-                    <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}">
-                </div>
-            {% endfor %}
-        </div>
-        {% else %}
-            <p class="no-content">No avatars available.</p>
-        {% endif %}
+        {% for item in avatar_showcase %}
+            <div class="avatar-card">
+                <!-- Avatar Image -->
+                <img src="{{ url_for('static', filename=item.avatar_path) }}" alt="{{ item.avatarname }}">
+                <h5>{{ item.avatarname }}</h5>
+
+                <!-- Published Video -->
+                {% if item.video_url %}
+                    <video width="120" height="120" controls class="mt-2" style="border-radius: 50%; object-fit: cover;">
+                        <source src="{{ item.video_url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                {% else %}
+                    <p class="text-muted">No video published</p>
+                {% endif %}
+            </div>
+        {% endfor %}
     </div>
 
     <!-- ✅ Classroom Section -->
@@ -421,7 +427,48 @@
             transform: scale(1.1); /* Zoom in slightly on hover */
         }
 
-
+        .avatar-video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 30px;
+            padding: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .avatar-video-card {
+            background: white;
+            padding: 20px;
+            border-radius: 18px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .avatar-video-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .avatar-showcase-img {
+            width: 140px;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .avatar-video-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        
+        .avatar-showcase-video {
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
     </style>    
 
 {% endblock %}
