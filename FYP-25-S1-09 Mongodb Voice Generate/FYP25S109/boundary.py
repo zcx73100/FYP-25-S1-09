@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory, make_response, send_file
 from . import mongo
 import os
 from werkzeug.utils import secure_filename
@@ -57,46 +57,23 @@ class HomePage:
         username = session.get("username", None)
         role = session.get("role", None)
 
-        user_info = mongo.db.useraccount.find_one({"username": username}) if username else None
+        user_info = mongo.db.useraccount.find_one({"username": username},{}) if username else None
 
-        # Get all Teacher and Admin usernames
-        teacher_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
-        admin_users = [user["username"] for user in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
-
+        teacher_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
         teacher_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": teacher_users}}))
+
+        admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
 
-        # ✅ Only show avatars uploaded by Admins
-        admin_avatars = list(mongo.db.avatar.find({"username": {"$in": admin_users}}))
+        avatars = list(mongo.db.avatar.find({"username": {"$in":admin_users}}, {})) #Show only admin-uploaded avatars
 
-        # ✅ For each Admin avatar, find their latest published video
-        avatar_showcase = []
-        for avatar in admin_avatars:
-            video = mongo.db.video.find_one(
-                {"avatar_id": avatar["_id"], "is_published": True},
-                sort=[("created_at", -1)]
-            )
-
-            avatar_showcase.append({
-                "avatarname": avatar.get("avatarname"),
-                "avatar_path": avatar.get("file_path"),
-                "video_url": video.get("video_url") if video else None
-            })
-
-        # Classrooms by role
         classrooms = []
         if role == "Teacher":
-            classrooms = list(mongo.db.classroom.find(
-                {"teacher": username}, {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
         elif role == "Student":
-            classrooms = list(mongo.db.classroom.find(
-                {"student_list": username}, {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
         elif role == "Admin":
-            classrooms = list(mongo.db.classroom.find(
-                {}, {"_id": 1, "classroom_name": 1, "description": 1}
-            ))
+            classrooms = list(mongo.db.classroom.find({}, {"_id": 1, "classroom_name": 1, "description": 1}))
 
         classroom_ids = [classroom["_id"] for classroom in classrooms]
 
@@ -127,185 +104,146 @@ class HomePage:
                 {"_id": 1, "title": 1}
             )) for classroom in classrooms
         }
+        print(session)
 
         return render_template(
             "homepage.html",
             user_info=user_info,
             username=username,
             videos=admin_videos + teacher_videos,
-            avatar_showcase=avatar_showcase,  # ✅ new
+            avatars=avatars,
             classrooms=classrooms,
             announcements=announcements,
             materials=materials,
             assignments=assignments,
             quizzes=quizzes
         )
-        
-# Generate Video
-@boundary.route("/generate_voice", methods=["POST"])
-def generate_voice():
-    try:
-        data = request.get_json()
-        text = data.get("text")
 
-        if not text:
-            return jsonify({"success": False, "error": "Text is required"}), 400
+class AvatarVideoBoundary:
+    # Generate Voice
+    @boundary.route("/generate_voice", methods=["GET","POST"])
+    def generate_voice():
+        if request.method == "POST":
+            try:
+                data = request.get_json()
+                text = data.get("text")
 
-        voice_entity = GenerateVideoEntity(text)
-        audio_url = voice_entity.generate_voice()
+                if not text:
+                    return jsonify({"success": False, "error": "Text is required"}), 400
 
-        if not audio_url:
-            return jsonify({"success": False, "error": "Voice generation failed"}), 500
+                voice_entity = GenerateVideoEntity(text)
+                audio_id = voice_entity.generate_voice()
 
-        return jsonify({"success": True, "audio_url": audio_url})
+                if not audio_id:
+                    return jsonify({"success": False, "error": "Voice generation failed"}), 500
 
-    except Exception as e:
-        return jsonify({"success": False, "error": repr(e)}), 500
+                return jsonify({"success": True, "audio_id": audio_id})
 
-# Generate Talking Video
-@boundary.route("/status")
-def proxy_status():
-    return requests.get("http://127.0.0.1:7860/status").json()
+            except Exception as e:
+                return jsonify({"success": False, "error": repr(e)}), 500
 
-@boundary.route("/progress")
-def proxy_progress():
-    try:
-        response = requests.get("http://127.0.0.1:7860/progress")
-        response.raise_for_status()  # 🚨 force error for non-200s
-        return jsonify(response.json())
-    except Exception as e:
-        print(f"Progress fetch failed: {e}")  # ✅ useful log
-        return jsonify({"progress": 0, "error": str(e)})
+    # Generate Talking Video
+    @boundary.route("/generate_video", methods=["GET","POST"])
+    def generate_video():
+        if request.method == "POST":
+            try:
+                username = session.get("username")
+                if not username:
+                    return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-@boundary.route("/generate_video", methods=["GET", "POST"])
-def generate_video():
-    try:
-        username = session.get("username")
-        role = session.get("role")
+                data = request.get_json()
+                text = data.get("text")
+                avatar_id = data.get("avatar_id")
+                audio_id = data.get("audio_id")
 
-        if not username:
-            return redirect(url_for("login"))
+                if not all([text, avatar_id, audio_id]):
+                    return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-        if request.method == "GET":
-            classroom_id = request.args.get("classroom_id")
-            assignment_id = request.args.get("assignment_id")
-            source = request.args.get("source")
+                # Retrieve avatar and audio from GridFS
+                avatar_file = fs.get(ObjectId(avatar_id))
+                audio_file = fs.get(ObjectId(audio_id))
 
-            if role == "Teacher" and source == "assignment" and not classroom_id:
-                flash("Missing classroom context for assignment video.", "danger")
-                return redirect(url_for("boundary.home"))
+                if not avatar_file or not audio_file:
+                    return jsonify({"success": False, "error": "Avatar or audio not found"}), 404
 
-            avatars = list(mongo.db.avatar.find({"username": username}))
+                # Create temporary files for processing
+                temp_dir = "temp_processing"
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                avatar_path = os.path.join(temp_dir, f"avatar_{avatar_id}.png")
+                audio_path = os.path.join(temp_dir, f"audio_{audio_id}.wav")
+                
+                with open(avatar_path, "wb") as f:
+                    f.write(avatar_file.read())
+                
+                with open(audio_path, "wb") as f:
+                    f.write(audio_file.read())
+
+                # Generate video
+                entity = GenerateVideoEntity(text, avatar_path, audio_path)
+                video_id = entity.generate_video()
+
+                # Clean up temporary files
+                try:
+                    os.remove(avatar_path)
+                    os.remove(audio_path)
+                except:
+                    pass
+
+                if not video_id:
+                    return jsonify({"success": False, "error": "Video generation failed"}), 500
+
+                return jsonify({"success": True, "video_id": video_id})
+
+            except Exception as e:
+                print(f"❌ Error in /generate_video route: {str(e)}")
+                return jsonify({"success": False, "error": repr(e)}), 500
+    
+    @boundary.route("/stream_audio/<audio_id>")
+    def stream_audio(audio_id):
+        if request.method=="POST":
+            try:
+                audio_file = fs.get(ObjectId(audio_id))
+                if not audio_file:
+                    return "Audio not found", 404
+                    
+                response = make_response(audio_file.read())
+                response.headers.set('Content-Type', 'audio/wav')
+                response.headers.set('Content-Disposition', 'inline', filename=f'audio_{audio_id}.wav')
+                return response
+            except Exception as e:
+                return str(e), 500
+
+    @boundary.route("/stream_video/<video_id>")
+    def stream_video(video_id):
+        if request.method=="POST":
+            try:
+                video_file = fs.get(ObjectId(video_id))
+                if not video_file:
+                    return "Video not found", 404
+                    
+                response = make_response(video_file.read())
+                response.headers.set('Content-Type', 'video/mp4')
+                response.headers.set('Content-Disposition', 'inline', filename=f'video_{video_id}.mp4')
+                return response
+            except Exception as e:
+                return str(e), 500
+    
+    @boundary.route("/generate_video_page", methods=["GET"])
+    def generate_video_page():
+        try:
+            username = session.get("username")
+            if not username:
+                return redirect("/login")  # or return unauthorized response
             
-            return render_template(
-                "generateVideo.html",
-                avatars=avatars,
-                classroom_id=classroom_id if source == "assignment" else None,
-                assignment_id=assignment_id if assignment_id else None,
-                source=source
-            )
+            avatars = list(mongo.db.avatar.find({"username": username}))
 
-        # POST — handle video generation request
-        text = request.form.get("text")
-        avatar_id = request.form.get("avatar_id")
-        audio_path = request.form.get("audio_path")
-
-        print("📥 Incoming POST /generate_video:")
-        print("Text:", text)
-        print("Avatar ID:", avatar_id)
-        print("Audio Path:", audio_path)
-
-        if not all([text, avatar_id, audio_path]):
-            return jsonify({"success": False, "error": "Missing required parameters"}), 400
-
-        # Fetch avatar from DB
-        avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
-        if not avatar:
-            return jsonify({"success": False, "error": "Avatar not found"}), 404
-
-        avatar_path = os.path.join("FYP25S109/static", avatar["file_path"])
-        audio_path = os.path.join("FYP25S109", audio_path.replace("/static/", "static/"))
-
-        # Validate file paths
-        if not os.path.exists(avatar_path):
-            return jsonify({"success": False, "error": f"Avatar file not found: {avatar_path}"}), 404
-        if not os.path.exists(audio_path):
-            return jsonify({"success": False, "error": f"Audio file not found: {audio_path}"}), 404
-
-        # 🎬 Generate video using avatar and voice
-        entity = GenerateVideoEntity(text, avatar_path, audio_path)
-        video_url = entity.generate_video()
-
-        if not video_url:
-            return jsonify({"success": False, "error": "Video generation failed"}), 500
-
-        return jsonify({"success": True, "video_url": video_url})
-
-    except Exception as e:
-        print(f"❌ Error in /generate_video route: {str(e)}")
-        return jsonify({"success": False, "error": repr(e)}), 500
+        except Exception as e:
+            print(f"❌ Error loading generate_video_page: {e}")
+            return "Error loading page", 500
+        return render_template("generateVideo.html", avatars=avatars)
 
 
-# Save Video
-@boundary.route("/save_generated_video", methods=["POST"])
-def save_generated_video():
-    try:
-        username = session.get("username")
-        user = mongo.db.useraccount.find_one({"username": username})
-        if not user:
-            return jsonify({"success": False, "error": "User not found"}), 404
-
-        data = request.json
-        text = data.get("text")
-        video_url = data.get("video_url")
-        audio_url = data.get("audio_url")
-        avatar_id = data.get("avatar_id")  # ✅ Now using avatar ID
-
-        if not all([text, video_url, audio_url, avatar_id]):
-            return jsonify({"success": False, "error": "Missing fields"}), 400
-
-        # Save video info with reference to avatar_id
-        mongo.db.video.insert_one({
-            "username": username,
-            "role": user["role"].lower(),
-            "text": text,
-            "video_url": video_url,
-            "audio_url": audio_url,
-            "avatar_id": ObjectId(avatar_id),  # ✅ Convert to ObjectId
-            "created_at": datetime.now()
-        })
-
-        return jsonify({"success": True, "message": "Video saved successfully."})
-
-    except Exception as e:
-        logging.error(f"❌ Error saving video: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# Admin Publish Video to Homepage    
-@boundary.route("/publish_to_homepage", methods=["POST"])
-def publish_to_homepage():
-    try:
-        username = session.get("username")
-        role = session.get("role")
-        if role != "Admin":
-            return jsonify({"success": False, "error": "Unauthorized"}), 403
-
-        data = request.json
-        video_url = data.get("video_url")
-
-        result = mongo.db.video.update_one(
-            {"username": username, "video_url": video_url},
-            {"$set": {"is_published": True}}
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"success": False, "error": "Video not found or already published"}), 404
-
-        return jsonify({"success": True})
-
-    except Exception as e:
-        print("❌ Error publishing to homepage:", str(e))
-        return jsonify({"success": False, "error": str(e)}), 500    
     
 # Log In
 class LoginBoundary:

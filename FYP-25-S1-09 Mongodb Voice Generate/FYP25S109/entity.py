@@ -249,6 +249,101 @@ class TutorialVideo:
         except Exception as e:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
+
+class GenerateVideoEntity:
+    def __init__(self, text, avatar_path=None, audio_path=None):
+        self.text = text
+        self.avatar_path = avatar_path
+        self.audio_path = audio_path
+
+    def generate_voice(self):
+        try:
+            if not self.text.strip():
+                raise ValueError("Text input is empty.")
+
+            # Generate audio file in memory
+            tts = gTTS(text=self.text, lang="en")
+            
+            # Save to a temporary file
+            temp_mp3 = "temp_voice.mp3"
+            temp_wav = "temp_voice.wav"
+            tts.save(temp_mp3)
+            
+            # Convert to WAV format
+            subprocess.run(["ffmpeg", "-y", "-i", temp_mp3, temp_wav],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Read the WAV file and store in GridFS
+            with open(temp_wav, "rb") as f:
+                audio_id = fs.put(f, filename=f"voice_{datetime.now().isoformat()}.wav", 
+                                content_type="audio/wav")
+            
+            # Clean up temporary files
+            os.remove(temp_mp3)
+            os.remove(temp_wav)
+            
+            return audio_id
+
+        except Exception as e:
+            print(f"❌ Error generating voice: {e}")
+            return None
+
+    def generate_video(self):
+        try:
+            if not os.path.exists(self.avatar_path) or not os.path.exists(self.audio_path):
+                raise FileNotFoundError("Missing avatar or audio file")
+
+            SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
+
+            with open(self.avatar_path, "rb") as avatar_file, open(self.audio_path, "rb") as audio_file:
+                files = {
+                    "image_file": (
+                        os.path.basename(self.avatar_path),
+                        avatar_file,
+                        mimetypes.guess_type(self.avatar_path)[0] or "image/jpeg"
+                    ),
+                    "audio_file": (
+                        os.path.basename(self.audio_path),
+                        audio_file,
+                        mimetypes.guess_type(self.audio_path)[0] or "audio/wav"
+                    ),
+                }
+
+                data = {
+                    "preprocess_type": "crop",
+                    "is_still_mode": "false",
+                    "enhancer": "false",
+                    "batch_size": "2",
+                    "size_of_image": "256",
+                    "pose_style": "0"
+                }
+
+                response = requests.post(SADTALKER_API, files=files, data=data)
+
+            result = response.json()
+
+            if response.status_code != 200 or "video_path" not in result:
+                return None
+
+            video_path_on_disk = result.get("video_path")
+
+            if not os.path.exists(video_path_on_disk):
+                return None
+
+            # Upload video to GridFS
+            with open(video_path_on_disk, "rb") as f:
+                video_id = fs.put(f, filename=f"video_{datetime.now().isoformat()}.mp4", 
+                                content_type="video/mp4")
+
+            # Clean up the temporary video file
+            os.remove(video_path_on_disk)
+            
+            return str(video_id)
+
+        except Exception as e:
+            print(f"❌ Error during SadTalker call: {e}")
+            return None
+
     
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
@@ -359,35 +454,47 @@ class GenerateVideoEntity:
 
         self.video_filename = f"video_{timestamp}.mp4"
         self.video_path = os.path.abspath(
-            os.path.join("D:/Code/FYP-25-S1-09 Mongodb Voice Generate/FYP25S109/static/generated_videos", self.video_filename)
+            os.path.join("/FYP-25-S1-09 Mongodb Voice Generate/FYP25S109/static/generated_videos", self.video_filename)
         )
 
     def generate_voice(self):
         try:
+            if not self.text.strip():
+                raise ValueError("Text input is empty.")
+
             os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
 
-            # Save MP3 from gTTS first
             mp3_temp = self.audio_path.replace(".wav", ".mp3")
             tts = gTTS(text=self.text, lang="en")
             tts.save(mp3_temp)
 
-            # Convert to WAV using ffmpeg
-            result = subprocess.run(
-                ["ffmpeg", "-y", "-i", mp3_temp, self.audio_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            subprocess.run(["ffmpeg", "-y", "-i", mp3_temp, self.audio_path],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            if result.returncode != 0:
-                print("❌ FFmpeg error:", result.stderr.decode())
-                return None
+            # ✅ Upload to GridFS
+            with open(self.audio_path, "rb") as f:
+                audio_id = fs.put(f, filename=os.path.basename(self.audio_path), content_type="audio/wav")
 
-            return f"/static/generated_audios/{os.path.basename(self.audio_path)}"
+            # ✅ Store metadata in `voices` collection
+            voice_metadata = {
+                "text": self.text,
+                "audio_gridfs_id": audio_id,
+                "filename": self.audio_filename,
+                "timestamp": datetime.utcnow()
+            }
+            voice_id = mongo.db.voices.insert_one(voice_metadata).inserted_id
+
+            print(f"✅ Stored voice metadata with ID: {voice_id}")
+            return str(voice_id)  # Return MongoDB document ID
+
         except Exception as e:
             print(f"❌ Error generating voice: {e}")
             return None
 
-    def generate_video(self):
+
+
+
+    def generate_video(self, voice_id=None):
         try:
             if not os.path.exists(self.avatar_path) or not os.path.exists(self.audio_path):
                 raise FileNotFoundError("Missing avatar or audio file")
@@ -419,33 +526,38 @@ class GenerateVideoEntity:
 
                 response = requests.post(SADTALKER_API, files=files, data=data)
 
-            print("🔁 SadTalker Response Code:", response.status_code)
             result = response.json()
-            print("📦 SadTalker JSON Response:", result)
 
             if response.status_code != 200 or "video_path" not in result:
-                print("❌ SadTalker Error or Missing Key:", result)
                 return None
 
             video_path_on_disk = result.get("video_path")
-            video_url_for_frontend = result.get("video_url")
-
-            print("🧪 SadTalker returned video path:", video_path_on_disk)
 
             if not os.path.exists(video_path_on_disk):
-                print("❌ File not found at path:", video_path_on_disk)
                 return None
 
-            # ✅ Move to Flask static directory (optional, you could skip if already in static folder)
-            os.makedirs(os.path.dirname(self.video_path), exist_ok=True)
-            shutil.copy(video_path_on_disk, self.video_path)
+            # ✅ Upload video to GridFS
+            with open(video_path_on_disk, "rb") as f:
+                video_id = fs.put(f, filename=os.path.basename(video_path_on_disk), content_type="video/mp4")
 
-            print(f"✅ Video saved to: {self.video_path}")
-            return video_url_for_frontend
+            # ✅ Store metadata in `videos` collection
+            video_metadata = {
+                "avatar_used": self.avatar_path,
+                "video_gridfs_id": video_id,
+                "linked_voice_id": ObjectId(voice_id) if voice_id else None,
+                "filename": os.path.basename(video_path_on_disk),
+                "timestamp": datetime.utcnow()
+            }
+            stored_video_id = mongo.db.videos.insert_one(video_metadata).inserted_id
+
+            print(f"✅ Stored video metadata with ID: {stored_video_id}")
+            return str(stored_video_id)
 
         except Exception as e:
             print(f"❌ Error during SadTalker call: {e}")
             return None
+
+
 
 class Classroom:
     def __init__(self, classroom_name=None, teacher=None, student_list=None, capacity=None, description=None):

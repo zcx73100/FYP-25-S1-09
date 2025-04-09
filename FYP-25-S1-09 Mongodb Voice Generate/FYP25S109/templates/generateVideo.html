@@ -16,7 +16,7 @@
         <!-- Voice Generation -->
         <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">🔊 Generate Voice</button>
         <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
-        <input type="hidden" id="audio_path" name="audio_path">
+        <input type="hidden" id="audio_id" name="audio_id">
 
         <!-- Avatar Selection -->
         <div class="mb-3">
@@ -25,7 +25,7 @@
                 {% if avatars %}
                     {% for avatar in avatars %}
                     <label class="avatar-option text-center">
-                        <input type="radio" name="avatar_id" value="{{ avatar._id }}" required>
+                        <input type="radio" name="avatar_id" value="{{ avatar.file_id }}" required>
                         <img src="data:image/jpeg;base64,{{ avatar.image_data }}" alt="{{ avatar.avatarname }}" class="img-thumbnail" style="width:100px; height:100px;">
                         <p>{{ avatar.avatarname }}</p>
                     </label>
@@ -68,7 +68,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const errorMsg = document.getElementById("error-message");
-    const audioPathInput = document.getElementById("audio_path");
+    const audioIdInput = document.getElementById("audio_id");
     const generateVideoForm = document.getElementById("videoForm");
     const audioPreview = document.getElementById("audioPreview");
     const videoPreview = document.getElementById("video-preview");
@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const publishButton = document.getElementById("publishBtn");
     const publishMessage = document.getElementById("publishMessage");
 
-    let lastVideoURL = "";
+    let lastVideoId = "";
     let lastText = "";
     let selectedAvatarId = "";
 
@@ -100,8 +100,9 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                audioPathInput.value = data.audio_url;
-                audioPreview.src = data.audio_url;
+                audioIdInput.value = data.audio_id;
+                // Fetch the audio stream from the server
+                audioPreview.src = `/stream_audio/${data.audio_id}`;
                 audioPreview.style.display = "block";
             } else {
                 alert("❌ Voice generation failed: " + data.error);
@@ -120,9 +121,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const text = document.getElementById("text").value.trim();
         const avatarRadio = document.querySelector("input[name='avatar_id']:checked");
         selectedAvatarId = avatarRadio ? avatarRadio.value : null;
-        const audioPath = audioPathInput.value.trim();
+        const audioId = audioIdInput.value.trim();
 
-        if (!text || !selectedAvatarId || !audioPath) {
+        if (!text || !selectedAvatarId || !audioId) {
             errorMsg.innerText = "❌ Please enter text, select an avatar, and generate voice.";
             errorMsg.style.display = "block";
             return;
@@ -133,7 +134,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const formData = new FormData();
         formData.append("text", text);
         formData.append("avatar_id", selectedAvatarId);
-        formData.append("audio_path", audioPath);
+        formData.append("audio_id", audioId);
 
         // Reset progress UI
         document.getElementById("progress-container").style.display = "block";
@@ -179,12 +180,11 @@ document.addEventListener("DOMContentLoaded", function () {
             }, 1000);
 
             if (data.success) {
-                const videoURL = data.video_url;
-                lastVideoURL = videoURL;
+                lastVideoId = data.video_id;
 
                 videoPreview.innerHTML = `
                     <video width="400" controls autoplay>
-                        <source src="${videoURL}" type="video/mp4">
+                        <source src="/stream_video/${data.video_id}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>`;
 
@@ -213,8 +213,8 @@ document.addEventListener("DOMContentLoaded", function () {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 text: lastText,
-                video_url: lastVideoURL,
-                audio_url: audioPathInput.value.trim(),
+                video_id: lastVideoId,
+                audio_id: audioIdInput.value.trim(),
                 avatar_id: selectedAvatarId
             })
         })
@@ -242,7 +242,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    video_url: lastVideoURL
+                    video_id: lastVideoId
                 })
             })
             .then(res => res.json())
