@@ -463,11 +463,10 @@ class GenerateVideoController:
         return audio_id
 
     @staticmethod
-    def generate_video(text, avatar_path):
-        entity = GenerateVideoEntity(text, avatar_path)
-        entity.generate_voice()
-        video_path = entity.generate_video()
-        return video_path
+    def generate_video(text, avatar_id, audio_id):
+        entity = GenerateVideoEntity(text, avatar_id, audio_id)
+        return entity.generate_video()
+
 
 class AddDiscussionRoomController:
     @staticmethod

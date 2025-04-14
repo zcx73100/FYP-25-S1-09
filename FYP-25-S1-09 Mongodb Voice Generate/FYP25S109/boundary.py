@@ -118,7 +118,7 @@ class HomePage:
             assignments=assignments,
             quizzes=quizzes
         )
-
+    
 class AvatarVideoBoundary:
     # Route: Generate Voice
     @boundary.route("/generate_voice", methods=["POST"])
@@ -128,7 +128,7 @@ class AvatarVideoBoundary:
 
         if not text:
             return jsonify(success=False, error="No text provided."), 400
-
+        
         try:
             controller = GenerateVideoController()
             audio_id = controller.generate_voice(text)
@@ -151,57 +151,32 @@ class AvatarVideoBoundary:
         except Exception as e:
             return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
 
-    # Route: Generate Talking Video
-    @boundary.route("/generate_video", methods=["GET", "POST"])
+    @boundary.route("/generate_video", methods=["POST"])
     def generate_video():
-        if request.method == "POST":
-            try:
-                username = session.get("username")
-                if not username:
-                    return jsonify({"success": False, "error": "Unauthorized"}), 401
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-                data = request.get_json()
-                text = data.get("text")
-                avatar_id = data.get("avatar_id")
-                audio_id = data.get("audio_id")
+            data = request.get_json()
+            text = data.get("text")
+            avatar_id = data.get("avatar_id")
+            audio_id = data.get("audio_id")
 
-                if not all([text, avatar_id, audio_id]):
-                    return jsonify({"success": False, "error": "Missing required parameters"}), 400
+            if not all([text, avatar_id, audio_id]):
+                return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-                avatar_file = fs.get(ObjectId(avatar_id))
-                audio_file = fs.get(ObjectId(audio_id))
+            controller = GenerateVideoController()
+            video_id = controller.generate_video(text, avatar_id, audio_id)
 
-                if not avatar_file or not audio_file:
-                    return jsonify({"success": False, "error": "Avatar or audio not found"}), 404
+            if not video_id:
+                return jsonify({"success": False, "error": "Video generation failed"}), 500
 
-                temp_dir = "temp_processing"
-                os.makedirs(temp_dir, exist_ok=True)
+            return jsonify({"success": True, "video_id": video_id})
 
-                avatar_path = os.path.join(temp_dir, f"avatar_{avatar_id}.png")
-                audio_path = os.path.join(temp_dir, f"audio_{audio_id}.wav")
-
-                with open(avatar_path, "wb") as f:
-                    f.write(avatar_file.read())
-                with open(audio_path, "wb") as f:
-                    f.write(audio_file.read())
-
-                entity = GenerateVideoEntity(text, avatar_path, audio_path)
-                video_id = entity.generate_video()
-
-                try:
-                    os.remove(avatar_path)
-                    os.remove(audio_path)
-                except:
-                    pass
-
-                if not video_id:
-                    return jsonify({"success": False, "error": "Video generation failed"}), 500
-
-                return jsonify({"success": True, "video_id": video_id})
-
-            except Exception as e:
-                print(f"❌ Error in /generate_video route: {str(e)}")
-                return jsonify({"success": False, "error": repr(e)}), 500
+        except Exception as e:
+            print(f"Error in /generate_video route: {str(e)}")
+            return jsonify({"success": False, "error": repr(e)}), 500
 
     # Route: Stream video
     @boundary.route("/stream_video/<video_id>")
@@ -217,7 +192,7 @@ class AvatarVideoBoundary:
             return response
         except Exception as e:
             return str(e), 500
-
+    
     # Route: Render generate video page
     @boundary.route("/generate_video_page", methods=["GET"])
     def generate_video_page():
@@ -227,11 +202,12 @@ class AvatarVideoBoundary:
                 return redirect("/login")
 
             avatars = list(mongo.db.avatar.find({"username": username}))
+            audios = list(mongo.db.voice_records.find({"username": username}))
         except Exception as e:
             print(f"❌ Error loading generate_video_page: {e}")
             return "Error loading page", 500
 
-        return render_template("generateVideo.html", avatars=avatars)
+        return render_template("generateVideo.html", avatars=avatars, voice_records=audios)
 
 
     

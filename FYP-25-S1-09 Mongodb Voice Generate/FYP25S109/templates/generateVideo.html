@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-
+{% block title %}Generate Video{% endblock %}
 {% block content %}
 <div class="container py-5">
     <h2 class="text-center mb-4">🎬 Create Animated Video</h2>
@@ -16,7 +16,24 @@
         <!-- Voice Generation -->
         <button type="button" id="generateVoice" class="btn btn-warning w-100 mb-3">🔊 Generate Voice</button>
         <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
-        <input type="hidden" id="audio_id" name="audio_id">
+        <input type="hidden" id="audio_id" name="audio_id" required>
+
+        <!-- Existing Voice Selection -->
+        <div class="mb-3">
+            <label class="form-label">🎵 Or select from your saved voices:</label>
+            {% if voice_records %}
+                {% for record in voice_records %}
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="audio_choice" value="{{ record.audio_id }}" id="voice{{ loop.index }}">
+                    <label class="form-check-label" for="voice{{ loop.index }}">
+                        {{ record.audio_name }}
+                    </label>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-danger">No voice records available.</p>
+            {% endif %}
+        </div>
 
         <!-- Avatar Selection -->
         <div class="mb-3">
@@ -101,9 +118,11 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(data => {
             if (data.success) {
                 audioIdInput.value = data.audio_id;
-                // Fetch the audio stream from the server
                 audioPreview.src = `/stream_audio/${data.audio_id}`;
                 audioPreview.style.display = "block";
+
+                // Uncheck previous choices
+                document.querySelectorAll("input[name='audio_choice']").forEach(r => r.checked = false);
             } else {
                 alert("❌ Voice generation failed: " + data.error);
             }
@@ -111,6 +130,15 @@ document.addEventListener("DOMContentLoaded", function () {
         .catch(error => {
             console.error("❌ Error:", error);
             alert("❌ Error generating voice.");
+        });
+    });
+
+    // 📻 Select Existing Audio
+    document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
+        radio.addEventListener("change", function () {
+            audioIdInput.value = this.value;
+            audioPreview.src = `/stream_audio/${this.value}`;
+            audioPreview.style.display = "block";
         });
     });
 
@@ -124,7 +152,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const audioId = audioIdInput.value.trim();
 
         if (!text || !selectedAvatarId || !audioId) {
-            errorMsg.innerText = "❌ Please enter text, select an avatar, and generate voice.";
+            errorMsg.innerText = "❌ Please enter text, select an avatar, and generate or select a voice.";
             errorMsg.style.display = "block";
             return;
         }
