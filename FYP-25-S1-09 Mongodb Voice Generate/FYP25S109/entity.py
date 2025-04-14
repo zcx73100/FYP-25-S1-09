@@ -250,38 +250,36 @@ class TutorialVideo:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
 
+
 class GenerateVideoEntity:
     def __init__(self, text, avatar_path=None, audio_path=None):
         self.text = text
         self.avatar_path = avatar_path
         self.audio_path = audio_path
 
+    @staticmethod
+    def save_audio_to_gridfs(audio_bytes, filename="audio.mp3", content_type="audio/mpeg"):
+        audio_io = BytesIO(audio_bytes)
+        file_id = fs.put(audio_io, filename=filename, content_type=content_type)
+        return file_id
+
     def generate_voice(self):
         try:
             if not self.text.strip():
                 raise ValueError("Text input is empty.")
 
-            # Generate audio file in memory
+            # Generate MP3 in memory
             tts = gTTS(text=self.text, lang="en")
-            
-            # Save to a temporary file
-            temp_mp3 = "temp_voice.mp3"
-            temp_wav = "temp_voice.wav"
-            tts.save(temp_mp3)
-            
-            # Convert to WAV format
-            subprocess.run(["ffmpeg", "-y", "-i", temp_mp3, temp_wav],
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            # Read the WAV file and store in GridFS
-            with open(temp_wav, "rb") as f:
-                audio_id = fs.put(f, filename=f"voice_{datetime.now().isoformat()}.wav", 
-                                content_type="audio/wav")
-            
-            # Clean up temporary files
-            os.remove(temp_mp3)
-            os.remove(temp_wav)
-            
+            audio_mp3 = BytesIO()
+            tts.write_to_fp(audio_mp3)
+            audio_mp3.seek(0)
+
+            # Save MP3 to GridFS
+            audio_id = fs.put(
+                audio_mp3,
+                filename=f"voice_{datetime.now().isoformat()}.mp3",
+                content_type="audio/mpeg"
+            )
             return audio_id
 
         except Exception as e:
@@ -330,14 +328,10 @@ class GenerateVideoEntity:
             if not os.path.exists(video_path_on_disk):
                 return None
 
-            # Upload video to GridFS
             with open(video_path_on_disk, "rb") as f:
-                video_id = fs.put(f, filename=f"video_{datetime.now().isoformat()}.mp4", 
-                                content_type="video/mp4")
+                video_id = fs.put(f, filename=f"video_{datetime.now().isoformat()}.mp4", content_type="video/mp4")
 
-            # Clean up the temporary video file
             os.remove(video_path_on_disk)
-            
             return str(video_id)
 
         except Exception as e:
@@ -462,30 +456,22 @@ class GenerateVideoEntity:
             if not self.text.strip():
                 raise ValueError("Text input is empty.")
 
-            os.makedirs(os.path.dirname(self.audio_path), exist_ok=True)
+            # Create in-memory buffer
+            mp3_buffer = BytesIO()
 
-            mp3_temp = self.audio_path.replace(".wav", ".mp3")
+            # Generate audio to buffer
             tts = gTTS(text=self.text, lang="en")
-            tts.save(mp3_temp)
+            tts.write_to_fp(mp3_buffer)
+            mp3_buffer.seek(0)
 
-            subprocess.run(["ffmpeg", "-y", "-i", mp3_temp, self.audio_path],
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # Save to GridFS
+            audio_id = fs.put(
+                mp3_buffer,
+                filename=f"voice_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.mp3",
+                content_type="audio/mpeg"
+            )
 
-            # ✅ Upload to GridFS
-            with open(self.audio_path, "rb") as f:
-                audio_id = fs.put(f, filename=os.path.basename(self.audio_path), content_type="audio/wav")
-
-            # ✅ Store metadata in `voices` collection
-            voice_metadata = {
-                "text": self.text,
-                "audio_gridfs_id": audio_id,
-                "filename": self.audio_filename,
-                "timestamp": datetime.utcnow()
-            }
-            voice_id = mongo.db.voices.insert_one(voice_metadata).inserted_id
-
-            print(f"✅ Stored voice metadata with ID: {voice_id}")
-            return str(voice_id)  # Return MongoDB document ID
+            return audio_id
 
         except Exception as e:
             print(f"❌ Error generating voice: {e}")

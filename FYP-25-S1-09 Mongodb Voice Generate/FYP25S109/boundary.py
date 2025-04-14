@@ -120,30 +120,39 @@ class HomePage:
         )
 
 class AvatarVideoBoundary:
-    # Generate Voice
-    @boundary.route("/generate_voice", methods=["GET","POST"])
+    # Route: Generate Voice
+    @boundary.route("/generate_voice", methods=["POST"])
     def generate_voice():
-        if request.method == "POST":
-            try:
-                data = request.get_json()
-                text = data.get("text")
+        data = request.get_json()
+        text = data.get("text", "").strip()
 
-                if not text:
-                    return jsonify({"success": False, "error": "Text is required"}), 400
+        if not text:
+            return jsonify(success=False, error="No text provided."), 400
 
-                voice_entity = GenerateVideoEntity(text)
-                audio_id = voice_entity.generate_voice()
+        try:
+            controller = GenerateVideoController()
+            audio_id = controller.generate_voice(text)
 
-                if not audio_id:
-                    return jsonify({"success": False, "error": "Voice generation failed"}), 500
+            if not audio_id:
+                return jsonify(success=False, error="Voice generation failed."), 500
 
-                return jsonify({"success": True, "audio_id": audio_id})
+            return jsonify(success=True, audio_id=str(audio_id))
 
-            except Exception as e:
-                return jsonify({"success": False, "error": repr(e)}), 500
+        except Exception as e:
+            return jsonify(success=False, error=str(e)), 500
 
-    # Generate Talking Video
-    @boundary.route("/generate_video", methods=["GET","POST"])
+
+    # Route: Stream audio from GridFS
+    @boundary.route("/stream_audio/<audio_id>")
+    def stream_audio(audio_id):
+        try:
+            file = fs.get(ObjectId(audio_id))
+            return send_file(file, mimetype=file.content_type, as_attachment=False, download_name=file.filename)
+        except Exception as e:
+            return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
+
+    # Route: Generate Talking Video
+    @boundary.route("/generate_video", methods=["GET", "POST"])
     def generate_video():
         if request.method == "POST":
             try:
@@ -159,31 +168,26 @@ class AvatarVideoBoundary:
                 if not all([text, avatar_id, audio_id]):
                     return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-                # Retrieve avatar and audio from GridFS
                 avatar_file = fs.get(ObjectId(avatar_id))
                 audio_file = fs.get(ObjectId(audio_id))
 
                 if not avatar_file or not audio_file:
                     return jsonify({"success": False, "error": "Avatar or audio not found"}), 404
 
-                # Create temporary files for processing
                 temp_dir = "temp_processing"
                 os.makedirs(temp_dir, exist_ok=True)
-                
+
                 avatar_path = os.path.join(temp_dir, f"avatar_{avatar_id}.png")
                 audio_path = os.path.join(temp_dir, f"audio_{audio_id}.wav")
-                
+
                 with open(avatar_path, "wb") as f:
                     f.write(avatar_file.read())
-                
                 with open(audio_path, "wb") as f:
                     f.write(audio_file.read())
 
-                # Generate video
                 entity = GenerateVideoEntity(text, avatar_path, audio_path)
                 video_id = entity.generate_video()
 
-                # Clean up temporary files
                 try:
                     os.remove(avatar_path)
                     os.remove(audio_path)
@@ -198,49 +202,35 @@ class AvatarVideoBoundary:
             except Exception as e:
                 print(f"❌ Error in /generate_video route: {str(e)}")
                 return jsonify({"success": False, "error": repr(e)}), 500
-    
-    @boundary.route("/stream_audio/<audio_id>")
-    def stream_audio(audio_id):
-        if request.method=="POST":
-            try:
-                audio_file = fs.get(ObjectId(audio_id))
-                if not audio_file:
-                    return "Audio not found", 404
-                    
-                response = make_response(audio_file.read())
-                response.headers.set('Content-Type', 'audio/wav')
-                response.headers.set('Content-Disposition', 'inline', filename=f'audio_{audio_id}.wav')
-                return response
-            except Exception as e:
-                return str(e), 500
 
+    # Route: Stream video
     @boundary.route("/stream_video/<video_id>")
     def stream_video(video_id):
-        if request.method=="POST":
-            try:
-                video_file = fs.get(ObjectId(video_id))
-                if not video_file:
-                    return "Video not found", 404
-                    
-                response = make_response(video_file.read())
-                response.headers.set('Content-Type', 'video/mp4')
-                response.headers.set('Content-Disposition', 'inline', filename=f'video_{video_id}.mp4')
-                return response
-            except Exception as e:
-                return str(e), 500
-    
+        try:
+            video_file = fs.get(ObjectId(video_id))
+            if not video_file:
+                return "Video not found", 404
+
+            response = make_response(video_file.read())
+            response.headers.set('Content-Type', 'video/mp4')
+            response.headers.set('Content-Disposition', 'inline', filename=f'video_{video_id}.mp4')
+            return response
+        except Exception as e:
+            return str(e), 500
+
+    # Route: Render generate video page
     @boundary.route("/generate_video_page", methods=["GET"])
     def generate_video_page():
         try:
             username = session.get("username")
             if not username:
-                return redirect("/login")  # or return unauthorized response
-            
-            avatars = list(mongo.db.avatar.find({"username": username}))
+                return redirect("/login")
 
+            avatars = list(mongo.db.avatar.find({"username": username}))
         except Exception as e:
             print(f"❌ Error loading generate_video_page: {e}")
             return "Error loading page", 500
+
         return render_template("generateVideo.html", avatars=avatars)
 
 

@@ -458,17 +458,16 @@ class StudentDeleteSubmissionController:
 class GenerateVideoController:
     @staticmethod
     def generate_voice(text):
-        entity = GenerateVideoEntity(text=text, avatar_path=None)
-        audio_path = entity.generate_voice()
-        return audio_path
+        entity = GenerateVideoEntity(text=text)
+        audio_id = entity.generate_voice()
+        return audio_id
 
     @staticmethod
     def generate_video(text, avatar_path):
         entity = GenerateVideoEntity(text, avatar_path)
-        entity.generate_voice()  # Make sure audio is generated first
+        entity.generate_voice()
         video_path = entity.generate_video()
         return video_path
-
 
 class AddDiscussionRoomController:
     @staticmethod

@@ -3,7 +3,7 @@ import requests
 
 chatbot = Blueprint('chatbot', __name__)
 
-API_KEY = "YOUR API KEY"
+API_KEY = "your_api_key_here"
 
 # Model:openchat
 MODEL = "openchat/openchat-7b:free"
