@@ -5,8 +5,8 @@ chatbot = Blueprint('chatbot', __name__)
 
 API_KEY = "your_api_key_here"
 
-# Model:openchat
-MODEL = "openchat/openchat-7b:free"
+# Model:deepseek
+MODEL = "deepseek/deepseek-chat-v3-0324:free"
 
 @chatbot.route("/api/chat", methods=["POST"])
 def chat():
