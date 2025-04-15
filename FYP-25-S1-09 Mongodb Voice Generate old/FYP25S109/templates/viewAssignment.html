@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-messages">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="assignment-view-container">
+  <h2>📘 Assignment: {{ assignment.title }}</h2>
+
+  <!-- Meta Info -->
+  <div class="assignment-meta">
+    {% if assignment.description %}
+      <p><strong>Description:</strong> {{ assignment.description }}</p>
+    {% endif %}
+    {% if assignment.due_date %}
+      <p><strong>Due Date:</strong> {{ assignment.due_date.strftime('%d %B %Y, %I:%M %p') }}</p>
+    {% endif %}
+  </div>
+
+  <!-- 🎥 Instructional Video -->
+  {% if assignment.video_path %}
+    {% if session['role'] == 'Admin' 
+        or (session['role'] == 'Teacher' and session['username'] == assignment.teacher_username)
+        or (session['role'] == 'Student' and session['username'] in enrolled_students) %}
+      <div class="video-preview my-6">
+        <h4 class="text-lg font-semibold text-gray-800 mb-2">🎥 Instructional Video</h4>
+        <div class="flex justify-center">
+          <video class="rounded-xl shadow-lg w-full max-w-md" controls>
+            <source src="{{ assignment.video_path }}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <!-- 📂 File Preview Section -->
+  <div class="assignment-frame mt-4">
+    {% if file_extension == "pdf" %}
+      <iframe src="data:application/pdf;base64,{{ file_base64 }}" width="100%" height="600px" frameborder="0"></iframe>
+    {% elif file_extension in ["doc", "docx", "ppt", "pptx"] %}
+      <p>This file type cannot be previewed. Please download it below.</p>
+    {% elif file_extension in ["txt", "md"] %}
+      <div class="text-content">
+        <pre>{{ text_content | e }}</pre>
+      </div>
+    {% else %}
+      <p>Unsupported file format.</p>
+    {% endif %}
+  </div>
+
+  <!-- 👨‍🎓 Student Submission Logic -->
+  {% if session.get('role') == 'Student' %}
+    <div class="submission-section mt-6">
+      <h3 class="text-2xl font-semibold mb-4 text-white">Submit Your Work</h3>
+
+      {% if student_submission %}
+        <p class="text-white"><strong>You have already submitted this assignment.</strong></p>
+        <div class="mt-3 flex flex-col gap-2">
+          <a href="{{ url_for('boundary.student_view_submission', submission_id=student_submission._id) }}" class="btn btn-success">📄 View Submission</a>
+          <a href="{{ url_for('boundary.student_edit_submission', submission_id=student_submission._id) }}" class="btn btn-warning">✏️ Edit Submission</a>
+          <form action="{{ url_for('boundary.student_delete_submission', submission_id=student_submission._id, assignment_id=assignment._id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your submission?');">
+            <button type="submit" class="btn btn-danger">🗑️ Delete Submission</button>
+          </form>
+        </div>
+
+      {% else %}
+        <div class="mb-4 text-left text-white">
+          <label class="block text-sm font-semibold mb-2">🎯 Choose Submission Type:</label>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <label class="flex items-center gap-2">
+              <input type="radio" id="submit-file" name="submit_type" checked class="accent-blue-500">
+              <span>📄 Upload File</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="radio" id="submit-video" name="submit_type" class="accent-blue-500">
+              <span>🎥 Generate Video</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- File Upload Form -->
+        <form id="file-form" action="{{ url_for('boundary.submit_assignment', assignment_id=assignment._id, filename=filename) }}" method="POST" enctype="multipart/form-data" class="mb-4">
+          <label for="file-upload" class="block text-sm font-medium mb-1 text-white">Choose file:</label>
+          <input type="file" name="file" id="file-upload" required class="w-full p-2 rounded bg-white text-black">
+          <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
+          <input type="hidden" name="student_username" value="{{ session['username'] }}">
+          <button type="submit" class="btn btn-primary mt-3 w-full">📤 Submit File</button>
+        </form>
+
+        <!-- Video Generation Redirect -->
+        <form id="video-form" action="{{ url_for('boundary.generate_video') }}" method="GET" style="display: none;">
+          <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
+          <input type="hidden" name="classroom_id" value="{{ assignment.classroom_id }}">
+          <input type="hidden" name="source" value="submission">
+          <button type="submit" class="btn btn-outline-primary w-full mt-3">🎬 Generate Video Submission</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- 👩‍🏫 Teacher View of Submissions -->
+  {% if session.get('role') == 'Teacher' %}
+    <div class="submissions mt-5">
+      <h3>Student Submissions</h3>
+      <ul>
+        {% if submissions %}
+          {% for submission in submissions %}
+            <li>
+              <strong>{{ submission.student_name }}</strong>: {{ submission.submission_date }}
+              <br>
+              <a href="{{ url_for('boundary.view_submission', filename=submission.filename) }}" class="file-button">📄 View</a>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li>No submissions available.</li>
+        {% endif %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <!-- 📥 Download + Navigation -->
+  <div class="buttons mt-4">
+    <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
+    <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">🏠 Return Home</a>
+  </div>
+</div>
+
+<style>
+  .assignment-view-container {
+    text-align: center;
+    padding: 20px;
+  }
+
+  .assignment-frame {
+    margin: 20px auto;
+    width: 80%;
+    height: 600px;
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .submission-section {
+    background: linear-gradient(to right, #1e1e1e, #2a2a2a);
+    padding: 20px;
+    border-radius: 12px;
+    color: white;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .submissions {
+    margin-top: 20px;
+    background: #1e1e1e;
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+  }
+
+  .buttons {
+    margin-top: 20px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 5px;
+    text-decoration: none;
+    color: white;
+  }
+
+  .btn-primary {
+    background-color: #007bff;
+  }
+
+  .btn-secondary {
+    background-color: #6c757d;
+  }
+
+  .btn-success {
+    background-color: #28a745;
+  }
+
+  .btn-warning {
+    background-color: #ffc107;
+    color: black;
+  }
+
+  .btn-danger {
+    background-color: #dc3545;
+  }
+
+  .btn-outline-primary {
+    border: 2px solid #007bff;
+    color: #007bff;
+    background: transparent;
+  }
+
+  .btn-outline-primary:hover {
+    background-color: #007bff;
+    color: white;
+  }
+
+  .btn:hover {
+    opacity: 0.9;
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const fileRadio = document.getElementById("submit-file");
+    const videoRadio = document.getElementById("submit-video");
+    const fileForm = document.getElementById("file-form");
+    const videoForm = document.getElementById("video-form");
+
+    fileRadio.addEventListener("change", function () {
+      fileForm.style.display = "block";
+      videoForm.style.display = "none";
+    });
+
+    videoRadio.addEventListener("change", function () {
+      fileForm.style.display = "none";
+      videoForm.style.display = "block";
+    });
+  });
+</script>
+
+{% endblock %}

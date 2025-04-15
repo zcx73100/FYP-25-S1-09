@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="upload-title">Upload Assignment</h2>
+
+<form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}" 
+      method="POST" enctype="multipart/form-data" class="upload-form">
+
+    <!-- Assignment Title -->
+    <p>Assignment Title:</p>
+    <input type="text" name="title" placeholder="Assignment Title" class="input-field" required>
+
+    <!-- Description + Generate Video -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label>Assignment Description:</label>
+        <a href="{{ url_for('boundary.generate_video', classroom_id=classroom_id, source='assignment') }}"
+           class="btn btn-sm btn-outline-primary">
+            🎬 Generate Assignment Video
+        </a>
+    </div>
+
+    <input type="text" name="description" placeholder="Assignment Description" class="input-field">
+
+    <!-- 🎥 Show Generated Video if Available -->
+    {% if video_url %}
+    <div class="video-preview mt-3">
+        <p><strong>Generated Instructional Video:</strong></p>
+        <video controls width="100%" class="mb-3 rounded shadow-sm">
+            <source src="{{ video_url }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    {% endif %}
+
+    <!-- Deadline -->
+    <p>Deadline:</p>
+    <input type="datetime-local" name="deadline" class="input-field" required>
+
+    <!-- File Upload -->
+    <p>Upload File:</p>
+    <input type="file" name="file" class="file-input" required>
+
+    <!-- Submit -->
+    <button type="submit" class="upload-button">📤 Upload Assignment</button>
+</form>
+
+<!-- Return Button -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary mt-3">
+    ⬅️ Return to Classroom
+</a>
+
+<style>
+  /* Container for the form */
+.upload-form {
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Title styling */
+.upload-title {
+    text-align: center;
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+/* Styling for text inputs and datetime picker */
+.input-field {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.input-field:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+/* File input styling */
+.file-input {
+    border: none;
+    font-size: 16px;
+}
+
+/* Upload button styling */
+.upload-button {
+    background-color: #007bff;
+    color: white;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.upload-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+</style>
+{% endblock %}

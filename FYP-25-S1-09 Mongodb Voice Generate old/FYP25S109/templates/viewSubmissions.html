@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="submissions-title">Submissions for Assignment: {{ assignment.title }}</h2>
+
+{% if submissions %}
+<table class="submissions-table">
+  <thead>
+    <tr>
+      <th class="table-header">Student</th>
+      <th class="table-header">Submission</th>
+      <th class="table-header">Submitted At</th>
+      <th class="table-header">Grade</th>
+      <th class="table-header">Score</th>
+      <th class="table-header">Feedback</th>
+      <th class="table-header">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for submission in submissions %}
+    <tr class="table-row">
+      <td class="table-data">{{ submission.student }}</td>
+
+      <td class="table-data">
+        {% if submission.file_name and submission.file_name != "Not Available" %}
+          <a href="{{ url_for('boundary.view_submitted_assignment', filename=submission.file_name, submission_id=submission._id) }}" class="view-link">📄 View</a><br>
+        {% endif %}
+        {% if submission.video_url %}
+          <a href="{{ submission.video_url }}" target="_blank" class="view-link text-danger">🎬 Watch</a>
+        {% endif %}
+        {% if not submission.file_name and not submission.video_url %}
+          <span class="text-muted">Not Available</span>
+        {% endif %}
+      </td>
+
+      <td class="table-data">
+        {{ submission.submitted_at.strftime("%Y-%m-%d %H:%M:%S") if submission.submitted_at else "Not Available" }}
+      </td>
+
+      <td class="table-data grade-text">
+        {% if submission.grade is not none %}
+          {% if submission.grade >= 85 %} HD
+          {% elif submission.grade >= 75 %} D
+          {% elif submission.grade >= 65 %} C
+          {% elif submission.grade >= 50 %} P
+          {% else %} F
+          {% endif %}
+        {% else %}
+          Not graded
+        {% endif %}
+      </td>
+
+      <td class="table-data">
+        {% if submission.grade is not none %}
+          {{ submission.grade }} / 100
+        {% else %}
+          -
+        {% endif %}
+      </td>
+
+      <td class="table-data feedback-text">
+        {% if submission.feedback %}
+          <div class="feedback-box">{{ submission.feedback }}</div>
+        {% else %}
+          <em>-</em>
+        {% endif %}
+      </td>
+
+      <td class="table-actions">
+        <!-- Grade Form -->
+        <form action="{{ url_for('boundary.grade_assignment', classroom_id=classroom_id, assignment_id=assignment._id, student_username=submission.student_username, submission_id=submission._id) }}" method="POST" class="inline-form">
+          <input type="number" name="grade" min="0" max="100" required class="grade-input" placeholder="Grade">
+          <button type="submit" class="grade-button">✓</button>
+        </form>
+
+        <!-- Feedback Form -->
+        <form action="{{ url_for('boundary.add_feedback', submission_id=submission._id) }}" method="POST" class="inline-form">
+          <input type="hidden" name="student_username" value="{{ submission.student }}">
+          <textarea name="feedback" rows="2" placeholder="Feedback..." required class="feedback-input"></textarea>
+          <button type="submit" class="feedback-button">💬</button>
+        </form>
+
+        <!-- Delete Form -->
+        <form action="{{ url_for('boundary.delete_submission', submission_id=submission._id) }}" method="POST" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this submission?');">
+          <button type="submit" class="delete-button">🗑</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="no-submissions">No submissions have been made for this assignment yet.</p>
+{% endif %}
+
+<!-- Back Button -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="back-button">Back to Classroom Page</a>
+
+<style>
+.submissions-title {
+  text-align: center;
+  color: #333;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.no-submissions {
+  text-align: center;
+  font-size: 18px;
+  color: #555;
+  margin-top: 20px;
+}
+
+.submissions-table {
+  width: 90%;
+  margin: 0 auto;
+  border-collapse: collapse;
+  background: #f9f9f9;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table-header {
+  background: #007bff;
+  color: white;
+  padding: 12px;
+  text-align: left;
+  font-size: 16px;
+}
+
+.table-row:nth-child(even) {
+  background: #f1f1f1;
+}
+
+.table-row:hover {
+  background: #e0e0e0;
+}
+
+.table-data {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.view-link {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.view-link:hover {
+  text-decoration: underline;
+}
+
+.table-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.grade-input {
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100px;
+}
+
+.grade-button {
+  background-color: #28a745;
+  color: white;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.grade-button:hover {
+  background-color: #218838;
+}
+
+.feedback-input {
+  width: 100%;
+  font-size: 13px;
+  border-radius: 4px;
+  padding: 6px;
+  margin-top: 4px;
+}
+
+.feedback-button {
+  background-color: #17a2b8;
+  color: white;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.feedback-button:hover {
+  background-color: #138496;
+}
+
+.delete-button {
+  background-color: red;
+  color: white;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-button:hover {
+  background-color: darkred;
+}
+
+.back-button {
+  display: block;
+  width: fit-content;
+  margin: 20px auto;
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  text-align: center;
+  transition: background 0.3s;
+}
+
+.back-button:hover {
+  background: #0056b3;
+}
+
+.feedback-box {
+  background-color: #f0f0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: left;
+}
+</style>
+
+{% endblock %}

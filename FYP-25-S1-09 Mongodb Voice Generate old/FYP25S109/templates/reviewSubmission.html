@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="material-view-container">
+  <h2>Viewing Your Submission: {{ filename }}</h2>
+
+  <div class="material-frame">
+    {% if file_extension == "pdf" %}
+      <iframe src="data:application/pdf;base64,{{ file_base64 }}"
+              width="100%" height="600px" frameborder="0"></iframe>
+
+    {% elif file_extension in ["doc", "docx", "ppt", "pptx"] %}
+      <div class="empty-preview">
+        <p class="mb-3">📄 DOCX/PPT files cannot be previewed. Please download the file.</p>
+        <a href="{{ url_for('boundary.student_download_submission', file_id=submission.file_id) }}"
+           class="btn btn-primary" download>⬇️ Download File</a>
+      </div>
+
+    {% elif file_extension in ["txt", "md"] %}
+      <div class="text-content">
+        <pre>{{ text_content }}</pre>
+      </div>
+
+    {% else %}
+      {% if not video_url %}
+        <p>Unsupported file format. Please contact the instructor for more information.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if video_url %}
+      <div class="video-preview mt-4">
+        <h4>🎬 Submitted Video</h4>
+        <video width="100%" controls class="rounded shadow">
+          <source src="{{ video_url }}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="buttons mt-4">
+    <button class="btn btn-secondary" onclick="window.history.back();">Return to Previous Screen</button>
+  </div>
+</div>
+
+<style>
+.material-view-container {
+  text-align: center;
+  padding: 20px;
+}
+
+.material-frame {
+  margin: 20px auto;
+  width: 80%;
+  min-height: 200px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+.text-content {
+  text-align: left;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 15px;
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+.empty-preview {
+  text-align: center;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 5px;
+  margin: 10px;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+</style>
+
+{% endblock %}
