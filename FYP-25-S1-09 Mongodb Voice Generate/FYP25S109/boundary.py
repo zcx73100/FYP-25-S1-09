@@ -71,31 +71,35 @@ class HomePage:
         avatar = list(mongo.db.avatar.find({"username": {"$in": admin_users}}))
 
         avatar_showcase = []
-
         for avatar_doc in avatar:
             avatar_id = avatar_doc["_id"]
+
             avatar_data = {
                 "avatarname": avatar_doc.get("avatarname"),
                 "image_data": avatar_doc.get("image_data"),
             }
 
+            # Force ObjectId just in case something changed in type
+            if not isinstance(avatar_id, ObjectId):
+                avatar_id = ObjectId(avatar_id)
+
             print(f"🔍 Looking for video with avatar_id={avatar_id} (type: {type(avatar_id)})")
 
+            # Lookup published video linked to this avatar
             video = mongo.db.video.find_one({
                 "avatar_id": avatar_id,
                 "is_published": True
             })
 
             if video:
-                print(f"✅ Found video: {video}")
+                print(f"✅ Found video for {avatar_data['avatarname']}: {video.get('_id')}")
                 avatar_data["video_id"] = str(video.get("video_gridfs_id") or video.get("file_id"))
             else:
-                print(f"❌ No video found for avatar {avatar_doc.get('avatarname')}")
+                print(f"❌ No video found for avatar {avatar_data['avatarname']} with ID {avatar_id}")
                 avatar_data["video_id"] = None
 
             avatar_showcase.append(avatar_data)
-
-    
+                    
         # Classrooms by role
         if role == "Teacher":
             classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
@@ -183,22 +187,33 @@ class AvatarVideoBoundary:
                 return jsonify({"success": False, "error": "Unauthorized"}), 401
 
             text = request.form.get("text", "").strip()
-            avatar_id = request.form.get("avatar_id")
-            audio_id = request.form.get("audio_id")
+            avatar_doc_id = request.form.get("avatar_id")
+            audio_id      = request.form.get("audio_id")
 
-            if not avatar_id or not audio_id:
+            if not avatar_doc_id or not audio_id:
                 return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
-            controller = GenerateVideoController()
-            video_id = controller.generate_video(text, avatar_id, audio_id)
+            # 1) Fetch the avatar document by its _id
+            avatar_doc = mongo.db.avatar.find_one({"_id": ObjectId(avatar_doc_id)})
+            if not avatar_doc:
+                return jsonify({"success": False, "error": "Avatar not found"}), 400
 
-            if not video_id:
+            # 2) Extract the GridFS file_id from that document
+            file_id = avatar_doc.get("file_id")
+            if not file_id:
+                return jsonify({"success": False, "error": "Avatar has no image file"}), 400
+
+            # 3) Generate video by passing the GridFS file_id (not the document _id)
+            controller = GenerateVideoController()
+            video_gridfs_id = controller.generate_video(text, str(file_id), audio_id)
+
+            if not video_gridfs_id:
                 return jsonify({"success": False, "error": "Video generation failed"}), 500
 
-            return jsonify({"success": True, "video_id": video_id})
+            return jsonify({"success": True, "video_id": video_gridfs_id})
 
         except Exception as e:
-            print(f"Error in /generate_video route: {str(e)}")
+            print(f"Error in /generate_video route: {e!r}")
             return jsonify({"success": False, "error": repr(e)}), 500
 
     
