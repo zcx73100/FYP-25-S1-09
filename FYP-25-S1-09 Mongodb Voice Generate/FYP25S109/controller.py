@@ -5,14 +5,6 @@ import json
 from bson import ObjectId
 from datetime import datetime, timezone
 
-class GenerateVideoController:
-    @staticmethod
-    def generate_voice(text):
-        entity = GenerateVideoEntity(text=text, avatar_path=None)
-        return entity.generate_voice(text)
-    def generate_video(text, avatar_path):
-        entity = GenerateVideoEntity(text, avatar_path)
-        entity.generate_voice()  # Make sure audio is generated first
 
 class VideoController:
     @staticmethod
@@ -464,8 +456,9 @@ class GenerateVideoController:
 
     @staticmethod
     def generate_video(text, avatar_id, audio_id):
-        entity = GenerateVideoEntity(text, avatar_id, audio_id)
-        return entity.generate_video()
+        entity = GenerateVideoEntity(text=text, avatar_path=avatar_id, audio_path=audio_id)
+        video_id = entity.generate_video(avatar_id, audio_id)
+        return video_id  # GridFS ObjectId or string
 
 
 class AddDiscussionRoomController:

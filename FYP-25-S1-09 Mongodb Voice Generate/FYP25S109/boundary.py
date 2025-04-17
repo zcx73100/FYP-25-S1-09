@@ -54,71 +54,95 @@ class HomePage:
     @staticmethod
     @boundary.route('/')
     def home():
-        username = session.get("username", None)
-        role = session.get("role", None)
+        username = session.get("username")
+        role = session.get("role")
 
-        user_info = mongo.db.useraccount.find_one({"username": username},{}) if username else None
+        user_info = mongo.db.useraccount.find_one({"username": username}) if username else None
 
-        teacher_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
+        # Fetch teacher + admin users
+        teacher_users = [u["username"] for u in mongo.db.useraccount.find({"role": "Teacher"}, {"username": 1})]
+        admin_users = [u["username"] for u in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
+
+        # Fetch all tutorial videos (for main video section)
         teacher_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": teacher_users}}))
-
-        admin_users = [user_info["username"] for user_info in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
         admin_videos = list(mongo.db.tutorialvideo.find({"username": {"$in": admin_users}}))
 
-        avatars = list(mongo.db.avatar.find({"username": {"$in":admin_users}}, {})) #Show only admin-uploaded avatars
+        # Fetch avatars uploaded by Admins
+        avatar = list(mongo.db.avatar.find({"username": {"$in": admin_users}}))
 
-        classrooms = []
+        avatar_showcase = []
+
+        for avatar_doc in avatar:
+            avatar_id = avatar_doc["_id"]
+            avatar_data = {
+                "avatarname": avatar_doc.get("avatarname"),
+                "image_data": avatar_doc.get("image_data"),
+            }
+
+            print(f"🔍 Looking for video with avatar_id={avatar_id} (type: {type(avatar_id)})")
+
+            video = mongo.db.video.find_one({
+                "avatar_id": avatar_id,
+                "is_published": True
+            })
+
+            if video:
+                print(f"✅ Found video: {video}")
+                avatar_data["video_id"] = str(video.get("video_gridfs_id") or video.get("file_id"))
+            else:
+                print(f"❌ No video found for avatar {avatar_doc.get('avatarname')}")
+                avatar_data["video_id"] = None
+
+            avatar_showcase.append(avatar_data)
+
+    
+        # Classrooms by role
         if role == "Teacher":
             classrooms = list(mongo.db.classroom.find({"teacher": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
         elif role == "Student":
             classrooms = list(mongo.db.classroom.find({"student_list": username}, {"_id": 1, "classroom_name": 1, "description": 1}))
-        elif role == "Admin":
+        else:
             classrooms = list(mongo.db.classroom.find({}, {"_id": 1, "classroom_name": 1, "description": 1}))
 
-        classroom_ids = [classroom["_id"] for classroom in classrooms]
+        classroom_ids = [c["_id"] for c in classrooms]
 
+        # Class-related collections
         announcements = {
-            classroom["_id"]: list(mongo.db.announcements.find(
-                {"classroom_id": classroom["_id"]},
-                {"_id": 1, "title": 1, "content": 1, "created_at": 1}
-            )) for classroom in classrooms
+            cid: list(mongo.db.announcements.find({"classroom_id": cid}, {"_id": 1, "title": 1, "content": 1}))
+            for cid in classroom_ids
         }
 
         materials = {
-            classroom["_id"]: list(mongo.db.materials.find(
-                {"classroom_id": classroom["_id"]},
-                {"_id": 1, "title": 1}
-            )) for classroom in classrooms
+            cid: list(mongo.db.materials.find({"classroom_id": cid}, {"_id": 1, "title": 1}))
+            for cid in classroom_ids
         }
 
         assignments = {
-            classroom["_id"]: list(mongo.db.assignments.find(
-                {"classroom_id": classroom["_id"]},
-                {"_id": 1, "title": 1}
-            )) for classroom in classrooms
+            cid: list(mongo.db.assignments.find({"classroom_id": cid}, {"_id": 1, "title": 1}))
+            for cid in classroom_ids
         }
 
         quizzes = {
-            str(classroom["_id"]): list(mongo.db.quizzes.find(
-                {"classroom_id": ObjectId(classroom["_id"])},
-                {"_id": 1, "title": 1}
-            )) for classroom in classrooms
+            str(cid): list(mongo.db.quizzes.find({"classroom_id": ObjectId(cid)}, {"_id": 1, "title": 1}))
+            for cid in classroom_ids
         }
-        print(session)
 
         return render_template(
             "homepage.html",
             user_info=user_info,
             username=username,
+            role=role,
             videos=admin_videos + teacher_videos,
-            avatars=avatars,
+            avatar_showcase=avatar_showcase,
             classrooms=classrooms,
             announcements=announcements,
             materials=materials,
             assignments=assignments,
             quizzes=quizzes
         )
-    
+
+
+
 class AvatarVideoBoundary:
     # Route: Generate Voice
     @boundary.route("/generate_voice", methods=["POST"])
@@ -128,7 +152,7 @@ class AvatarVideoBoundary:
 
         if not text:
             return jsonify(success=False, error="No text provided."), 400
-        
+
         try:
             controller = GenerateVideoController()
             audio_id = controller.generate_voice(text)
@@ -136,7 +160,7 @@ class AvatarVideoBoundary:
             if not audio_id:
                 return jsonify(success=False, error="Voice generation failed."), 500
 
-            return jsonify(success=True, audio_id=str(audio_id))
+            return jsonify(success=True, audio_id=str(audio_id))  # ✅ Ensures it's a string
 
         except Exception as e:
             return jsonify(success=False, error=str(e)), 500
@@ -158,12 +182,11 @@ class AvatarVideoBoundary:
             if not username:
                 return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-            data = request.get_json()
-            text = data.get("text")
-            avatar_id = data.get("avatar_id")
-            audio_id = data.get("audio_id")
+            text = request.form.get("text", "").strip()
+            avatar_id = request.form.get("avatar_id")
+            audio_id = request.form.get("audio_id")
 
-            if not all([text, avatar_id, audio_id]):
+            if not avatar_id or not audio_id:
                 return jsonify({"success": False, "error": "Missing required parameters"}), 400
 
             controller = GenerateVideoController()
@@ -178,20 +201,15 @@ class AvatarVideoBoundary:
             print(f"Error in /generate_video route: {str(e)}")
             return jsonify({"success": False, "error": repr(e)}), 500
 
+    
     # Route: Stream video
     @boundary.route("/stream_video/<video_id>")
     def stream_video(video_id):
         try:
-            video_file = fs.get(ObjectId(video_id))
-            if not video_file:
-                return "Video not found", 404
-
-            response = make_response(video_file.read())
-            response.headers.set('Content-Type', 'video/mp4')
-            response.headers.set('Content-Disposition', 'inline', filename=f'video_{video_id}.mp4')
-            return response
+            file = fs.get(ObjectId(video_id))  # GridFS
+            return send_file(file, mimetype="video/mp4", as_attachment=False)
         except Exception as e:
-            return str(e), 500
+            return f"Video not found: {e}", 404
     
     # Route: Render generate video page
     @boundary.route("/generate_video_page", methods=["GET"])
@@ -209,6 +227,71 @@ class AvatarVideoBoundary:
 
         return render_template("generateVideo.html", avatars=avatars, voice_records=audios)
 
+    @boundary.route("/save_generated_video", methods=["POST"])
+    def save_generated_video():
+        try:
+            data = request.get_json()
+            username = session.get("username")
+            role = session.get("role")
+
+            text = data.get("text", "").strip()
+            audio_id = data.get("audio_id")
+            avatar_id = data.get("avatar_id")
+            video_id = data.get("video_id")  # GridFS ID
+
+            # Validate required fields
+            if not all([audio_id, avatar_id, video_id]):
+                return jsonify(success=False, error="Missing required fields.")
+
+            # Insert into the correct video collection
+            saved = mongo.db.video.insert_one({
+                "username": username,
+                "role": role,
+                "text": text,
+                "audio_id": ObjectId(audio_id),
+                "avatar_id": ObjectId(avatar_id),
+                "video_gridfs_id": ObjectId(video_id),
+                "created_at": datetime.utcnow(),
+                "is_published": False
+            })
+
+            return jsonify(success=True, saved_id=str(saved.inserted_id))
+
+        except Exception as e:
+            print("❌ Error in saving video:", str(e))
+            return jsonify(success=False, error=str(e)), 500
+
+
+
+    # Publish To Homepage
+    @boundary.route("/publish_to_homepage", methods=["POST"])
+    def publish_to_homepage():
+        try:
+            username = session.get("username")
+            role = session.get("role")
+
+            if role != "Admin":
+                return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+            data = request.get_json()
+            video_id = data.get("video_id")  # this is the metadata document _id, not the GridFS one
+
+            if not video_id:
+                return jsonify({"success": False, "error": "Missing video_id"}), 400
+
+            result = mongo.db.video.update_one(
+                {"_id": ObjectId(video_id), "username": username},
+                {"$set": {"is_published": True}}
+            )
+
+            if result.modified_count == 0:
+                return jsonify({"success": False, "error": "Video not found or already published"}), 404
+
+            return jsonify(success=True)
+
+        except Exception as e:
+            print("❌ Publish Error:", e)
+            return jsonify(success=False, error=str(e)), 500
 
     
 # Log In

@@ -21,6 +21,7 @@ import base64
 import mimetypes
 from gtts import gTTS
 import gridfs
+import uuid
 fs = gridfs.GridFS(mongo.db)
 
 
@@ -303,26 +304,32 @@ class GenerateVideoEntity:
             return None
 
 
-    def generate_video(self, avatar_id, voice_id=None):
+    def generate_video(self, avatar_id, audio_id):
         try:
             SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
-            # Fetch avatar and audio files from GridFS
-            avatar_file = fs.get(ObjectId(self.avatar_path))  # self.avatar_path should be the GridFS ObjectId
-            audio_file = fs.get(ObjectId(self.audio_path))  # self.audio_path should be the GridFS ObjectId
 
-            if not avatar_file or not audio_file:
-                raise FileNotFoundError("Missing avatar or audio file from the database")
+            # Load avatar and audio from GridFS
+            avatar_file = fs.get(ObjectId(avatar_id))
+            audio_file = fs.get(ObjectId(audio_id))
 
-            # Create file-like objects using BytesIO from GridFS files
-            avatar_bytes = BytesIO(avatar_file.read())
-            audio_bytes = BytesIO(audio_file.read())
+            # Save temporary files
+            avatar_temp_path = f"/tmp/avatar_{uuid.uuid4().hex}.png"
+            audio_temp_path = f"/tmp/audio_{uuid.uuid4().hex}.wav"
 
-            # Prepare files for the POST request
+            with open(avatar_temp_path, "wb") as f:
+                f.write(avatar_file.read())
+
+            with open(audio_temp_path, "wb") as f:
+                f.write(audio_file.read())
+
+            print(f"[DEBUG] Avatar saved to {avatar_temp_path}")
+            print(f"[DEBUG] Audio saved to {audio_temp_path}")
+
+            # Prepare POST to SadTalker
             files = {
-                "image_file": ("avatar.png", avatar_bytes, "image/png"),
-                "audio_file": ("audio.wav", audio_bytes, "audio/wav")
+                "image_file": ("avatar.png", open(avatar_temp_path, "rb"), "image/png"),
+                "audio_file": ("audio.wav", open(audio_temp_path, "rb"), "audio/wav")
             }
-
             data = {
                 "preprocess_type": "crop",
                 "is_still_mode": "false",
@@ -332,39 +339,33 @@ class GenerateVideoEntity:
                 "pose_style": "0"
             }
 
-            # Send the POST request to the external API
             response = requests.post(SADTALKER_API, files=files, data=data)
+            print("[DEBUG] SadTalker response status:", response.status_code)
+
+            if response.status_code != 200:
+                print("❌ SadTalker failed:", response.text)
+                return None
 
             result = response.json()
+            video_path = result.get("video_path")
+            print(f"[DEBUG] SadTalker returned video_path: {video_path}")
 
-            if response.status_code != 200 or "video_path" not in result:
+            if not video_path or not os.path.exists(video_path):
+                print("❌ ERROR: video_path is missing or file does not exist.")
                 return None
 
-            video_path_on_disk = result.get("video_path")
+            # Upload to GridFS
+            with open(video_path, "rb") as f:
+                video_id = fs.put(f, filename=os.path.basename(video_path), content_type="video/mp4")
 
-            if not os.path.exists(video_path_on_disk):
-                return None
-
-            # ✅ Upload video to GridFS
-            with open(video_path_on_disk, "rb") as f:
-                video_id = fs.put(f, filename=os.path.basename(video_path_on_disk), content_type="video/mp4")
-
-            # ✅ Store metadata in `videos` collection
-            video_metadata = {
-                "avatar_used": self.avatar_path,
-                "video_gridfs_id": video_id,
-                "linked_voice_id": ObjectId(voice_id) if voice_id else None,
-                "filename": os.path.basename(video_path_on_disk),
-                "timestamp": datetime.utcnow()
-            }
-            stored_video_id = mongo.db.videos.insert_one(video_metadata).inserted_id
-
-            print(f"✅ Stored video metadata with ID: {stored_video_id}")
-            return str(stored_video_id)
+            print(f"[✅] Video saved to GridFS with ID: {video_id}")
+            return str(video_id)
 
         except Exception as e:
-            print(f"❌ Error during SadTalker call: {e}")
+            print(f"❌ Error during video generation: {e}")
             return None
+
+
 
     
 class Avatar:
@@ -386,35 +387,34 @@ class Avatar:
             if not self.allowed_file(filename):
                 raise ValueError("Invalid image format.")
 
-            # Read file content as binary
+            # Read file content
             image_binary = self.image_file.read()
 
             # Remove background using rembg
             image_no_bg = remove(image_binary)  # This returns binary image data
 
-            # Save to disk
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            file_basename = f"{self.avatarname}_{timestamp}.png"
-            relative_path = f"uploads/avatar/{file_basename}"
-            absolute_path = os.path.join("FYP25S109/static", relative_path)
+            # Save to GridFS
+            gridfs_id = fs.put(image_no_bg, filename=filename, content_type="image/png")
 
-            os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-            with open(absolute_path, "wb") as f:
-                f.write(image_no_bg)
-
-            # Also convert to Base64 (optional for preview or future use)
+            # Optionally save a base64 version for preview
             image_base64 = base64.b64encode(image_no_bg).decode("utf-8")
 
-            # Save to DB (both base64 and relative file_path)
-            success = self.add_avatar(self.avatarname, self.username, image_base64, relative_path)
-            if not success:
-                return {"success": False, "message": "Failed to add avatar to database."}
+            # Store metadata in MongoDB
+            avatar_doc = {
+                'avatarname': self.avatarname,
+                'username': self.username,
+                'image_data': image_base64,  # for preview
+                'file_id': gridfs_id,        # used by generate_video()
+                'upload_date': datetime.utcnow()
+            }
 
-            return {"success": True, "message": "Avatar uploaded and saved successfully."}
+            mongo.db.avatar.insert_one(avatar_doc)
+
+            return {"success": True, "message": "Avatar uploaded successfully."}
 
         except Exception as e:
-            logging.error(f"Error processing avatar: {str(e)}")
-            return {"success": False, "message": f"Error processing avatar: {str(e)}"}
+            logging.error(f"Error saving avatar: {str(e)}")
+            return {"success": False, "message": str(e)}
 
     def add_avatar(self, avatarname, username, image_data, file_path):
         try:
