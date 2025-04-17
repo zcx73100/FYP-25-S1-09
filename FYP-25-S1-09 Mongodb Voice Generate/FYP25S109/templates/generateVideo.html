@@ -39,7 +39,7 @@
         {% if avatars %}
           {% for avatar in avatars %}
             <label class="text-center">
-              <input type="radio" name="avatar_id" value="{{ avatar.file_id }}" required>
+              <input type="radio" name="avatar_id" value="{{ avatar._id }}" required>
               <img src="data:image/jpeg;base64,{{ avatar.image_data }}" class="img-thumbnail" style="width:100px; height:100px;">
               <p>{{ avatar.avatarname }}</p>
             </label>
