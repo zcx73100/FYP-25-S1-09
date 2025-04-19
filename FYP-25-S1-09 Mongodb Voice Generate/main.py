@@ -3,10 +3,11 @@ from bson.objectid import ObjectId
 from apscheduler.schedulers.background import BackgroundScheduler
 from FYP25S109 import create_app
 from flask_pymongo import PyMongo
+from flask_cors import CORS
 import logging
 
 app = create_app()
-
+CORS(app, supports_credentials=True)
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     logger.info("Starting the Flask app...")
     # Initialize APScheduler to schedule tasks in the background
     scheduler = BackgroundScheduler()
-    scheduler.add_job(func=send_assignment_notification, trigger="cron", hour=13, minute=4)  # Run at 3:00 PM every day
+    scheduler.add_job(func=send_assignment_notification, trigger="cron", hour=0, minute=0)  
     logger.debug("Scheduler job for sending notifications has been added.")
     scheduler.start()
     app.run(debug=True)
