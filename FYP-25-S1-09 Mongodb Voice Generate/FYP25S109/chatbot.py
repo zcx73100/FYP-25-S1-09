@@ -3,7 +3,7 @@ import requests
 
 chatbot = Blueprint('chatbot', __name__)
 
-API_KEY = "sk-9f86542b6f8845449526da06b4cc9159"
+API_KEY = "insert-api-key"
 
 # Model:deepseek
 MODEL = "deepseek/deepseek-chat-v3-0324:free"
