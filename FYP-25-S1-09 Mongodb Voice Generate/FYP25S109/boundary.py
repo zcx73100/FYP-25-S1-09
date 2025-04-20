@@ -1390,21 +1390,21 @@ class ViewUserDetailsBoundary:
 
 # ------------------------------------------------------------------------------------------------------- Upload Assignment
 class TeacherAssignmentBoundary:
-    @boundary.route("/upload_assignment", methods=["GET"])
-    def upload_assignment_form():
-        classroom_id = request.args.get("classroom_id")
-        video_url = session.get("stashed_video_url")  
-
-        return render_template("uploadAssignment.html", classroom_id=classroom_id, video_url=video_url)
-
-    @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['POST'])
+    @boundary.route("teacher/upload_assignment/<classroom_id>", methods=["GET", "POST"])
     def upload_assignment(classroom_id):
+        if request.method == "GET":
+            classroom_id = classroom_id
+            video_url = session.get("stashed_video_url")  
+            return render_template("uploadAssignment.html", classroom_id=classroom_id, video_url=video_url)
+
+        # POST method handling
+        classroom_id = classroom_id
         title = request.form.get('title')
         description = request.form.get('description')
         deadline = request.form.get('deadline')
         file = request.files.get('file')
+        video_url = session.pop('stashed_video_url', None)
 
-        video_url = session.pop('stashed_video_url', None) 
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
 
@@ -1415,7 +1415,7 @@ class TeacherAssignmentBoundary:
             if result['success']:
                 flash(result['message'], 'success')
                 new_assignment_id = str(result['assignment_id'])
-                return redirect(url_for('boundary.generate_video', classroom_id=classroom_id, source='assignment', assignment_id=new_assignment_id))
+                return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
             else:
                 flash(result['message'], 'danger')
                 return redirect(request.url)
