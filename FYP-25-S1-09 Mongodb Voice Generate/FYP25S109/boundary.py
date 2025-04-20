@@ -318,33 +318,21 @@ class LoginBoundary:
             username = request.form.get('username')
             password = request.form.get('password')
 
-            # Fetch user_info from DB
-            user_info = mongo.db.useraccount.find_one({"username": username},{})
+            user_info = mongo.db.useraccount.find_one({"username": username})
 
             if user_info:
-                # Check user_info status
-                if user_info.get('status') == 'suspended':
-                    flash('Your account is suspended. Please contact admin.', category='error')
-                    return redirect(url_for('boundary.login'))
-                elif user_info.get('status') == 'deleted':
-                    flash('This account has been deleted.', category='error')
-                    return redirect(url_for('boundary.login'))
-
-                # Validate password
-                stored_hashed_password = user_info["password"]
-                if check_password_hash(stored_hashed_password, password):
-                    # Successful login for active users only
+                if check_password_hash(user_info['password'], password):  # or just `==` if no hashing
                     session['username'] = username
-                    session['role'] = user_info['role']
-                    session['user_authenticated'] = True
-                    flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
-                    return redirect(url_for('boundary.home'))
-                else:
-                    flash('Wrong password.', category='error')
-            else:
-                flash('Username does not exist.', category='error')
+                    session['role'] = user_info.get('role', 'Student')  # default to Student
+                    session['first_login'] = True  # 👈 Personalization flag
 
-        return render_template("login.html")
+                    return redirect(url_for('boundary.home'))  # or whatever your homepage route is
+                else:
+                    flash('Incorrect password.', 'danger')
+            else:
+                flash('Username not found.', 'danger')
+
+        return render_template('login.html')  # your login page
 
 # Profile Pic    
 @boundary.route('/profile_pic/<username>')
