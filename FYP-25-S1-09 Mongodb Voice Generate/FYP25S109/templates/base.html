@@ -116,6 +116,26 @@
     margin-top: 10px;
     margin-bottom: 10px;
   }
+
+  #chatbot-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background-color: #007bff;
+  color: white;
+  border-radius: 50%;
+  padding: 15px 20px;
+  font-size: 20px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#chatbot-btn:hover {
+  background-color: #0056b3;
+}
+
   </style>
 </head>
 
@@ -215,25 +235,14 @@
   {% block content %}{% endblock %}
 </main>
 
-<!-- Chatbot UI -->
-{% if session.get('role') in ['Student', 'Teacher', 'Admin'] %}
-<div id="chatbot-container">
-  
 
-  <div id="chat-header">
-    AI-INTERACTIVE GPT
-  </div>
-  <div id="chat-box" style="display: none;">
-  </div>
-    <div id="chat-messages"></div>
-    <div id="chat-input-container">
-      <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="sendOnEnter(event)">
-      <button id="send-btn" onclick="sendMessage()">Send</button>
-    <div id="status"></div>
-    <button id="expand-button" onclick="toggleSize()">🗖 Expand</button>
-  </div>
-</div>
+<!-- Floating Chatbot Button -->
+{% if session.get('role') in ['Student', 'Teacher', 'Admin'] %}
+  <button id="chatbot-btn" class="btn btn-outline-info" onclick="location.href='{{ url_for('chatbot.chatbot_page') }}'" title="Chat with AI">
+    <i class="fas fa-robot"></i> Chat with Edumate!
+  </button>
 {% endif %}
+
 
 <!-- Footer -->
 <footer class="bg-dark text-white text-center py-3 mt-5">

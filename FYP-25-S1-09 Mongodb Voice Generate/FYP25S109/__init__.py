@@ -2,7 +2,6 @@ from flask import Flask
 from flask_pymongo import PyMongo
 import sys
 import os
-from .chatbot import chatbot
 
 mongo = PyMongo()
 
