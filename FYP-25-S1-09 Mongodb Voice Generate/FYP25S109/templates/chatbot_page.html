@@ -68,6 +68,28 @@
     .new-chat-btn {
         margin-bottom: 10px;
     }
+
+    .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
+    .message-row {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .message-row.user {
+        justify-content: flex-end;
+    }
+
+    .message-row.bot {
+        justify-content: flex-start;
+    }
 </style>
 
 <div class="container mt-4">
@@ -307,12 +329,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Append message to chat
     function appendMessage(sender, message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message-${sender}`;
-        messageDiv.innerHTML = message;
-        messagesContainer.appendChild(messageDiv);
-        scrollToBottom();
+    const messageRow = document.createElement('div');
+    messageRow.className = `message-row ${sender}`;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-${sender}`;
+    messageDiv.innerHTML = message;
+
+    if (sender === 'bot') {
+        const botAvatar = document.createElement('img');
+        botAvatar.src = '/static/images/chat-icon-for-edumate.png'; // Replace with your bot icon path
+        botAvatar.alt = 'Bot Avatar';
+        botAvatar.className = 'avatar';
+
+        messageRow.appendChild(botAvatar);
+        messageRow.appendChild(messageDiv);
+    } else {
+        messageRow.appendChild(messageDiv);
     }
+
+    messagesContainer.appendChild(messageRow);
+    scrollToBottom();
+}
 
     // Scroll to bottom of chat
     function scrollToBottom() {
