@@ -7,6 +7,9 @@
     #sidebar-wrapper {
         transition: all 0.3s ease;
         width: 300px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        
     }
 
     #sidebar-wrapper.collapsed {
@@ -70,12 +73,23 @@
     }
 
     .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: 10px;
-}
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 10px;
+    }
+
+    .user-avatar {
+        margin-left: 10px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        position: absolute;
+        right: 0;
+    }
+
 
     .message-row {
         display: flex;
@@ -85,6 +99,7 @@
 
     .message-row.user {
         justify-content: flex-end;
+        padding-right:10px;
     }
 
     .message-row.bot {
@@ -328,29 +343,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Append message to chat
-    function appendMessage(sender, message) {
-    const messageRow = document.createElement('div');
-    messageRow.className = `message-row ${sender}`;
+    function appendMessage(sender, message, username) {
+        const messageRow = document.createElement('div');
+        messageRow.className = `message-row ${sender}`;
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-${sender}`;
-    messageDiv.innerHTML = message;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-${sender}`;
+        messageDiv.innerHTML = message;
 
-    if (sender === 'bot') {
-        const botAvatar = document.createElement('img');
-        botAvatar.src = '/static/images/chat-icon-for-edumate.png'; // Replace with your bot icon path
-        botAvatar.alt = 'Bot Avatar';
-        botAvatar.className = 'avatar';
+        if (sender === 'bot') {
+            const botAvatar = document.createElement('img');
+            botAvatar.src = '/static/images/chat-icon-for-edumate.png'; // Replace with your bot icon path
+            botAvatar.alt = 'Bot Avatar';
+            botAvatar.className = 'avatar';
 
-        messageRow.appendChild(botAvatar);
-        messageRow.appendChild(messageDiv);
-    } else {
-        messageRow.appendChild(messageDiv);
+            messageRow.appendChild(botAvatar);
+            messageRow.appendChild(messageDiv);
+        } else if (sender === 'user') {
+            // Dynamically load user avatar from Flask route using the username
+            const userAvatar = document.createElement('img');
+            userAvatar.src = "{{ url_for('boundary.get_profile_pic', username=session['username']) }}"; // This will fetch the user's avatar from the Flask route
+            userAvatar.alt = 'User Avatar';
+            userAvatar.className = 'user-avatar';
+
+            messageRow.appendChild(userAvatar);
+            messageRow.appendChild(messageDiv);
+        }
+
+        messagesContainer.appendChild(messageRow);
+        scrollToBottom();
     }
 
-    messagesContainer.appendChild(messageRow);
-    scrollToBottom();
-}
 
     // Scroll to bottom of chat
     function scrollToBottom() {
