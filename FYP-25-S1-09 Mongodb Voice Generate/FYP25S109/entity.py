@@ -13,6 +13,18 @@ from io import BytesIO
 from bson import ObjectId
 import pyttsx3
 from flask import flash, session, redirect, url_for
+import wave
+import subprocess
+import shutil
+import base64
+import mimetypes
+from gtts import gTTS
+import gridfs
+import uuid
+import tempfile
+fs = gridfs.GridFS(mongo.db)
+from pathlib import Path
+import time
 
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
@@ -229,6 +241,142 @@ class TutorialVideo:
             logging.error(f"Failed to search videos: {str(e)}")
             return []
 
+
+class GenerateVideoEntity:
+    def __init__(self, text, avatar_path=None, audio_path=None):
+        self.text = text
+        self.avatar_path = avatar_path
+        self.audio_path = audio_path
+
+    @staticmethod
+    def save_audio_to_gridfs(audio_bytes, filename="audio.mp3", content_type="audio/mpeg"):
+        audio_io = BytesIO(audio_bytes)
+        file_id = fs.put(audio_io, filename=filename, content_type=content_type)
+        return file_id
+
+    def generate_voice(self):
+        try:
+            if not self.text.strip():
+                raise ValueError("Text input is empty.")
+
+            # Create in-memory buffer
+            mp3_buffer = BytesIO()
+
+            # Generate audio to buffer
+            tts = gTTS(text=self.text, lang="en")
+            tts.write_to_fp(mp3_buffer)
+            mp3_buffer.seek(0)
+
+            # Save to GridFS
+            audio_id = fs.put(
+                mp3_buffer,
+                filename=f"voice_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.mp3",
+                content_type="audio/mpeg"
+            )
+
+            # Store audio_id and metadata in the database (e.g., 'voice_records' collection)
+            voice_data = {
+                "audio_id": audio_id,
+                "text": self.text,
+                "generated_at": datetime.now(),
+                "status": "generated",  # You can add other statuses like 'processing', 'failed', etc.
+                "username" : session.get("username")  # To get the collection of text that has been generated
+            }
+
+            # Save the voice record to the database (adjust your collection name if needed)
+            mongo.db.voice_records.insert_one(voice_data)
+
+            # Return the audio_id after saving it to the database
+            return audio_id
+
+        except Exception as e:
+            print(f"❌ Error generating voice: {e}")
+            return None
+
+
+    def generate_video(self, avatar_id, audio_id):
+        try:
+            SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
+
+            # Load avatar and audio from GridFS
+            avatar_file = fs.get(ObjectId(avatar_id))
+            audio_file = fs.get(ObjectId(audio_id))
+
+            # Save temporary files
+            avatar_temp_path = os.path.join(tempfile.gettempdir(), f"avatar_{uuid.uuid4().hex}.png")
+            audio_temp_path = os.path.join(tempfile.gettempdir(), f"audio_{uuid.uuid4().hex}.wav")
+
+            with open(avatar_temp_path, "wb") as f:
+                f.write(avatar_file.read())
+
+            with open(audio_temp_path, "wb") as f:
+                f.write(audio_file.read())
+
+            print(f"[DEBUG] Avatar saved to {avatar_temp_path}")
+            print(f"[DEBUG] Audio saved to {audio_temp_path}")
+
+            # Prepare POST to SadTalker
+            files = {
+                "image_file": ("avatar.png", open(avatar_temp_path, "rb"), "image/png"),
+                "audio_file": ("audio.wav", open(audio_temp_path, "rb"), "audio/wav")
+            }
+            data = {
+                "preprocess_type": "crop",
+                "is_still_mode": "false",
+                "enhancer": "false",
+                "batch_size": "2",
+                "size_of_image": "256",
+                "pose_style": "0"
+            }
+
+            response = requests.post(SADTALKER_API, files=files, data=data)
+            print("[DEBUG] SadTalker response status:", response.status_code)
+
+            if response.status_code != 200:
+                print("❌ SadTalker failed:", response.text)
+                return None
+
+            result = response.json()
+            video_path = result.get("video_path")
+            print(f"[DEBUG] SadTalker returned video_path: {video_path}")
+
+            safe_video_path = os.path.normpath(video_path.strip())
+
+            safe_video_path = os.path.normpath(video_path.strip())
+            print(f"[DEBUG] Normalized path to check: {safe_video_path}")
+
+            # Retry up to 5 times with short delay in case file write is delayed
+            for i in range(5):
+                if os.path.exists(safe_video_path):
+                    break
+                print(f"[WAIT] Video not found yet, retrying ({i+1}/5)...")
+                time.sleep(0.2)
+            else:
+                print(f"❌ ERROR: video does not exist at {safe_video_path}")
+                return None
+
+            with open(safe_video_path, "rb") as vf:
+                video_id = fs.put(
+                    vf,
+                    filename=os.path.basename(safe_video_path),
+                    content_type="video/mp4",
+                    metadata={"username": session.get("username")}
+                )
+            
+
+            print(f"[DEBUG] Checking existence of normalized path: {safe_video_path}")
+            print(f"[DEBUG] Exists? {os.path.exists(safe_video_path)}")
+
+            print(f"[✅] Video saved to GridFS with ID: {video_id}")
+            return str(video_id)
+
+        except Exception as e:
+            print(f"❌ Error during video generation: {e}")
+            return None
+
+
+
+    
 class Avatar:
     def __init__(self, image_file, avatarname=None, username=None, upload_date=None):
         self.image_file = image_file
