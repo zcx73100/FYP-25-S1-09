@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
-from bson import ObjectId, Binary
+from bson import ObjectId, Binary, errors
 from markupsafe import Markup
 import base64
 import mimetypes
@@ -15,6 +15,10 @@ from flask import Flask, send_file, Response
 from gradio_client import Client
 from FYP25S109.controller import *
 from FYP25S109.entity import * 
+from bson.errors import InvalidId
+from io import BytesIO
+
+
 
 
 boundary = Blueprint('boundary', __name__)
@@ -350,21 +354,33 @@ class LoginBoundary:
             username = request.form.get('username')
             password = request.form.get('password')
 
-            user_info = mongo.db.useraccount.find_one({"username": username})
+            # Fetch user_info from DB
+            user_info = mongo.db.useraccount.find_one({"username": username},{})
 
             if user_info:
-                if check_password_hash(user_info['password'], password):  # or just `==` if no hashing
+                # Check user_info status
+                if user_info.get('status') == 'suspended':
+                    flash('Your account is suspended. Please contact admin.', category='error')
+                    return redirect(url_for('boundary.login'))
+                elif user_info.get('status') == 'deleted':
+                    flash('This account has been deleted.', category='error')
+                    return redirect(url_for('boundary.login'))
+
+                # Validate password
+                stored_hashed_password = user_info["password"]
+                if check_password_hash(stored_hashed_password, password):
+                    # Successful login for active users only
                     session['username'] = username
-                    session['role'] = user_info.get('role', 'Student')  # default to Student
-                    session['first_login'] = True  # 👈 Personalization flag
-
-                    return redirect(url_for('boundary.home'))  # or whatever your homepage route is
+                    session['role'] = user_info['role']
+                    session['user_authenticated'] = True
+                    flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
+                    return redirect(url_for('boundary.home'))
                 else:
-                    flash('Incorrect password.', 'danger')
+                    flash('Wrong password.', category='error')
             else:
-                flash('Username not found.', 'danger')
+                flash('Username does not exist.', category='error')
 
-        return render_template('login.html')  # your login page
+        return render_template("login.html")
 
 # Profile Pic    
 @boundary.route('/profile_pic/<username>')
@@ -1475,22 +1491,16 @@ class TeacherAssignmentBoundary:
             return jsonify({"success": False, "error": "Missing video ID or classroom ID"}), 400
 
         try:
-            video_oid = ObjectId(video_id)
-            classroom_oid = ObjectId(classroom_id)
+            # Validate IDs
+            ObjectId(video_id)
+            ObjectId(classroom_id)
         except Exception:
             return jsonify({"success": False, "error": "Invalid ID format"}), 400
 
         try:
-            mongo.db.assignments.insert_one({
-                "video_id": video_oid,
-                "classroom_id": classroom_oid,
-                "title": "Generated Video Assignment",
-                "description": "This assignment contains a generated video.",
-                "created_at": datetime.utcnow()
-            })
-
+            # Just stash it for next page
+            session["stashed_video_id"] = video_id
             return jsonify({"success": True})
-
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1534,47 +1544,7 @@ class TeacherAssignmentBoundary:
             download_name=assignment["file_name"]
         )
 
-    @staticmethod
-    @boundary.route('/teacher/view_submissions/<classroom_id>/<assignment_id>')
-    def view_submissions(classroom_id, assignment_id):
-        """Show all student submissions for an assignment"""
-
-        if 'role' not in session or session.get('role') != 'Teacher':
-            flash("Unauthorized access.", category='error')
-            return redirect(url_for('boundary.home'))
-
-        # Ensure the assignment exists
-        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
-        if not assignment:
-            flash("Assignment not found!", "danger")
-            return redirect(url_for('boundary.manage_assignments', classroom_id=classroom_id))
-
-        # Fetch submissions and ensure it's always a list
-        submissions = list(mongo.db.submissions.find({"assignment_id": ObjectId(assignment_id)}))
-
-        # Ensure every submission has necessary fields to prevent errors in Jinja
-        for submission in submissions:
-            submission.setdefault("student_username", "Unknown")
-            submission.setdefault("filename", "Not Available")
-            submission.setdefault("submitted_at", None)
-            submission.setdefault("grade", "Not graded")
-            submission.setdefault("_id", ObjectId())  # Ensure submission has an ID
-
-            # Convert `submitted_at` to datetime if it's a string
-            if isinstance(submission["submitted_at"], str):
-                try:
-                    submission["submitted_at"] = datetime.strptime(submission["submitted_at"], "%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    print(f"⚠️ Invalid date format for submission {submission['_id']}")
-                    submission["submitted_at"] = None
-
-        return render_template(
-            'viewSubmissions.html',
-            assignment=assignment,
-            submissions=submissions,  # Make sure `submissions` is passed
-            classroom_id=classroom_id
-        )
-
+    
 
 
     @boundary.route('/delete_submission/<submission_id>')
@@ -1806,7 +1776,6 @@ class TeacherManageQuizBoundary:
 class StudentQuizBoundary:
     @boundary.route('/attempt_quiz/<quiz_id>', methods=['GET', 'POST'])
     def attempt_quiz(quiz_id):
-        from datetime import datetime, timezone
         student_username = session.get('username')
 
         if request.method == 'POST':
@@ -1962,10 +1931,20 @@ class ViewAssignmentBoundary:
                                text_content=text_content,
                                student_submission=student_submission,
                                enrolled_students=enrolled_students) 
- 
 
-    
 #This function facilitates student to view the list of classrooms he/she is enrolled in.
+class StudentViewClassroomsBoundary:
+    @staticmethod
+    @boundary.route('/student/viewClassrooms', methods=['GET'])
+    def get_list_of_classrooms():
+        if 'role' not in session or session.get('role') != 'Student':
+            flash("Unauthorized access.", category='error')
+            return redirect(url_for('boundary.home'))
+        username = session.get('username')
+        classrooms = list(mongo.db.classroom.find({"student_list": username}))
+        return render_template("manageClassrooms.html", classrooms=classrooms)
+
+# Student Assignment
 class StudentAssignmentBoundary:
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 
@@ -1977,7 +1956,7 @@ class StudentAssignmentBoundary:
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in StudentAssignmentBoundary.ALLOWED_EXTENSIONS
 
-    @boundary.route('/student/view_assignment/<assignment_id>/<filename>', methods=['GET', 'POST'])
+    @boundary.route('/student/view_submission/<assignment_id>/<filename>', methods=['GET', 'POST'])
     def submit_assignment(assignment_id, filename):
         """Handles assignment submission and displays the submission form."""
         try:
@@ -2135,7 +2114,6 @@ class StudentAssignmentBoundary:
 
     @boundary.route('/submit_video_assignment/<assignment_id>', methods=['POST'])
     def submit_video_assignment_json(assignment_id):
-        """Handles video submission using video_id (called from JS)."""
         if 'username' not in session or session.get('role') != "Student":
             return jsonify({"success": False, "message": "Unauthorized"}), 403
 
@@ -2153,8 +2131,7 @@ class StudentAssignmentBoundary:
             return jsonify(result)
         except Exception as e:
             return jsonify({"success": False, "message": str(e)}), 500
-
-        
+      
 # Access Forum
 class AccessForumBoundary:
     @staticmethod

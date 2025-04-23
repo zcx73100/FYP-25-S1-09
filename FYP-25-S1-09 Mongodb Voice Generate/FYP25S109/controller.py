@@ -287,7 +287,8 @@ class UploadAssignmentController:
         except Exception as e:
             return {"success": False, "message": f"Error: {e}"}
 
-    
+
+
 class ViewUserDetailsController:
     @staticmethod
     def view_user_details(username):
@@ -422,20 +423,19 @@ class StudentSendSubmissionController:
     @staticmethod
     def submit_video_assignment_logic(assignment_id, student_username, video_id):
         try:
-            # Build the Mongo document using video_id instead of video_url
             submission = {
                 "assignment_id": ObjectId(assignment_id),
                 "student": student_username,
-                "video_id": ObjectId(video_id),     # ← store as ObjectId
+                "video_id": ObjectId(video_id),
                 "submitted_at": datetime.now(),
-                "file_name": None,                  # no file
+                "file_name": None,
                 "file_id": None,
                 "grade": None,
-                "feedback": ""                      # you might want feedback too
+                "feedback": ""
             }
 
-            # Upsert by assignment + student
-            result = mongo.db.submissions.update_one(
+            # Perform upsert
+            mongo.db.submissions.update_one(
                 {
                     "assignment_id": ObjectId(assignment_id),
                     "student": student_username
@@ -444,10 +444,21 @@ class StudentSendSubmissionController:
                 upsert=True
             )
 
-            return {"success": True}
+            # Fetch the actual submission document (it may have existed or been newly inserted)
+            saved_submission = mongo.db.submissions.find_one({
+                "assignment_id": ObjectId(assignment_id),
+                "student": student_username
+            })
+
+            return {
+                "success": True,
+                "submission_id": str(saved_submission["_id"])
+            }
+
         except Exception as e:
             logging.error(f"Error in submit_video_assignment_logic: {e}")
             return {"success": False, "message": str(e)}
+
         
         
 class StudentViewSubmissionController:

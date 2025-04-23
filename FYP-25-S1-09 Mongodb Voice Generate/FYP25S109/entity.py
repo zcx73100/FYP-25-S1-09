@@ -935,7 +935,6 @@ class Submission:
         except Exception as e:
             logging.error(f"Error saving submission: {str(e)}")
             return {"success": False, "message": str(e)}
-    
     @staticmethod
     def get_submission_by_student_and_assignment(student_username, assignment_id):
         """
@@ -958,7 +957,6 @@ class Submission:
             '_id': ObjectId(submission_id)
         })
         return submission
-    
     def get_submission_file(file_id):
         """
         Retrieve the file from GridFS using the file_id.
@@ -988,7 +986,6 @@ class Submission:
         except Exception as e:
             logging.error(f"Error deleting submission: {str(e)}")
             return {"success": False, "message": str(e)}
-   
     @staticmethod
     def update_feedback(submission_id, student_username, feedback):
         """
@@ -1005,7 +1002,6 @@ class Submission:
         except Exception as e:
             logging.error(f"Error updating feedback: {str(e)}")
             return {"success": False, "message": str(e)}
-      
       
 class DiscussionRoom:
     def __init__(self, classroom_id=None, discussion_room_name=None,discussion_room_description=None, created_by =None):
