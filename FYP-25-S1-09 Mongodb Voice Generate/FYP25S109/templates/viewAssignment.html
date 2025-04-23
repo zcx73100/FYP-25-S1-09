@@ -13,7 +13,7 @@
 {% endwith %}
 
 <div class="assignment-view-container">
-  <h2>📘 Assignment: {{ assignment.title }}</h2>
+  <h2 class="mb-3">📘 Assignment: {{ assignment.title }}</h2>
 
   <!-- Meta Info -->
   <div class="assignment-meta">
@@ -26,23 +26,19 @@
   </div>
 
   <!-- 🎥 Instructional Video -->
-  {% if assignment.video_path %}
-    {% if session['role'] == 'Admin' 
-        or (session['role'] == 'Teacher' and session['username'] == assignment.teacher_username)
-        or (session['role'] == 'Student' and session['username'] in enrolled_students) %}
-      <div class="video-preview my-6">
-        <h4 class="text-lg font-semibold text-gray-800 mb-2">🎥 Instructional Video</h4>
-        <div class="flex justify-center">
-          <video class="rounded-xl shadow-lg w-full max-w-md" controls>
-            <source src="{{ assignment.video_path }}" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        </div>
+  {% if assignment.video_id %}
+    <div class="video-preview my-4">
+      <h4 class="text-lg font-semibold text-gray-800 mb-2">🎥 Instructional Video</h4>
+      <div class="flex justify-center">
+        <video class="rounded shadow w-full max-w-md" controls>
+          <source src="{{ url_for('boundary.stream_video', video_id=assignment.video_id) }}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
       </div>
-    {% endif %}
+    </div>
   {% endif %}
 
-  <!-- 📂 File Preview Section -->
+  <!-- 📂 File Preview -->
   <div class="assignment-frame mt-4">
     {% if file_extension == "pdf" %}
       <iframe src="data:application/pdf;base64,{{ file_base64 }}" width="100%" height="600px" frameborder="0"></iframe>
@@ -57,10 +53,10 @@
     {% endif %}
   </div>
 
-  <!-- 👨‍🎓 Student Submission Logic -->
+  <!-- 👨‍🎓 Student Submission -->
   {% if session.get('role') == 'Student' %}
-    <div class="submission-section mt-6">
-      <h3 class="text-2xl font-semibold mb-4 text-white">Submit Your Work</h3>
+    <div class="submission-section mt-5">
+      <h3 class="text-white text-xl mb-3">Submit Your Work</h3>
 
       {% if student_submission %}
         <p class="text-white"><strong>You have already submitted this assignment.</strong></p>
@@ -71,43 +67,36 @@
             <button type="submit" class="btn btn-danger">🗑️ Delete Submission</button>
           </form>
         </div>
-
       {% else %}
         <div class="mb-4 text-left text-white">
           <label class="block text-sm font-semibold mb-2">🎯 Choose Submission Type:</label>
-          <div class="flex flex-col sm:flex-row gap-4">
-            <label class="flex items-center gap-2">
-              <input type="radio" id="submit-file" name="submit_type" checked class="accent-blue-500">
-              <span>📄 Upload File</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="radio" id="submit-video" name="submit_type" class="accent-blue-500">
-              <span>🎥 Generate Video</span>
-            </label>
+          <div class="flex gap-4">
+            <label><input type="radio" id="submit-file" name="submit_type" checked> 📄 Upload File</label>
+            <label><input type="radio" id="submit-video" name="submit_type"> 🎥 Generate Video</label>
           </div>
         </div>
 
-        <!-- File Upload Form -->
-        <form id="file-form" action="{{ url_for('boundary.submit_assignment', assignment_id=assignment._id, filename=filename) }}" method="POST" enctype="multipart/form-data" class="mb-4">
-          <label for="file-upload" class="block text-sm font-medium mb-1 text-white">Choose file:</label>
-          <input type="file" name="file" id="file-upload" required class="w-full p-2 rounded bg-white text-black">
+        <!-- File Upload -->
+        <form id="file-form" action="{{ url_for('boundary.submit_assignment', assignment_id=assignment._id, filename=filename) }}" method="POST" enctype="multipart/form-data">
+          <label for="file-upload" class="text-white">Choose file:</label>
+          <input type="file" name="file" id="file-upload" required class="w-full p-2 bg-white text-black rounded">
           <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
           <input type="hidden" name="student_username" value="{{ session['username'] }}">
           <button type="submit" class="btn btn-primary mt-3 w-full">📤 Submit File</button>
         </form>
 
-        <!-- Video Generation Redirect -->
-        <form id="video-form" action="{{ url_for('boundary.generate_video') }}" method="GET" style="display: none;">
+        <!-- Redirect to Generate Video -->
+        <form id="video-form" action="{{ url_for('boundary.generate_video_page') }}" method="GET" style="display: none;">
           <input type="hidden" name="assignment_id" value="{{ assignment._id }}">
           <input type="hidden" name="classroom_id" value="{{ assignment.classroom_id }}">
           <input type="hidden" name="source" value="submission">
-          <button type="submit" class="btn btn-outline-primary w-full mt-3">🎬 Generate Video Submission</button>
+          <button type="submit" class="btn btn-outline-primary mt-3 w-full">🎬 Generate Video Submission</button>
         </form>
       {% endif %}
     </div>
   {% endif %}
 
-  <!-- 👩‍🏫 Teacher View of Submissions -->
+  <!-- 👩‍🏫 Teacher View -->
   {% if session.get('role') == 'Teacher' %}
     <div class="submissions mt-5">
       <h3>Student Submissions</h3>
@@ -127,93 +116,14 @@
     </div>
   {% endif %}
 
-  <!-- 📥 Download + Navigation -->
+  <!-- 📥 Navigation -->
   <div class="buttons mt-4">
     <a href="{{ url_for('boundary.download_assignment', assignment_id=assignment._id) }}" class="btn btn-primary" download>⬇️ Download Assignment</a>
     <a href="{{ url_for('boundary.home') }}" class="btn btn-secondary">🏠 Return Home</a>
   </div>
 </div>
 
-<style>
-  .assignment-view-container {
-    text-align: center;
-    padding: 20px;
-  }
-
-  .assignment-frame {
-    margin: 20px auto;
-    width: 80%;
-    height: 600px;
-    border: 1px solid #ddd;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .submission-section {
-    background: linear-gradient(to right, #1e1e1e, #2a2a2a);
-    padding: 20px;
-    border-radius: 12px;
-    color: white;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-  }
-
-  .submissions {
-    margin-top: 20px;
-    background: #1e1e1e;
-    padding: 15px;
-    border-radius: 10px;
-    color: white;
-  }
-
-  .buttons {
-    margin-top: 20px;
-  }
-
-  .btn {
-    display: inline-block;
-    padding: 10px 20px;
-    margin: 5px;
-    border-radius: 5px;
-    text-decoration: none;
-    color: white;
-  }
-
-  .btn-primary {
-    background-color: #007bff;
-  }
-
-  .btn-secondary {
-    background-color: #6c757d;
-  }
-
-  .btn-success {
-    background-color: #28a745;
-  }
-
-  .btn-warning {
-    background-color: #ffc107;
-    color: black;
-  }
-
-  .btn-danger {
-    background-color: #dc3545;
-  }
-
-  .btn-outline-primary {
-    border: 2px solid #007bff;
-    color: #007bff;
-    background: transparent;
-  }
-
-  .btn-outline-primary:hover {
-    background-color: #007bff;
-    color: white;
-  }
-
-  .btn:hover {
-    opacity: 0.9;
-  }
-</style>
-
+<!-- JS for toggling submission type -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const fileRadio = document.getElementById("submit-file");
@@ -221,16 +131,194 @@
     const fileForm = document.getElementById("file-form");
     const videoForm = document.getElementById("video-form");
 
-    fileRadio.addEventListener("change", function () {
+    fileRadio.addEventListener("change", () => {
       fileForm.style.display = "block";
       videoForm.style.display = "none";
     });
 
-    videoRadio.addEventListener("change", function () {
+    videoRadio.addEventListener("change", () => {
       fileForm.style.display = "none";
       videoForm.style.display = "block";
     });
   });
 </script>
+
+<!-- Optional styling -->
+<style>
+.assignment-view-container {
+  padding: 20px;
+}
+
+.assignment-frame {
+  margin: 20px auto;
+  width: 80%;
+  height: 600px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.submission-section {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+}
+
+.submissions {
+  background: #1e1e1e;
+  padding: 15px;
+  border-radius: 10px;
+  color: white;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 5px;
+  border-radius: 5px;
+  text-decoration: none;
+  color: white;
+}
+
+.btn-primary { background-color: #007bff; }
+.btn-secondary { background-color: #6c757d; }
+.btn-success { background-color: #28a745; }
+.btn-warning { background-color: #ffc107; color: black; }
+.btn-danger { background-color: #dc3545; }
+.btn-outline-primary {
+  border: 2px solid #007bff;
+  color: #007bff;
+  background: transparent;
+}
+.btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.video-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: #fff;
+}
+
+/* Hover lift */
+.video-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+/* Gradient header */
+.video-card .card-header {
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Ensure 16:9 aspect and cover crop */
+.video-player {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+
+/* Play‑icon overlay */
+.video-card::before {
+  content: "▶";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  color: rgba(255,255,255,0.8);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.video-card:hover::before {
+  opacity: 1;
+}
+
+
+.assignment-view-container {
+  text-align: center;
+  padding: 20px;
+}
+
+.assignment-frame {
+  margin: 20px auto;
+  width: 80%;
+  height: 600px;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.submission-section {
+  background: linear-gradient(to right, #1e1e1e, #2a2a2a);
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.submissions {
+  margin-top: 20px;
+  background: #1e1e1e;
+  padding: 15px;
+  border-radius: 10px;
+  color: white;
+}
+
+.buttons {
+  margin-top: 20px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 5px;
+  border-radius: 5px;
+  text-decoration: none;
+  color: white;
+}
+
+.btn-primary {
+  background-color: #007bff;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+}
+
+.btn-success {
+  background-color: #28a745;
+}
+
+.btn-warning {
+  background-color: #ffc107;
+  color: black;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+}
+
+.btn-outline-primary {
+  border: 2px solid #007bff;
+  color: #007bff;
+  background: transparent;
+}
+
+.btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+</style>
 
 {% endblock %}

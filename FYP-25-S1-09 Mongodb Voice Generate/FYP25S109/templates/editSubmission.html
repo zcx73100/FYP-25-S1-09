@@ -20,14 +20,13 @@
         <a href="{{ url_for('boundary.student_download_submission', file_id=submission.file_id) }}"
            class="btn btn-outline-primary mt-2">⬇️ Download Current File</a>
       {% endif %}
-
     {% endif %}
 
-    {% if video_url %}
+    {% if submission.video_id %}
       <div class="video-preview mt-4">
         <h4>🎬 Current Submitted Video</h4>
         <video width="100%" controls class="rounded shadow">
-          <source src="{{ video_url }}" type="video/mp4">
+          <source src="{{ url_for('boundary.stream_video', video_id=submission.video_id) }}" type="video/mp4">
           Your browser does not support the video tag.
         </video>
       </div>

@@ -1,113 +1,165 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h2 class="upload-title">Upload Assignment</h2>
+<h2 class="upload-title">📘 Upload Assignment</h2>
 
-<form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}" 
+<!-- ✅ Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-messages">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}"
       method="POST" enctype="multipart/form-data" class="upload-form">
 
-    <!-- Assignment Title -->
-    <p>Assignment Title:</p>
-    <input type="text" name="title" placeholder="Assignment Title" class="input-field" required>
+  <!-- 👇 Carry the generated video ID through submission -->
+  <input type="hidden" name="video_id" value="{{ video_id }}">
 
-    <!-- Description + Generate Video -->
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label>Assignment Description:</label>
-        <a href="{{ url_for('boundary.generate_video', classroom_id=classroom_id, source='assignment') }}"
-           class="btn btn-sm btn-outline-primary">
-            🎬 Generate Assignment Video
-        </a>
-    </div>
+  <!-- Title -->
+  <label for="title">Assignment Title:</label>
+  <input type="text" name="title" id="title" placeholder="Enter assignment title"
+         class="input-field" required>
 
-    <input type="text" name="description" placeholder="Assignment Description" class="input-field">
+  <!-- Description + Generate Video Button -->
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <label for="description">Assignment Description:</label>
+    <a href="{{ url_for('boundary.generate_video_page') }}?classroom_id={{ classroom_id }}&source=assignment"
+       class="btn btn-sm btn-outline-primary">
+      🎬 Generate Assignment Video
+    </a>
+  </div>
+  <input type="text" name="description" id="description" placeholder="Enter description"
+         class="input-field">
 
-    <!-- 🎥 Show Generated Video if Available -->
-    {% if video_url %}
+  <!-- ✅ Video Preview (if video_id is present) -->
+  {% if video_id %}
     <div class="video-preview mt-3">
-        <p><strong>Generated Instructional Video:</strong></p>
-        <video controls width="100%" class="mb-3 rounded shadow-sm">
-            <source src="{{ video_url }}" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
+      <p><strong>🎥 Generated Instructional Video:</strong></p>
+      <video controls class="video-player">
+        <source src="{{ url_for('boundary.stream_video', video_id=video_id) }}"
+                type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
     </div>
-    {% endif %}
+  {% endif %}
 
-    <!-- Deadline -->
-    <p>Deadline:</p>
-    <input type="datetime-local" name="deadline" class="input-field" required>
+  <!-- Deadline -->
+  <label for="deadline">Deadline:</label>
+  <input type="datetime-local" name="deadline" id="deadline"
+         class="input-field" required>
 
-    <!-- File Upload -->
-    <p>Upload File:</p>
-    <input type="file" name="file" class="file-input" required>
+  <!-- File Upload -->
+  <label for="file">Upload File:</label>
+  <input type="file" name="file" id="file" class="file-input" required>
 
-    <!-- Submit -->
-    <button type="submit" class="upload-button">📤 Upload Assignment</button>
+  <!-- Submit Button -->
+  <button type="submit" class="upload-button">📤 Upload Assignment</button>
 </form>
 
-<!-- Return Button -->
-<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}" class="btn btn-secondary mt-3">
-    ⬅️ Return to Classroom
+<!-- Return to Classroom -->
+<a href="{{ url_for('boundary.view_classroom', classroom_id=classroom_id) }}"
+   class="btn btn-secondary mt-3">
+  ⬅️ Return to Classroom
 </a>
 
+<!-- Style -->
 <style>
-  /* Container for the form */
 .upload-form {
-    max-width: 500px;
-    margin: 20px auto;
-    padding: 20px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 25px;
+  background: #fdfdfd;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-/* Title styling */
 .upload-title {
-    text-align: center;
-    color: #333;
-    font-size: 24px;
-    margin-bottom: 15px;
+  text-align: center;
+  font-size: 26px;
+  color: #333;
+  margin-bottom: 20px;
 }
 
-/* Styling for text inputs and datetime picker */
-.input-field {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 16px;
-    transition: border-color 0.3s;
+.input-field, .file-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 15px;
 }
 
 .input-field:focus {
-    border-color: #007bff;
-    outline: none;
+  border-color: #007bff;
+  outline: none;
 }
 
-/* File input styling */
 .file-input {
-    border: none;
-    font-size: 16px;
+  padding: 6px 0;
 }
 
-/* Upload button styling */
 .upload-button {
-    background-color: #007bff;
-    color: white;
-    padding: 12px;
-    font-size: 16px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.3s, transform 0.2s;
+  background-color: #007bff;
+  color: white;
+  padding: 12px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
 }
 
 .upload-button:hover {
-    background-color: #0056b3;
-    transform: scale(1.05);
+  background-color: #0056b3;
 }
 
+.video-player {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.alert {
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.alert-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.alert-success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 6px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-outline-primary {
+  padding: 6px 10px;
+  border: 1px solid #007bff;
+  color: #007bff;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+.btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
 </style>
 {% endblock %}
