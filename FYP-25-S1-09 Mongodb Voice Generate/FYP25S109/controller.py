@@ -258,17 +258,34 @@ class AttemptQuizController:
 
 class UploadAssignmentController:
     @staticmethod
-    def upload_assignment(title, classroom_id, description, deadline, file, filename, video_path=None):
-        assignment = Assignment(
-            title=title,
-            classroom_id=classroom_id,
-            description=description,
-            due_date=deadline,
-            file=file,
-            filename=filename,
-            video_path=video_path  
-        )
-        return assignment.save_assignment()
+    def upload_assignment(title, classroom_id, description, deadline, file, filename, video_id=None):
+        try:
+            # 1️⃣ Save the file...
+            file_id = fs.put(file, filename=filename) if file else None
+
+            # 2️⃣ Build the assignment doc
+            assignment_doc = {
+                "title": title,
+                "description": description,
+                "due_date": deadline,
+                "classroom_id": classroom_id,
+                "created_at": datetime.utcnow()
+            }
+            if file_id:
+                assignment_doc.update({
+                    "file_id": file_id,
+                    "file_name": filename
+                })
+            if video_id:
+                # store the generated-video GridFS id here
+                assignment_doc["video_id"] = ObjectId(video_id)
+
+            # 3️⃣ Insert
+            mongo.db.assignments.insert_one(assignment_doc)
+
+            return {"success": True, "message": "Assignment uploaded successfully with video."}
+        except Exception as e:
+            return {"success": False, "message": f"Error: {e}"}
 
     
 class ViewUserDetailsController:
@@ -369,6 +386,7 @@ class StudentSendSubmissionController:
         except Exception as e:
             logging.error(f"Error retrieving file: {str(e)}")
             return None
+        
     @staticmethod
     def check_submission_exists(assignment_id, student_username):
         """
@@ -400,35 +418,35 @@ class StudentSendSubmissionController:
         except Exception as e:
             return {"success": False, "message": str(e)}
         
+
     @staticmethod
-    def submit_video_assignment_logic(assignment_id, student_username, video_url):
+    def submit_video_assignment_logic(assignment_id, student_username, video_id):
         try:
+            # Build the Mongo document using video_id instead of video_url
             submission = {
                 "assignment_id": ObjectId(assignment_id),
                 "student": student_username,
-                "video_url": video_url,
+                "video_id": ObjectId(video_id),     # ← store as ObjectId
                 "submitted_at": datetime.now(),
-                "file_name": None,  # Since it's a video submission
+                "file_name": None,                  # no file
                 "file_id": None,
-                "grade": None
+                "grade": None,
+                "feedback": ""                      # you might want feedback too
             }
 
-            # Either insert or update existing submission
-            existing = mongo.db.submissions.find_one({
-                "assignment_id": ObjectId(assignment_id),
-                "student": student_username
-            })
-
-            if existing:
-                mongo.db.submissions.update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": submission}
-                )
-            else:
-                mongo.db.submissions.insert_one(submission)
+            # Upsert by assignment + student
+            result = mongo.db.submissions.update_one(
+                {
+                    "assignment_id": ObjectId(assignment_id),
+                    "student": student_username
+                },
+                {"$set": submission},
+                upsert=True
+            )
 
             return {"success": True}
         except Exception as e:
+            logging.error(f"Error in submit_video_assignment_logic: {e}")
             return {"success": False, "message": str(e)}
         
         
