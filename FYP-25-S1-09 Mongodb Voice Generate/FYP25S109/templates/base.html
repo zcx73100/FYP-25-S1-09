@@ -1,438 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Home{% endblock %}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Home{% endblock %}</title>
 
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='chatbot.css') }}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='chatbot.css') }}">
 
-  <style>
-    .profile-pic {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #fff;
-    }
-    .dropdown-menu .dropdown-header {
-      font-weight: bold;
-    }
-    #notification-count {
-      font-size: 0.6rem;
-    }
-    #notification-box li {
-      border-bottom: 1px solid #ddd;
-      padding: 5px 10px;
-    }
-    #notification-box li:last-child {
-      border-bottom: none;
-    }
-    #chatbot-container {
-      position: fixed;
-      bottom: 10px;
-      right: 20px;
-      z-index: 1000;
-      background-color: #fff;
-      border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-      width: 250px;
-      max-width: 100%;
-      padding: 10px;
-    }
-    #chatbot-face {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      overflow: hidden;
-    }
-    #chatbot-face img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    #chat-header {
-      background-color: #007bff;
-      color: white;
-      padding: 8px;
-      text-align: center;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #chat-header:hover {
-      background-color: #0056b3;
-    }
-    .chat-message {
-    display: flex;
-    align-items: flex-start;
-    margin-bottom: 10px;
-  }
+    <style>
+        .profile-pic {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #fff;
+        }
 
-  .chat-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin-right: 10px;
-    object-fit: cover;
-    border: 1px solid #ccc;
-  }
+        .dropdown-menu .dropdown-header {
+            font-weight: bold;
+        }
 
-  .chat-text {
-    background-color: #f1f1f1;
-    padding: 8px 12px;
-    border-radius: 10px;
-    max-width: 80%;
-  }
+        #notification-count {
+            font-size: 0.6rem;
+        }
 
-  .chat-message.bot .chat-text {
-    background-color: #e2ecf9;
-  }
+        #notification-box li {
+            border-bottom: 1px solid #ddd;
+            padding: 5px 10px;
+        }
 
-  .chat-message.you {
-    flex-direction: row-reverse;
-    text-align: right;
-  }
-
-  .chat-message.you .chat-avatar {
-    margin-right: 0;
-    margin-left: 10px;
-  }
-
-  #chat-messages {
-    max-height: 250px;
-    overflow-y: auto;
-    margin-top: 10px;
-    margin-bottom: 10px;
-  }
-
-  #chatbot-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  background-color: #007bff;
-  color: white;
-  border-radius: 50%;
-  padding: 15px 20px;
-  font-size: 20px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-#chatbot-btn:hover {
-  background-color: #0056b3;
-}
-
-  </style>
+        #notification-box li:last-child {
+            border-bottom: none;
+        }
+    </style>
 </head>
 
 <body>
 <!-- Generate Video Button -->
 <button id="createVideoBtn"
-  class="btn btn-primary"
-  style="position: fixed; top: 80px; right: 20px; z-index: 900;"
-  onclick="location.href='{{ url_for('boundary.generate_video_page') }}'">
-  <i class="fas fa-video"></i> Generate Video
+        class="btn btn-primary"
+        style="position: fixed; top: 80px; right: 20px; z-index: 900;"
+        onclick="location.href='{{ url_for('boundary.generate_video') }}'">
+    <i class="fas fa-video"></i> Generate Video
 </button>
 
-<!-- Navigation Bar -->
+<!-- Navigation -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/">
-      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="40">
-    </a>
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="40">
+        </a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-    <div class="collapse navbar-collapse" id="main-nav">
-      <!-- Search Form -->
-      <form class="d-flex ms-auto" method="get" action="{{ url_for('boundary.search') }}">
-        <input class="form-control me-2" type="search" name="query" placeholder="Search" required>
-        <select class="form-select me-2" name="filter">
-          <option value="video">Video</option>
-          <option value="avatar">Avatar</option>
-        </select>
-        <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
-      </form>
+        <div class="collapse navbar-collapse" id="main-nav">
+            <!-- Search -->
+            <form class="d-flex ms-auto" method="get" action="{{ url_for('boundary.search') }}">
+                <input class="form-control me-2" type="search" name="query" placeholder="Search" required>
+                <select class="form-select me-2" name="filter">
+                    <option value="video">Video</option>
+                    <option value="avatar">Avatar</option>
+                </select>
+                <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+            </form>
 
-      <!-- Profile and Notification -->
-      <ul class="navbar-nav ms-auto align-items-center">
-        {% if session.get('username') %}
-          <!-- Notifications -->
-          <li class="nav-item dropdown me-3">
-            <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
-              <i class="fas fa-bell text-white"></i>
-              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notification-count" style="display: none;">0</span>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notificationDropdown" id="notification-box" style="width: 300px; max-height: 400px; overflow-y: auto;">
-              <li class="d-flex justify-content-between align-items-center px-3 py-2">
-                <strong>Notifications</strong>
-                <button class="btn btn-sm btn-link text-primary" id="markAllReadBtn">Mark all as read</button>
-              </li>
-              <div id="notification-content">
-                <li><span class="dropdown-item-text text-muted">No new notifications.</span></li>
-              </div>
+            <!-- Profile & Notification -->
+            <ul class="navbar-nav ms-auto align-items-center">
+                {% if session.get('username') %}
+                    <!-- Notification Bell -->
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell text-white"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notification-count" style="display: none;">0</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notificationDropdown" id="notification-box" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                            <li class="d-flex justify-content-between align-items-center px-3 py-2">
+                                <strong>Notifications</strong>
+                                <button class="btn btn-sm btn-link text-decoration-none text-primary" id="markAllReadBtn">Mark all as read</button>
+                            </li>
+                            <div id="notification-content">
+                                <li><span class="dropdown-item-text text-muted">No new notifications.</span></li>
+                            </div>
+                        </ul>
+                    </li>
+
+                    <img src="{{ url_for('boundary.get_profile_pic', username=session['username']) }}" class="profile-pic me-2" alt="Profile Picture">
+
+                    <li class="nav-item dropdown d-flex align-items-center">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <span>{{ session.get('role') }} Menu</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
+                            {% if session.get('role') == "Admin" %}
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Create Account</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.confirm_teacher_page') }}">Confirm Teacher Account</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_users') }}">Manage Users</a></li>
+                            {% elif session.get('role') == "Teacher" %}
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Register Student</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_classrooms') }}">Manage Classrooms</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">Manage Notifications</a></li>
+                            {% elif session.get('role') == "Student" %}
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.get_list_of_classrooms') }}">View Classrooms</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">View Notifications</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger fw-bold" href="{{ url_for('boundary.logout') }}">Logout</a></li>
+                        </ul>
+                    </li>
+                {% else %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('boundary.login') }}">Login</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('boundary.sign_up') }}">Register</a></li>
+                {% endif %}
             </ul>
-          </li>
-
-          <!-- Profile Picture -->
-          <img src="{{ url_for('boundary.get_profile_pic', username=session['username']) }}" class="profile-pic me-2" alt="Profile Picture">
-
-          <!-- User Menu -->
-          <li class="nav-item dropdown d-flex align-items-center">
-            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-              <span>{{ session.get('role') }} Menu</span>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-              <li><a class="dropdown-item" href="{{ url_for('boundary.accDetails') }}">View Profile</a></li>
-              {% if session.get('role') == "Admin" %}
-                <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Create Account</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.confirm_teacher_page') }}">Confirm Teacher Account</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.upload_tutorial') }}">Upload Tutorial Video</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.view_uploaded_videos') }}">Manage Tutorial Videos</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_users') }}">Manage Users</a></li>
-              {% elif session.get('role') == "Teacher" %}
-                <li><a class="dropdown-item" href="{{ url_for('boundary.sign_up') }}">Register Student</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_classrooms') }}">Manage Classrooms</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">Manage Notifications</a></li>
-              {% elif session.get('role') == "Student" %}
-                <li><a class="dropdown-item" href="{{ url_for('boundary.manage_avatars') }}">Manage Avatars</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.get_list_of_classrooms') }}">View Classrooms</a></li>
-                <li><a class="dropdown-item" href="{{ url_for('boundary.view_notifications') }}">View Notifications</a></li>
-              {% endif %}
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item text-danger fw-bold" href="{{ url_for('boundary.logout') }}">Logout</a></li>
-            </ul>
-          </li>
-        {% else %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('boundary.login') }}">Login</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('boundary.sign_up') }}">Register</a></li>
-        {% endif %}
-      </ul>
+        </div>
     </div>
-  </div>
 </nav>
 
-<!-- Main Page Content -->
-<main class="container mt-4">
-  {% block content %}{% endblock %}
-</main>
-
-
-<!-- Floating Chatbot Button -->
-{% if session.get('role') in ['Student', 'Teacher', 'Admin'] %}
-  <button id="chatbot-btn" class="btn btn-outline-info" onclick="location.href='{{ url_for('chatbot.chatbot_page') }}'" title="Chat with AI">
-    <i class="fas fa-robot"></i> Chat with Edumate!
-  </button>
-{% endif %}
-
+<!-- Page Content -->
+<main class="container mt-4">{% block content %}{% endblock %}</main>
 
 <!-- Footer -->
 <footer class="bg-dark text-white text-center py-3 mt-5">
-  <p class="mb-0">© 2025 AI-NTERACTIVE: NOT YOUR ORDINARY LEARNING MANAGEMENT SYSTEM - ALL RIGHTS RESERVED</p>
+    <p class="mb-0">© 2025 AI-NTERACTIVE: NOT YOUR ORDINARY LEARNING MANAGEMENT SYSTEM - ALL RIGHTS RESERVED</p>
 </footer>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='chatbot.js') }}"></script>
 
-<!-- Notifications Script -->
+<!-- Notifications Logic -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const countSpan = document.getElementById("notification-count");
-  const contentBox = document.getElementById("notification-content");
+    document.addEventListener("DOMContentLoaded", function () {
+        const countSpan = document.getElementById("notification-count");
+        const contentBox = document.getElementById("notification-content");
 
-  fetch("/get_notifications")
-    .then(response => response.json())
-    .then(data => {
-      contentBox.innerHTML = "";
-      if (data.length > 0) {
-        countSpan.textContent = data.length;
-        countSpan.style.display = "inline-block";
-        data.forEach(n => {
-          const li = document.createElement("li");
-          li.innerHTML = '<span class="dropdown-item-text">' + n.message + '</span>';
-          contentBox.appendChild(li);
+        fetch("/get_notifications")
+            .then(response => response.json())
+            .then(data => {
+                contentBox.innerHTML = "";
+                if (data.length > 0) {
+                    countSpan.textContent = data.length;
+                    countSpan.style.display = "inline-block";
+                    data.forEach(n => {
+                        const li = document.createElement("li");
+                        li.innerHTML = `<span class="dropdown-item-text"><strong>${n.title}</strong><br>${n.description}<br><small class="text-muted">${n.timestamp}</small></span>`;
+                        contentBox.appendChild(li);
+                    });
+                } else {
+                    countSpan.style.display = "none";
+                    contentBox.innerHTML = "<li><span class='dropdown-item-text text-muted'>No new notifications.</span></li>";
+                }
+            });
+
+        document.getElementById("markAllReadBtn").addEventListener("click", () => {
+            fetch("/mark_notifications_read", { method: "POST" })
+                .then(() => {
+                    countSpan.style.display = "none";
+                    contentBox.innerHTML = "<li><span class='dropdown-item-text text-muted'>No new notifications.</span></li>";
+                });
         });
-      } else {
-        const li = document.createElement("li");
-        li.innerHTML = '<span class="dropdown-item-text text-muted">No new notifications.</span>';
-        contentBox.appendChild(li);
-      }
     });
-
-  // Mark all as read
-  document.getElementById("markAllReadBtn").addEventListener("click", function () {
-    fetch("/mark_notifications_read", { method: "POST" })
-      .then(response => {
-        if (response.ok) {
-          countSpan.style.display = "none";
-          contentBox.innerHTML = '<li><span class="dropdown-item-text text-muted">No new notifications.</span></li>';
-        }
-      });
-  });
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-  const chatHeader = document.getElementById('chat-header');
-  const chatBox = document.getElementById('chat-box');
-  const sendBtn = document.getElementById('send-btn');
-  const chatInput = document.getElementById('chat-input');
-  const chatMessages = document.getElementById('chat-messages');
-
-  // Toggle chat open/close
-  chatHeader.addEventListener('click', () => {
-    if (chatBox.style.display === 'none') {
-      chatBox.style.display = 'block';
-    } else {
-      chatBox.style.display = 'none';
-    }
-  });
-
-  // Send message
-  sendBtn.addEventListener('click', () => {
-    const message = chatInput.value.trim();
-    if (message) {
-      const userMessage = document.createElement('div');
-      userMessage.innerHTML = `<strong>You:</strong> ${message}`;
-      chatMessages.appendChild(userMessage);
-      chatInput.value = '';
-
-      // Dummy Bot Reply
-      setTimeout(() => {
-        const botReply = document.createElement('div');
-        botReply.innerHTML = `<strong>Bot:</strong> This is a dummy response.`;
-        chatMessages.appendChild(botReply);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }, 500);
-    }
-  });
-
-  // Allow Enter key to send
-  chatInput.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      sendBtn.click();
-    }
-  });
-});
 </script>
+
+<!-- Minimize Chat on Load -->
 <script>
-    const chatHeader = document.getElementById('chat-header');
-    const chatBox = document.getElementById('chat-box');
-    const chatInput = document.getElementById('chat-input');
-    const chatMessages = document.getElementById('chat-messages');
-    const status = document.getElementById('status');
-
-    let expanded = false;
-
-    // Toggle chatbox visibility
-    chatHeader.addEventListener('click', () => {
-        chatBox.style.display = chatBox.style.display === 'none' ? 'block' : 'none';
-    });
-
-    // Toggle size of chatbot
-    function toggleSize() {
-        expanded = !expanded;
+    window.addEventListener('DOMContentLoaded', () => {
+        const chatBox = document.getElementById('chat-box');
         const container = document.getElementById('chatbot-container');
-        container.style.width = expanded ? '400px' : '250px';
-        container.style.height = expanded ? '500px' : 'auto';
-    }
-
-    // Send message on Enter
-    function sendOnEnter(event) {
-        if (event.key === 'Enter') {
-            sendMessage();
+        if (chatBox && container) {
+            chatBox.style.display = 'none';
+            container.classList.remove('expanded');
+            container.style.height = 'auto';
+            container.style.width = '200px';
         }
-    }
-
-    // Send chatbot message
-    async function sendMessage() {
-    const userInput = document.getElementById('chat-input').value.trim();
-    if (!userInput) return;
-
-    appendMessage('You', userInput);
-    document.getElementById('chat-input').value = '';
-    document.getElementById('status').textContent = 'Thinking...';
-
-    try {
-        const response = await fetch('/api/chat', {  // Match your Flask route
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userInput })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        appendMessage('Bot', data.reply);
-    } catch (error) {
-        appendMessage('Bot', `Error: ${error.message}`);
-    } finally {
-        document.getElementById('status').textContent = '';
-    }
-}
-
-function appendMessage(sender, message) {
-    const chatMessages = document.getElementById('chat-messages');
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('chat-message', sender === 'You' ? 'you' : 'bot');
-    
-    const avatarSrc = sender === 'You' 
-        ? "{{ url_for('boundary.get_profile_pic', username=session['username']) }}" 
-        : "{{ url_for('static', filename='images/bot_avatar.png') }}";  // Default bot avatar
-
-    msgDiv.innerHTML = `
-        <img src="${avatarSrc}" class="chat-avatar" alt="${sender}">
-        <div class="chat-text">${message}</div>
-    `;
-    
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-    const USER_AVATAR = "{{ url_for('boundary.get_profile_pic', username=session['username']) }}";
-    const BOT_AVATAR = "{{ url_for('static', filename='images/mascot.png') }}";  // Default bot avatar
-
-  function appendMessage(sender, message) {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('chat-message');
-    msgDiv.classList.add(sender === 'You' ? 'you' : 'bot');
-
-    const avatarSrc = sender === 'You' ? USER_AVATAR : BOT_AVATAR;
-
-    msgDiv.innerHTML = `
-      <img src="${avatarSrc}" class="chat-avatar" alt="${sender}">
-      <div class="chat-text"><strong>${sender}:</strong> ${message}</div>
-    `;
-
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
+    });
 </script>
-
 </body>
 </html>
