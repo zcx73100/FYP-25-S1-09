@@ -179,42 +179,71 @@ class AvatarVideoBoundary:
         except Exception as e:
             return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
 
-    @boundary.route("/generate_video", methods=["POST"])
+    @boundary.route("/generate_video", methods=["GET", "POST"])
     def generate_video():
+        username = session.get("username")
+        if not username:
+            return redirect(url_for("boundary.login"))
+
+        # GET: show page
+        if request.method == "GET":
+            classroom_id  = request.args.get("classroom_id")
+            assignment_id = request.args.get("assignment_id")
+            source        = request.args.get("source")  # e.g. "submission" vs "assignment" vs "general"
+
+            avatars       = list(mongo.db.avatar.find({"username": username}))
+            voice_records = list(mongo.db.voice_records.find({"username": username}))
+
+            return render_template(
+                "generateVideo.html",
+                avatars=avatars,
+                voice_records=voice_records,
+                classroom_id=classroom_id,
+                assignment_id=assignment_id,
+                source=source
+            )
+
+        # POST: generate & (if student) save submission
         try:
-            username = session.get("username")
-            if not username:
-                return jsonify({"success": False, "error": "Unauthorized"}), 401
+            text       = request.form.get("text", "").strip()
+            avatar_id  = request.form.get("avatar_id")
+            audio_id   = request.form.get("audio_id")
+            source     = request.form.get("source")
+            classroom_id  = request.form.get("classroom_id")
+            assignment_id = request.form.get("assignment_id")
 
-            text = request.form.get("text", "").strip()
-            avatar_doc_id = request.form.get("avatar_id")
-            audio_id      = request.form.get("audio_id")
+            if not avatar_id or not audio_id:
+                return jsonify({"success": False, "error": "Avatar and Audio are required."}), 400
 
-            if not avatar_doc_id or not audio_id:
-                return jsonify({"success": False, "error": "Missing required parameters"}), 400
+            avatar_doc = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+            if not avatar_doc or not avatar_doc.get("file_id"):
+                return jsonify({"success": False, "error": "Avatar file not found."}), 400
 
-            # 1) Fetch the avatar document by its _id
-            avatar_doc = mongo.db.avatar.find_one({"_id": ObjectId(avatar_doc_id)})
-            if not avatar_doc:
-                return jsonify({"success": False, "error": "Avatar not found"}), 400
+            file_id = avatar_doc["file_id"]
 
-            # 2) Extract the GridFS file_id from that document
-            file_id = avatar_doc.get("file_id")
-            if not file_id:
-                return jsonify({"success": False, "error": "Avatar has no image file"}), 400
-
-            # 3) Generate video by passing the GridFS file_id (not the document _id)
-            controller = GenerateVideoController()
-            video_gridfs_id = controller.generate_video(text, str(file_id), audio_id)
+            controller        = GenerateVideoController()
+            video_gridfs_id   = controller.generate_video(text, str(file_id), audio_id)
 
             if not video_gridfs_id:
-                return jsonify({"success": False, "error": "Video generation failed"}), 500
+                return jsonify({"success": False, "error": "Video generation failed."}), 500
 
-            return jsonify({"success": True, "video_id": video_gridfs_id})
+            # ——— student submission hook ———
+            if (
+                        source == "submission" 
+                        and assignment_id 
+                        and session.get("role") == "Student"
+                    ):
+                        student = session["username"]
+                        StudentSendSubmissionController.submit_video_assignment_logic(
+                            assignment_id,
+                            student,
+                            str(video_gridfs_id) 
+                        )
+            return jsonify({"success": True, "video_id": str(video_gridfs_id)})
 
         except Exception as e:
-            print(f"Error in /generate_video route: {e!r}")
-            return jsonify({"success": False, "error": repr(e)}), 500
+            print("❌ Error in /generate_video:", str(e))
+            return jsonify({"success": False, "error": str(e)}), 500
 
     
     # Route: Stream video
@@ -258,7 +287,7 @@ class AvatarVideoBoundary:
             if not all([audio_id, avatar_id, video_id]):
                 return jsonify(success=False, error="Missing required fields.")
 
-            # Insert into the correct video collection
+            # Save to MongoDB
             saved = mongo.db.video.insert_one({
                 "username": username,
                 "role": role,
@@ -269,6 +298,9 @@ class AvatarVideoBoundary:
                 "created_at": datetime.utcnow(),
                 "is_published": False
             })
+
+            # ✅ Stash video_id in session for redirect
+            session["stashed_video_id"] = str(saved.inserted_id)
 
             return jsonify(success=True, saved_id=str(saved.inserted_id))
 
@@ -1378,62 +1410,89 @@ class ViewUserDetailsBoundary:
 
 # ------------------------------------------------------------------------------------------------------- Upload Assignment
 class TeacherAssignmentBoundary:
-    @boundary.route("teacher/upload_assignment/<classroom_id>", methods=["GET", "POST"])
+    @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['GET', 'POST'])
     def upload_assignment(classroom_id):
-        if request.method == "GET":
-            classroom_id = classroom_id
-            video_url = session.get("stashed_video_url")  
-            return render_template("uploadAssignment.html", classroom_id=classroom_id, video_url=video_url)
+        # GET → render the form (with a hidden video_id if one was stashed)
+        if request.method == 'GET':
+            meta_id    = session.pop('stashed_video_id', None)
+            gridfs_id  = None
 
-        # POST method handling
-        classroom_id = classroom_id
-        title = request.form.get('title')
-        description = request.form.get('description')
-        deadline = request.form.get('deadline')
-        file = request.files.get('file')
-        video_url = session.pop('stashed_video_url', None)
+            if meta_id:
+                vid_doc = mongo.db.video.find_one({'_id': ObjectId(meta_id)})
+                if vid_doc:
+                    # whichever field holds your actual GridFS file
+                    real_oid = vid_doc.get('video_gridfs_id') or vid_doc.get('file_id')
+                    if real_oid:
+                        gridfs_id = str(real_oid)
 
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-
-            result = UploadAssignmentController.upload_assignment(
-                title, ObjectId(classroom_id), description, deadline, file, filename, video_url
+            return render_template(
+                'uploadAssignment.html',
+                classroom_id=classroom_id,
+                video_id=gridfs_id  # this becomes your hidden input value
             )
 
-            if result['success']:
-                flash(result['message'], 'success')
-                new_assignment_id = str(result['assignment_id'])
-                return redirect(url_for('boundary.view_classroom', classroom_id=classroom_id))
-            else:
-                flash(result['message'], 'danger')
-                return redirect(request.url)
-        else:
-            flash('Invalid file type!', 'danger')
+        # POST → handle the submitted form
+        title       = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        deadline    = request.form.get("deadline")
+        upload_file = request.files.get("file")
+        video_id    = request.form.get("video_id")  # from the <input type="hidden">
+
+        # basic validation
+        if not title or not upload_file or not allowed_file(upload_file.filename):
+            flash("❌ Please enter a title and upload a supported file.", "danger")
             return redirect(request.url)
 
-    
-       
-    @boundary.route('/publish_assignment_video', methods=['POST'])
+        filename = secure_filename(upload_file.filename)
+
+        # turn the string back into an ObjectId (or None)
+        video_oid = ObjectId(video_id) if video_id else None
+
+        result = UploadAssignmentController.upload_assignment(
+            title        = title,
+            classroom_id = ObjectId(classroom_id),
+            description  = description,
+            deadline     = deadline,
+            file         = upload_file,
+            filename     = filename,
+            video_id     = video_oid
+        )
+
+        if result.get("success"):
+            flash(result["message"], "success")
+            return redirect(url_for("boundary.view_classroom", classroom_id=classroom_id))
+        else:
+            flash(result.get("message", "Something went wrong"), "danger")
+            return redirect(request.url)
+
+    @boundary.route("/publish_assignment_video", methods=["POST"])
     def publish_assignment_video():
-        video_url = request.form.get("video_url")
-        classroom_id = request.form.get("classroom_id")
+        data = request.get_json()
+        video_id = data.get("video_id")
+        classroom_id = data.get("classroom_id")
 
-        # ✅ Optional: Validate user role
-        if session.get("role") != "Teacher":
-            flash("Only teachers can publish assignment videos.", "danger")
-            return redirect(url_for("boundary.home"))
+        if not video_id or not classroom_id:
+            return jsonify({"success": False, "error": "Missing video ID or classroom ID"}), 400
 
-        # 🛑 Safety check: Ensure required fields are present
-        if not video_url or not classroom_id:
-            flash("Missing video or classroom context.", "danger")
-            return redirect(url_for("boundary.home"))
+        try:
+            video_oid = ObjectId(video_id)
+            classroom_oid = ObjectId(classroom_id)
+        except Exception:
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
 
-        # 💾 Stash the video path in session (used in next route)
-        session["stashed_video_url"] = video_url
-        print("🎬 [DEBUG] Stashed video_url in session:", video_url)
+        try:
+            mongo.db.assignments.insert_one({
+                "video_id": video_oid,
+                "classroom_id": classroom_oid,
+                "title": "Generated Video Assignment",
+                "description": "This assignment contains a generated video.",
+                "created_at": datetime.utcnow()
+            })
 
-        # 🔁 Redirect to upload page where the video will be linked to assignment
-        return redirect(url_for("boundary.upload_assignment_form", classroom_id=classroom_id)) 
+            return jsonify({"success": True})
+
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
     @staticmethod
@@ -1903,22 +1962,10 @@ class ViewAssignmentBoundary:
                                text_content=text_content,
                                student_submission=student_submission,
                                enrolled_students=enrolled_students) 
+ 
 
     
 #This function facilitates student to view the list of classrooms he/she is enrolled in.
-class StudentViewClassroomsBoundary:
-    @staticmethod
-    @boundary.route('/student/viewClassrooms', methods=['GET'])
-    def get_list_of_classrooms():
-        if 'role' not in session or session.get('role') != 'Student':
-            flash("Unauthorized access.", category='error')
-            return redirect(url_for('boundary.home'))
-        username = session.get('username')
-        classrooms = list(mongo.db.classroom.find({"student_list": username}))
-        return render_template("manageClassrooms.html", classrooms=classrooms)
-
-
-# Student Assignment
 class StudentAssignmentBoundary:
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 
@@ -1927,34 +1974,40 @@ class StudentAssignmentBoundary:
         """
         Checks if the file has an allowed extension.
         """
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in StudentAssignmentBoundary.ALLOWED_EXTENSIONS
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in StudentAssignmentBoundary.ALLOWED_EXTENSIONS
 
-    
-    @boundary.route('/view_assignment/<assignment_id>/<filename>', methods=['GET', 'POST'])
+    @boundary.route('/student/view_assignment/<assignment_id>/<filename>', methods=['GET', 'POST'])
     def submit_assignment(assignment_id, filename):
         """Handles assignment submission and displays the submission form."""
         try:
             student_username = session.get('username')  # Get logged-in student's username
-            student_submission = None  # Default to no submission
 
             if request.method == 'POST':
                 file = request.files.get('file')
-
                 if not file:
                     flash('No file uploaded!', 'danger')
-                    return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+                    return redirect(url_for('boundary.submit_assignment',
+                                            assignment_id=assignment_id,
+                                            filename=filename))
 
-                result = StudentSendSubmissionController.submit_assignment_logic(assignment_id, student_username, file)
+                result = StudentSendSubmissionController.submit_assignment_logic(
+                    assignment_id, student_username, file
+                )
 
                 if result['success']:
                     flash('Assignment submitted successfully!', 'success')
                 else:
                     flash(f"Submission failed: {result['message']}", 'danger')
 
-                return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+                return redirect(url_for('boundary.submit_assignment',
+                                        assignment_id=assignment_id,
+                                        filename=filename))
 
-            # **Check if student has submitted**
-            student_submission = StudentSendSubmissionController.get_submission(assignment_id, student_username)
+            # GET → check existing submission
+            student_submission = StudentSendSubmissionController.get_submission(
+                assignment_id, student_username
+            )
 
             return render_template(
                 'view_assignment.html',
@@ -1962,13 +2015,14 @@ class StudentAssignmentBoundary:
                 filename=filename,
                 student_submission=student_submission
             )
-
         except Exception as e:
-            logging.error(f"Error in submit_assignment: {str(e)}")
+            logging.error(f"Error in submit_assignment: {e}")
             flash('An error occurred while submitting the assignment.', 'danger')
-            return redirect(url_for('boundary.view_assignment', filename=filename, assignment_id=assignment_id))
+            return redirect(url_for('boundary.submit_assignment',
+                                    assignment_id=assignment_id,
+                                    filename=filename))
 
-    @boundary.route('/student_download_submission/<file_id>')
+    @boundary.route('/student/download_submission/<file_id>')
     def student_download_submission(file_id):
         """Serves the student's submitted file."""
         try:
@@ -1983,45 +2037,36 @@ class StudentAssignmentBoundary:
                 flash("File not found!", "danger")
                 return redirect(request.referrer)
         except Exception as e:
-            logging.error(f"Error in download_submission: {str(e)}")
+            logging.error(f"Error in download_submission: {e}")
             flash("An error occurred while downloading the file.", "danger")
             return redirect(request.referrer)
-    
-    @boundary.route('student/view_submission/<submission_id>', methods=['GET'])
+
+    @boundary.route('/student/view_submission/<submission_id>', methods=['GET'])
     def student_view_submission(submission_id):
         """Allows a student to view their own submission."""
         student_username = session.get('username')
-        
         if not student_username:
             flash("You need to be logged in to view your submission.", "danger")
             return redirect(url_for('boundary.login'))
 
-        # Fetch the submission from the database
-        submission = StudentViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
-
+        submission = StudentViewSubmissionController.get_submission_by_student_and_id(
+            student_username, submission_id
+        )
         if not submission:
             flash("Submission not found.", "danger")
             return redirect(url_for('boundary.home'))
 
         file_name = submission.get("file_name")
         file_id = submission.get("file_id")
-        video_url = submission.get("video_url")
+        video_id = submission.get("video_id")
+        file_extension = file_name.rsplit('.', 1)[-1].lower() if file_name else None
 
-        file_extension = file_name.split(".")[-1].lower() if file_name else None
-        file_base64 = None
-        text_content = None
-
-        # Handle file preview only if there's a file
-        if file_id and file_extension:
-            try:
-                file_data = Submission.get_submission_file(file_id)
-                if file_extension in ["pdf", "txt", "md"]:
-                    file_base64 = base64.b64encode(file_data).decode("utf-8")
-                    if file_extension in ["txt", "md"]:
-                        text_content = file_data.decode("utf-8")
-            except Exception as e:
-                logging.error(f"Error reading submission file: {e}")
-                flash("There was a problem loading your file.", "danger")
+        file_base64 = text_content = None
+        if file_id and file_extension in ["pdf", "txt", "md"]:
+            file_data = Submission.get_submission_file(file_id)
+            file_base64 = base64.b64encode(file_data).decode("utf-8")
+            if file_extension in ["txt", "md"]:
+                text_content = file_data.decode("utf-8")
 
         return render_template(
             "reviewSubmission.html",
@@ -2030,39 +2075,33 @@ class StudentAssignmentBoundary:
             text_content=text_content,
             file_extension=file_extension,
             filename=file_name,
-            video_url=video_url
+            video_id = video_id
         )
 
-
-
-    @boundary.route('/edit_submission/<submission_id>', methods=['GET', 'POST'])
+    @boundary.route('/student/edit_submission/<submission_id>', methods=['GET', 'POST'])
     def student_edit_submission(submission_id):
-        student_username = session.get("username")
+        """Allows a student to edit their submission."""
+        student_username = session.get('username')
         if not student_username:
             flash("Please log in to edit your submission.", "danger")
             return redirect(url_for("boundary.login"))
 
-        submission = StudentViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
+        submission = StudentViewSubmissionController.get_submission_by_student_and_id(
+            student_username, submission_id
+        )
         if not submission:
             flash("Submission not found.", "danger")
             return redirect(url_for("boundary.home"))
 
         file_name = submission.get("file_name")
-        file_extension = file_name.split(".")[-1].lower() if file_name else None
-        video_url = submission.get("video_url")
+        file_extension = file_name.rsplit('.', 1)[-1].lower() if file_name else None
 
-        file_base64 = None
-        text_content = None
-
-        if file_extension in ["pdf", "txt", "md"] and submission.get("file_id"):
-            try:
-                file_data = Submission.get_submission_file(submission["file_id"])
-                file_base64 = base64.b64encode(file_data).decode("utf-8")
-                if file_extension in ["txt", "md"]:
-                    text_content = file_data.decode("utf-8")
-            except Exception as e:
-                logging.error(f"[Edit Submission] Failed to read file: {e}")
-                flash("Unable to load file for editing.", "danger")
+        file_base64 = text_content = None
+        if submission.get("file_id") and file_extension in ["pdf", "txt", "md"]:
+            file_data = Submission.get_submission_file(submission["file_id"])
+            file_base64 = base64.b64encode(file_data).decode("utf-8")
+            if file_extension in ["txt", "md"]:
+                text_content = file_data.decode("utf-8")
 
         return render_template(
             "editSubmission.html",
@@ -2071,49 +2110,49 @@ class StudentAssignmentBoundary:
             file_base64=file_base64,
             text_content=text_content,
             filename=file_name,
-            video_url=video_url
+            video_id = submission.get("video_id")
         )
 
-
-    @boundary.route('/delete_submission/<submission_id>/<assignment_id>', methods=['GET','POST'])
+    @boundary.route('/student/delete_submission/<submission_id>/<assignment_id>', methods=['POST'])
     def student_delete_submission(submission_id, assignment_id):
         """Allows a student to delete their own submission."""
-        
         student_username = session.get('username')
-        
         if not student_username:
             flash("Unauthorized action.", "danger")
-            return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))
+            return redirect(url_for('boundary.submit_assignment',
+                                    assignment_id=assignment_id,
+                                    filename=""))
 
         result = StudentDeleteSubmissionController.delete_submission(submission_id)
-
-        if result["success"]:
+        if result.get("success"):
             flash("Submission deleted successfully!", "success")
         else:
-            flash("Error Deleting Submission", "danger")
+            flash("Error deleting submission.", "danger")
 
-        return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))
+        return redirect(url_for('boundary.submit_assignment',
+                                assignment_id=assignment_id,
+                                filename=""))
 
-    @boundary.route('/submit_video_assignment', methods=['POST'])
-    def submit_video_assignment():
-        video_url = request.form.get("video_url")
-        assignment_id = request.form.get("assignment_id")
-        student_username = request.form.get("student_username")
+    @boundary.route('/submit_video_assignment/<assignment_id>', methods=['POST'])
+    def submit_video_assignment_json(assignment_id):
+        """Handles video submission using video_id (called from JS)."""
+        if 'username' not in session or session.get('role') != "Student":
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
 
-        if not (video_url and assignment_id and student_username):
-            flash("Missing required data for video submission.", "danger")
-            return redirect(url_for("boundary.home"))
+        student_username = session.get("username")
+        data = request.get_json()
+        video_id = data.get("video_id")
 
-        result = StudentSendSubmissionController.submit_video_assignment_logic(
-            assignment_id, student_username, video_url
-        )
+        if not video_id or not assignment_id:
+            return jsonify({"success": False, "message": "Missing required data."}), 400
 
-        if result["success"]:
-            flash("🎥 Video submitted successfully!", "success")
-        else:
-            flash(f"❌ Failed to submit video: {result['message']}", "danger")
-
-        return redirect(url_for('boundary.view_assignment', assignment_id=assignment_id))        
+        try:
+            result = StudentSendSubmissionController.submit_video_assignment_logic(
+                assignment_id, student_username, video_id
+            )
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
 
         
 # Access Forum
