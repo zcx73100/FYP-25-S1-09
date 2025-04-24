@@ -1255,7 +1255,7 @@ class Notification:
         )
 
     @staticmethod
-    def mark_notifications_as_read(username):
+    def mark_as_read(username):
         if session['role'] == 'Teacher':
             # If the user is a teacher, mark all their notifications as read
             mongo.db.notifications.update_many(
