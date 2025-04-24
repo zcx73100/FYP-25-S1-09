@@ -18,7 +18,7 @@ class ChatbotBoundary:
     @chatbot.route('/chatbot')
     def chatbot_page():
         if 'username' not in session:
-            return redirect(url_for('auth.login'))  # Assuming your login route is auth.login
+            return redirect(url_for('boundary.login'))  
         
         chatbot_chats = mongo.db.chatbot_chats.find({"username": session['username']}).sort("timestamp", -1).limit(10)
 

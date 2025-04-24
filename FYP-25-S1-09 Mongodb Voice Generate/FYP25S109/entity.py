@@ -1182,8 +1182,22 @@ class Message:
 class Notification:
     @staticmethod
     def get_notification_by_username(username):
-        # Get all notifications for a specific teacher (username)
-        return mongo.db.notifications.find({"username": username}).sort("timestamp", -1)
+        if session['role'] == 'Teacher':
+            # If the user is a teacher, fetch all notifications for their username, sorted by timestamp
+            return mongo.db.notifications.find({"username": username}).sort("timestamp", -1)
+        elif session['role'] == 'Student':
+            # If the user is a student, first check if they are enrolled in any classroom
+            classroom = mongo.db.classroom.find_one({
+                "student_list": username  # Check if the student is in the student_list
+            })
+
+            # If the student is enrolled in a classroom, fetch the notifications for that classroom
+            if classroom:
+                return mongo.db.notifications.find({
+                    "classroom_id": classroom["_id"]
+                }).sort("timestamp", -1)
+            else:
+                return None  # No notifications if the student is not in a classroom
 
     @staticmethod
     def search_notification(search_query):
@@ -1209,7 +1223,7 @@ class Notification:
         # Insert a new notification into the database
         mongo.db.notifications.insert_one({
             "username": username,
-            "classroom_id": classroom_id,
+            "classroom_id": ObjectId(classroom_id),
             "classroom_name": classroom_name,
             "title": title.strip(),
             "description": description.strip(),

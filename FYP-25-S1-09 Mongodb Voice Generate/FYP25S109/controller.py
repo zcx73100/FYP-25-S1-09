@@ -554,4 +554,9 @@ class SearchNotificationController:
 class DeleteNotificationController:
     @staticmethod
     def delete_notification(notification_id):
-        return Notification.delete_notification(notification_id)    
+        return Notification.delete_notification(notification_id)   
+
+class ReadNotificationController:
+    @staticmethod
+    def mark_as_read(notification_id):
+        return Notification.mark_as_read(notification_id) 

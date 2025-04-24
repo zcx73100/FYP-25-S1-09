@@ -2272,16 +2272,11 @@ class NotificationBoundary:
 
         notifications = None
 
-        if role == "Teacher":
+        if role == "Teacher" or role == "Student":
             if query:
                 notifications = SearchNotificationController.search_notification(query)
             else:
-                # Fetch notifications by classroom_id if provided
-                classroom_id = request.args.get('classroom_id')
-                if classroom_id:
-                    notifications = mongo.db.notifications.find({"teacher": username, "classroom_id": classroom_id})
-                else:
-                    notifications = ViewNotificationsController.view_notifications(username)
+                notifications = ViewNotificationsController.view_notifications(username)
 
         return render_template('viewNotifications.html', notifications=notifications, classroom=classroom)
 
@@ -2339,10 +2334,7 @@ class NotificationBoundary:
             if not username:
                 return jsonify([])
 
-            notifications = mongo.db.notifications.find({
-                "username": username,
-                "is_read": False
-            }).sort("timestamp", -1)
+            notifications = ViewNotificationsController.view_notifications(username)
 
             notif_list = [{
                 "title": n.get("title"),
@@ -2364,12 +2356,8 @@ class NotificationBoundary:
 
     @boundary.route("/mark_notifications_read", methods=["POST"])
     def mark_notifications_read():
-            username = session.get("username")
-            if username:
-                result = mongo.db.notifications.update_many(
-                    {"username": username, "is_read": False},
-                    {"$set": {"is_read": True}}
-                )
-                print(f"{result.modified_count} notifications marked as read.")
-                return jsonify({"status": "success"})
-            return jsonify({"status": "not_logged_in"})
+        username = session.get("username")
+        if username:
+            ReadNotificationController.mark_as_read(username)
+            return jsonify({"status": "success"})
+        return jsonify({"status": "not_logged_in"})
