@@ -22,6 +22,8 @@ import mimetypes
 from gtts import gTTS
 import gridfs
 import uuid
+import tempfile
+import time
 fs = gridfs.GridFS(mongo.db)
 
 
@@ -313,9 +315,10 @@ class GenerateVideoEntity:
             audio_file = fs.get(ObjectId(audio_id))
 
             # Save temporary files
-            avatar_temp_path = f"/tmp/avatar_{uuid.uuid4().hex}.png"
-            audio_temp_path = f"/tmp/audio_{uuid.uuid4().hex}.wav"
+            avatar_temp_path = os.path.join(tempfile.gettempdir(), f"avatar_{uuid.uuid4().hex}.png")
+            audio_temp_path = os.path.join(tempfile.gettempdir(), f"audio_{uuid.uuid4().hex}.wav")
 
+            
             with open(avatar_temp_path, "wb") as f:
                 f.write(avatar_file.read())
 
@@ -350,13 +353,32 @@ class GenerateVideoEntity:
             video_path = result.get("video_path")
             print(f"[DEBUG] SadTalker returned video_path: {video_path}")
 
-            if not video_path or not os.path.exists(video_path):
-                print("❌ ERROR: video_path is missing or file does not exist.")
+            safe_video_path = os.path.normpath(video_path.strip())
+
+            safe_video_path = os.path.normpath(video_path.strip())
+            print(f"[DEBUG] Normalized path to check: {safe_video_path}")
+
+            # Retry up to 5 times with short delay in case file write is delayed
+            for i in range(5):
+                if os.path.exists(safe_video_path):
+                    break
+                print(f"[WAIT] Video not found yet, retrying ({i+1}/5)...")
+                time.sleep(0.2)
+            else:
+                print(f"❌ ERROR: video does not exist at {safe_video_path}")
                 return None
 
-            # Upload to GridFS
-            with open(video_path, "rb") as f:
-                video_id = fs.put(f, filename=os.path.basename(video_path), content_type="video/mp4")
+            with open(safe_video_path, "rb") as vf:
+                video_id = fs.put(
+                    vf,
+                    filename=os.path.basename(safe_video_path),
+                    content_type="video/mp4",
+                    metadata={"username": session.get("username")}
+                )
+            
+
+            print(f"[DEBUG] Checking existence of normalized path: {safe_video_path}")
+            print(f"[DEBUG] Exists? {os.path.exists(safe_video_path)}")
 
             print(f"[✅] Video saved to GridFS with ID: {video_id}")
             return str(video_id)
@@ -1175,8 +1197,16 @@ class Notification:
 
     @staticmethod
     def insert_notification(username, classroom_id, title, description, priority):
+        # Fetch the classroom document as a dictionary
+        classroom = mongo.db.classroom.find_one(
+            {"_id": ObjectId(classroom_id)},
+            {"classroom_name": 1, "_id": 0}
+        )
+
+        # Extract only the classroom_name value safely
+        classroom_name = classroom.get('classroom_name') if classroom else None
+
         # Insert a new notification into the database
-        classroom_name = str(mongo.db.classroom.find_one({"_id": ObjectId(classroom_id)},{"classroom_name": 1, '_id': 0}))
         mongo.db.notifications.insert_one({
             "username": username,
             "classroom_id": classroom_id,
@@ -1187,6 +1217,7 @@ class Notification:
             "priority": int(priority),
             "timestamp": datetime.now()
         })
+
 
     @staticmethod
     def delete_notification(notification_id):

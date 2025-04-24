@@ -7,7 +7,7 @@ from . import mongo
 from bson import ObjectId
 
 # Configuration for the chatbot API
-API_KEY = "" # Use environment variable for the API key
+API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = "deepseek/deepseek-chat-v3-0324:free"
 
 # Define the Blueprint for the chatbot routes

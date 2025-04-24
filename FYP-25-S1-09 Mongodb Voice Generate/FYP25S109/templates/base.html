@@ -40,6 +40,26 @@
         #notification-box li:last-child {
             border-bottom: none;
         }
+
+
+   #chatbot-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: #007bff;
+        color: white;
+        border-radius: 50%;
+        padding: 15px 20px;
+        font-size: 20px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        }
+        
+        #chatbot-btn:hover {
+        background-color: #0056b3;
+        }
     </style>
 </head>
 
@@ -133,7 +153,16 @@
 </nav>
 
 <!-- Page Content -->
-<main class="container mt-4">{% block content %}{% endblock %}</main>
+<main class="container mt-4">
+    {% block content %}
+    
+    {% endblock %}
+    {% if session.get('role') in ['Student', 'Teacher', 'Admin'] %}
+        <button id="chatbot-btn" class="btn btn-outline-info" onclick="location.href='{{ url_for('chatbot.chatbot_page') }}'" title="Chat with AI">
+            <i class="fas fa-robot"></i> Chat with Edumate!
+        </button>
+    {% endif %}
+</main>
 
 <!-- Footer -->
 <footer class="bg-dark text-white text-center py-3 mt-5">

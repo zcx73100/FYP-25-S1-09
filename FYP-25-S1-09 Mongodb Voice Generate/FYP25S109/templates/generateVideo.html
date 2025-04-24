@@ -70,7 +70,9 @@
   </form>
 
   <!-- Video Preview -->
-  <div id="video-preview" class="text-center mt-4"></div>
+  <div id="video-preview" class="text-center mt-4">
+    <div class="alert alert-info">Video Preview:</div>
+  </div>
 
   <!-- Hidden Inputs for Context -->
   {% if session.get("role") == "Student" and request.args.get("source") == "submission" %}
