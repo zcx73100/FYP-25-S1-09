@@ -2348,11 +2348,28 @@ class NotificationBoundary:
         
     @boundary.route('/get_notifications_count', methods=['GET'])
     def get_notifications_count():
-            username = session.get("username")
-            if not username:
-                return jsonify({"count": 0})
-            count = ViewNotificationsController.view_notifications(username)
-            return jsonify({"count": count})
+        username = session.get("username")
+        if not username:
+            return jsonify({"count": 0})
+        count = GetUnreadNotificationsController.get_unread_notifications(username)
+
+        return jsonify({"count": count})
+    @boundary.route('/get_unread_notifications', methods=['GET'])
+    def get_unread_notifications():
+        username = session.get("username")
+        if not username:
+            return jsonify([])
+
+        notifications = GetUnreadNotificationsController.get_unread_notifications(username)
+
+        notif_list = [{
+            "title": n.get("title"),
+            "description": n.get("description"),
+            "priority": n.get("priority"),
+            "timestamp": n.get("timestamp").strftime("%Y-%m-%d %H:%M:%S")
+        } for n in notifications]
+
+        return jsonify(notif_list)
 
     @boundary.route("/mark_notifications_read", methods=["POST"])
     def mark_notifications_read():

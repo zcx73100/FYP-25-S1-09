@@ -560,3 +560,8 @@ class ReadNotificationController:
     @staticmethod
     def mark_as_read(notification_id):
         return Notification.mark_as_read(notification_id) 
+
+class GetUnreadNotificationsController:
+    @staticmethod
+    def get_unread_notifications(username):
+        return Notification.get_unread_notifications(username)

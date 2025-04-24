@@ -1180,28 +1180,27 @@ class Message:
 
 
 class Notification:
+
+    @staticmethod
+    def get_student_classroom_ids(username):
+        classrooms = mongo.db.classroom.find({"student_list": username})
+        return [classroom["_id"] for classroom in classrooms]
+
     @staticmethod
     def get_notification_by_username(username):
         if session['role'] == 'Teacher':
-            # If the user is a teacher, fetch all notifications for their username, sorted by timestamp
             return mongo.db.notifications.find({"username": username}).sort("timestamp", -1)
         elif session['role'] == 'Student':
-            # If the user is a student, first check if they are enrolled in any classroom
-            classroom = mongo.db.classroom.find_one({
-                "student_list": username  # Check if the student is in the student_list
-            })
-
-            # If the student is enrolled in a classroom, fetch the notifications for that classroom
-            if classroom:
+            classroom_ids = Notification.get_student_classroom_ids(username)
+            if classroom_ids:
                 return mongo.db.notifications.find({
-                    "classroom_id": classroom["_id"]
+                    "classroom_id": {"$in": classroom_ids}
                 }).sort("timestamp", -1)
             else:
-                return None  # No notifications if the student is not in a classroom
+                return None
 
     @staticmethod
     def search_notification(search_query):
-        # Search for notifications by title or description
         return mongo.db.notifications.find({
             "$or": [
                 {"title": {"$regex": search_query, "$options": "i"}},
@@ -1211,16 +1210,11 @@ class Notification:
 
     @staticmethod
     def insert_notification(username, classroom_id, title, description, priority):
-        # Fetch the classroom document as a dictionary
         classroom = mongo.db.classroom.find_one(
             {"_id": ObjectId(classroom_id)},
             {"classroom_name": 1, "_id": 0}
         )
-
-        # Extract only the classroom_name value safely
         classroom_name = classroom.get('classroom_name') if classroom else None
-
-        # Insert a new notification into the database
         mongo.db.notifications.insert_one({
             "username": username,
             "classroom_id": ObjectId(classroom_id),
@@ -1232,19 +1226,16 @@ class Notification:
             "timestamp": datetime.now()
         })
 
-
     @staticmethod
     def delete_notification(notification_id):
-        # Delete a notification by its ID
         mongo.db.notifications.delete_one({"_id": ObjectId(notification_id)})
-    
+
     @staticmethod
     def get_notification_by_id(notification_id):
-        # Get a specific notification by its ID
         return mongo.db.notifications.find_one({"_id": ObjectId(notification_id)})
+
     @staticmethod
-    def update_notification(notification_id, title,description, priority):
-        # Update notification details
+    def update_notification(notification_id, title, description, priority):
         mongo.db.notifications.update_one(
             {"_id": ObjectId(notification_id)},
             {"$set": {
@@ -1257,19 +1248,32 @@ class Notification:
     @staticmethod
     def mark_as_read(username):
         if session['role'] == 'Teacher':
-            # If the user is a teacher, mark all their notifications as read
             mongo.db.notifications.update_many(
                 {"username": username},
                 {"$set": {"is_read": True}}
             )
         elif session['role'] == 'Student':
-            # If the user is a student, mark all notifications for their classroom as read
-            classroom = mongo.db.classroom.find_one({
-                "student_list": username  # Check if the student is in the student_list
-            })
-
-            if classroom:
+            classroom_ids = Notification.get_student_classroom_ids(username)
+            if classroom_ids:
                 mongo.db.notifications.update_many(
-                    {"classroom_id": classroom["_id"]},
+                    {"classroom_id": {"$in": classroom_ids}},
                     {"$set": {"is_read": True}}
                 )
+
+    @staticmethod
+    def get_unread_notifications(username):
+        if session['role'] == 'Teacher':
+            return mongo.db.notifications.find({
+                "username": username,
+                "is_read": False
+            }).sort("timestamp", -1)
+        elif session['role'] == 'Student':
+            classroom_ids = Notification.get_student_classroom_ids(username)
+            if classroom_ids:
+                return mongo.db.notifications.find({
+                    "classroom_id": {"$in": classroom_ids},
+                    "is_read": False
+                }).sort("timestamp", -1)
+            else:
+                return None
+

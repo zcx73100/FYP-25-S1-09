@@ -179,7 +179,7 @@
         const countSpan = document.getElementById("notification-count");
         const contentBox = document.getElementById("notification-content");
 
-        fetch("/get_notifications")
+        fetch("/get_unread_notifications")
             .then(response => response.json())
             .then(data => {
                 contentBox.innerHTML = "";
