@@ -2351,7 +2351,7 @@ class NotificationBoundary:
             username = session.get("username")
             if not username:
                 return jsonify({"count": 0})
-            count = mongo.db.notifications.count_documents({"username": username, "is_read": False})
+            count = ViewNotificationsController.view_notifications(username)
             return jsonify({"count": count})
 
     @boundary.route("/mark_notifications_read", methods=["POST"])

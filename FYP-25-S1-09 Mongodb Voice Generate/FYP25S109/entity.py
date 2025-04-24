@@ -1256,7 +1256,20 @@ class Notification:
 
     @staticmethod
     def mark_notifications_as_read(username):
-        mongo.db.notifications.update_many(
-            {"username": username, "is_read": False},
-            {"$set": {"is_read": True}}
-        )
+        if session['role'] == 'Teacher':
+            # If the user is a teacher, mark all their notifications as read
+            mongo.db.notifications.update_many(
+                {"username": username},
+                {"$set": {"is_read": True}}
+            )
+        elif session['role'] == 'Student':
+            # If the user is a student, mark all notifications for their classroom as read
+            classroom = mongo.db.classroom.find_one({
+                "student_list": username  # Check if the student is in the student_list
+            })
+
+            if classroom:
+                mongo.db.notifications.update_many(
+                    {"classroom_id": classroom["_id"]},
+                    {"$set": {"is_read": True}}
+                )
