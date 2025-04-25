@@ -1783,65 +1783,66 @@ class TeacherManageQuizBoundary:
             return redirect(url_for('boundary.manage_quizzes'))
 
         if request.method == "POST":
-            quiz_title = request.form.get('quiz_title', '').strip()
-            quiz_description = request.form.get('quiz_description', '').strip()
-            questions = []
+            quiz_title = request.form.get('title', '').strip()
+            quiz_description = request.form.get('description', '').strip()
 
-            # Handle deleting questions
-            delete_question_index = request.form.get('delete_question')
-            if delete_question_index is not None:
-                delete_question_index = int(delete_question_index)
-                result = Quiz.delete_question(quiz_id, delete_question_index)
-                if result.get("success"):
-                    flash(result["message"], "success")
-                else:
-                    flash(result["message"], "danger")
+            updated_questions = []
+            i = 0
+            while True:
+                # Check if this question index exists in the form
+                question_text = request.form.get(f'questions[{i}][text]')
+                if question_text is None:
+                    break
 
-            # Add new questions
-            question_count = sum(1 for key in request.form.keys() if key.startswith('question_'))
-            for i in range(1, question_count + 1):
-                question_text = request.form.get(f'question_{i}', '').strip()
+                question_text = question_text.strip()
                 options = [
-                    request.form.get(f'option_{i}_1', '').strip(),
-                    request.form.get(f'option_{i}_2', '').strip(),
-                    request.form.get(f'option_{i}_3', '').strip(),
-                    request.form.get(f'option_{i}_4', '').strip()
+                    request.form.get(f'questions[{i}][options][]', ''),
+                    request.form.getlist(f'questions[{i}][options][]')[0] if len(request.form.getlist(f'questions[{i}][options][]')) > 0 else '',
+                    request.form.getlist(f'questions[{i}][options][]')[1] if len(request.form.getlist(f'questions[{i}][options][]')) > 1 else '',
+                    request.form.getlist(f'questions[{i}][options][]')[2] if len(request.form.getlist(f'questions[{i}][options][]')) > 2 else '',
                 ]
-                correct_answer = request.form.get(f'correct_answer_{i}', '').strip()
-                image_file = request.files.get(f'image_{i}')
 
-                # Convert image to base64 if uploaded
+                correct_answer = request.form.get(f'questions[{i}][correct_answer]')
+                if correct_answer is None:
+                    correct_answer = 0
+                else:
+                    correct_answer = int(correct_answer)
+
                 image_data = None
+                image_file = request.files.get(f'questions[{i}][image]')
                 if image_file and image_file.filename:
                     image_data = base64.b64encode(image_file.read()).decode('utf-8')
+                else:
+                    # Retain old image if exists
+                    if i < len(quiz.get('questions', [])):
+                        image_data = quiz['questions'][i].get('image')
 
-                question_data = {
+                updated_questions.append({
                     "text": question_text,
                     "options": options,
                     "correct_answer": correct_answer,
                     "image": image_data
+                })
+
+                i += 1
+
+            # Final update
+            mongo.db.quizzes.update_one(
+                {"_id": ObjectId(quiz_id)},
+                {
+                    "$set": {
+                        "title": quiz_title,
+                        "description": quiz_description,
+                        "questions": updated_questions
+                    }
                 }
+            )
 
-                result = Quiz.add_question(quiz_id, question_data)
-                if result.get("success"):
-                    flash(result["message"], "success")
-                else:
-                    flash(result["message"], "danger")
+            flash("Quiz updated successfully!", "success")
+            return redirect(url_for('boundary.manage_quizzes', classroom_id=quiz["classroom_id"]))
 
-            # Update the quiz with the new questions and details
-            result = UpdateQuizController.update_quiz(quiz_id, {
-                "title": quiz_title,
-                "description": quiz_description,
-                "questions": quiz["questions"]
-            })
+        return render_template("updateQuiz.html", quiz=quiz, quiz_id=quiz_id)
 
-            if result.get("success"):
-                flash("Quiz updated successfully!", "success")
-                return redirect(url_for('boundary.manage_quizzes', classroom_id=quiz["classroom_id"]))
-            else:
-                flash(f"Error: {result.get('message')}", "danger")
-
-        return render_template("updateQuiz.html", quiz_id=quiz_id, quiz=quiz)
 
 
 
