@@ -1743,6 +1743,7 @@ class TeacherManageQuizBoundary:
                     image_data = base64.b64encode(image_file.read()).decode('utf-8')
 
                 questions.append({
+                    "index": i,
                     "text": question_text,
                     "options": options,
                     "correct_answer": correct_answer,
@@ -1772,6 +1773,79 @@ class TeacherManageQuizBoundary:
         mongo.db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
         flash("Quiz deleted successfully!", category='success')
         return redirect(request.referrer)
+
+
+    @boundary.route('/teacher/update_quiz/<quiz_id>', methods=['GET', 'POST'])
+    def update_quiz(quiz_id):
+        quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+        if not quiz:
+            flash("Quiz not found!", "danger")
+            return redirect(url_for('boundary.manage_quizzes'))
+
+        if request.method == "POST":
+            quiz_title = request.form.get('quiz_title', '').strip()
+            quiz_description = request.form.get('quiz_description', '').strip()
+            questions = []
+
+            # Handle deleting questions
+            delete_question_index = request.form.get('delete_question')
+            if delete_question_index is not None:
+                delete_question_index = int(delete_question_index)
+                result = Quiz.delete_question(quiz_id, delete_question_index)
+                if result.get("success"):
+                    flash(result["message"], "success")
+                else:
+                    flash(result["message"], "danger")
+
+            # Add new questions
+            question_count = sum(1 for key in request.form.keys() if key.startswith('question_'))
+            for i in range(1, question_count + 1):
+                question_text = request.form.get(f'question_{i}', '').strip()
+                options = [
+                    request.form.get(f'option_{i}_1', '').strip(),
+                    request.form.get(f'option_{i}_2', '').strip(),
+                    request.form.get(f'option_{i}_3', '').strip(),
+                    request.form.get(f'option_{i}_4', '').strip()
+                ]
+                correct_answer = request.form.get(f'correct_answer_{i}', '').strip()
+                image_file = request.files.get(f'image_{i}')
+
+                # Convert image to base64 if uploaded
+                image_data = None
+                if image_file and image_file.filename:
+                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
+
+                question_data = {
+                    "text": question_text,
+                    "options": options,
+                    "correct_answer": correct_answer,
+                    "image": image_data
+                }
+
+                result = Quiz.add_question(quiz_id, question_data)
+                if result.get("success"):
+                    flash(result["message"], "success")
+                else:
+                    flash(result["message"], "danger")
+
+            # Update the quiz with the new questions and details
+            result = UpdateQuizController.update_quiz(quiz_id, {
+                "title": quiz_title,
+                "description": quiz_description,
+                "questions": quiz["questions"]
+            })
+
+            if result.get("success"):
+                flash("Quiz updated successfully!", "success")
+                return redirect(url_for('boundary.manage_quizzes', classroom_id=quiz["classroom_id"]))
+            else:
+                flash(f"Error: {result.get('message')}", "danger")
+
+        return render_template("updateQuiz.html", quiz_id=quiz_id, quiz=quiz)
+
+
+
+
 
 class StudentQuizBoundary:
     @boundary.route('/attempt_quiz/<quiz_id>', methods=['GET', 'POST'])

@@ -816,26 +816,25 @@ class Quiz:
     def __init__(self, title=None, description=None, questions=None, classroom_id=None):
         self.title = title
         self.description = description
-        self.questions = questions
+        self.questions = questions or []
         self.classroom_id = classroom_id
 
     def save_quiz(self):
-            try:
-                quiz_data = {
-                    'title': self.title,
-                    'description': self.description,
-                    'questions': self.questions,
-                    'classroom_id': ObjectId(self.classroom_id),
-                    'upload_date': datetime.now()
-                }
+        try:
+            quiz_data = {
+                'title': self.title,
+                'description': self.description,
+                'questions': self.questions,
+                'classroom_id': ObjectId(self.classroom_id),
+                'upload_date': datetime.now()
+            }
 
-                mongo.db.quizzes.insert_one(quiz_data)
-                return {"success": True, "message": "Quiz uploaded successfully."}
+            mongo.db.quizzes.insert_one(quiz_data)
+            return {"success": True, "message": "Quiz uploaded successfully."}
 
-            except Exception as e:
-                logging.error(f"Error saving quiz: {str(e)}")
-                return {"success": False, "message": str(e)}
-
+        except Exception as e:
+            logging.error(f"Error saving quiz: {str(e)}")
+            return {"success": False, "message": str(e)}
 
     @staticmethod
     def search_quiz(search_query):
@@ -850,20 +849,43 @@ class Quiz:
             return []
 
     @staticmethod
-    def delete_quiz(quiz_id):
+    def add_question(quiz_id, question_data):
         try:
-            quiz = mongo.db.quizzes.find_one({"_id": quiz_id})
-            if quiz:
-                # Delete quiz attempts if any
-                for attempt in quiz.get("attempts", []):
-                    if attempt.get("file_id"):
-                        fs.delete(ObjectId(attempt["file_id"]))
-
-                # Delete the quiz itself
-                mongo.db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
-                return {"success": True, "message": "Quiz deleted successfully."}
+            result = mongo.db.quizzes.update_one(
+                {"_id": ObjectId(quiz_id)},
+                {"$push": {"questions": question_data}}
+            )
+            if result.modified_count > 0:
+                return {"success": True, "message": "Question added successfully."}
+            else:
+                return {"success": False, "message": "Quiz not found or no changes made."}
         except Exception as e:
-            logging.error(f"Error deleting quiz: {str(e)}")
+            logging.error(f"Error adding question: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    @staticmethod
+    def delete_question(quiz_id, question_index):
+        try:
+            quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+            if not quiz:
+                return {"success": False, "message": "Quiz not found."}
+
+            # Check if the question index is valid
+            if question_index < 0 or question_index >= len(quiz.get('questions', [])):
+                return {"success": False, "message": "Invalid question index."}
+
+            # Remove the question at the specified index
+            result = mongo.db.quizzes.update_one(
+                {"_id": ObjectId(quiz_id)},
+                {"$pull": {"questions": {"$slice": [question_index, 1]}}}
+            )
+
+            if result.modified_count > 0:
+                return {"success": True, "message": "Question deleted successfully."}
+            else:
+                return {"success": False, "message": "Failed to delete the question."}
+        except Exception as e:
+            logging.error(f"Error deleting question: {str(e)}")
             return {"success": False, "message": str(e)}
 
     @staticmethod
@@ -876,41 +898,20 @@ class Quiz:
             return None
 
     @staticmethod
-    def attempt_quiz(quiz_id, student_username, answers):
+    def update_quiz(quiz_id, new_details):
         try:
-            quiz = mongo.db.quizzes.find_one({"_id": ObjectId(quiz_id)})
-            if not quiz:
-                return {"success": False, "message": "Quiz not found."}
-
-            # Check if the student already attempted the quiz
-            for attempt in quiz.get("attempts", []):
-                if attempt["student"] == student_username:
-                    return {"success": False, "message": "You have already attempted this quiz."}
-
-            # Calculate score
-            score = sum(
-                1 for question in quiz['questions']
-                if str(question['_id']) in answers and question['answer'] == answers[str(question['_id'])]
-            )
-
-            # Append new attempt
-            new_attempt = {
-                "student": student_username,
-                "answers": answers,
-                "score": score,
-                "attempted_at": datetime.now()
-            }
-
-            mongo.db.quizzes.update_one(
+            result = mongo.db.quizzes.update_one(
                 {"_id": ObjectId(quiz_id)},
-                {"$push": {"attempts": new_attempt}}
+                {"$set": new_details}
             )
-
-            return {"success": True, "message": f"Quiz submitted successfully. Score: {score}"}
-
+            if result.modified_count > 0:
+                return {"success": True, "message": "Quiz updated successfully."}
+            else:
+                return {"success": False, "message": "No changes made or quiz not found."}
         except Exception as e:
-            logging.error(f"Error attempting quiz: {str(e)}")
+            logging.error(f"Error updating quiz: {str(e)}")
             return {"success": False, "message": str(e)}
+
         
 class Submission:
     def __init__(self, assignment_id, student, file, submission_date=None):

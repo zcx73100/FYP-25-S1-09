@@ -254,6 +254,10 @@ class AttemptQuizController:
             "results": results,
             "classroom_id": str(quiz.get("classroom_id"))
         }
+class UpdateQuizController:
+    @staticmethod
+    def update_quiz(quiz_id, new_details):
+        return Quiz.update_quiz(quiz_id, new_details)
 
 
 class UploadAssignmentController:

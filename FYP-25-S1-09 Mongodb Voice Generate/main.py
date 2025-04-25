@@ -63,13 +63,13 @@ def send_assignment_notification():
             continue
 
         classroom = mongo.db.classrooms.find_one({"_id": ObjectId(classroom_id)})
-        if not classroom or 'students' not in classroom:
+        if not classroom or 'student_list' not in classroom:
             logger.warning(f"Classroom '{classroom_id}' is missing or has no students.")
             continue
 
-        logger.debug(f"Classroom '{classroom_id}' has {len(classroom['students'])} students.")
+        logger.debug(f"Classroom '{classroom_id}' has {len(classroom['student_list'])} students.")
 
-        for user_id in classroom['students']:
+        for user_id in classroom['student_list']:
             notification = {
                 "user_id": ObjectId(user_id),
                 "message": message,
