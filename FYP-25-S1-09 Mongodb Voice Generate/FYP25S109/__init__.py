@@ -5,6 +5,7 @@ import os
 
 mongo = PyMongo()
 
+
 def create_app():
     app = Flask(__name__)
 

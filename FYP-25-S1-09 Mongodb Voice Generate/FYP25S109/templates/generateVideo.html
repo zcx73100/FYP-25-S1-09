@@ -4,219 +4,788 @@
 <div class="container py-5">
   <h2 class="text-center mb-4">🎬 Create Animated Video</h2>
 
-  <!-- Error Message -->
-  <div class="alert alert-danger text-center" id="error-message" style="display: none;"></div>
+  <!-- Notification System -->
+  <div id="notification" class="alert text-center" style="display: none;"></div>
 
-  <!-- Debug Info -->
-  <div class="alert alert-secondary" style="font-size: 0.9em;">
+  <!-- Debug Info (Conditional) -->
+  {% if debug_mode %}
+  <div class="alert alert-secondary mb-4" style="font-size: 0.9em;">
     <strong>Debug Info:</strong><br>
     Session Role: <code>{{ session.get("role") }}</code><br>
-    Source Param: <code>{{ request.args.get("source") }}</code><br>
+    Source: <code>{{ request.args.get("source") }}</code><br>
     Classroom ID: <code>{{ request.args.get("classroom_id") }}</code><br>
     Assignment ID: <code>{{ request.args.get("assignment_id") }}</code>
   </div>
+  {% endif %}
 
-  <!-- Voice Generation -->
-  <div class="mb-3">
-    <label for="text">Enter Text for Animation (or leave blank if using a saved voice):</label>
-    <textarea id="text" name="text" class="form-control" rows="3"></textarea>
-    <button type="button" id="generateVoice" class="btn btn-warning w-100 my-2">🔊 Generate Voice</button>
-    <audio id="audioPreview" controls style="display:none; width:100%;"></audio>
-    <input type="hidden" id="audio_id" name="audio_id">
+  <!-- Voice Generation Section -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0"><i class="fas fa-microphone me-2"></i>Voice Settings</h5>
+      <span class="badge bg-light text-primary" id="voice-status">Not Generated</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- Text Input Column -->
+        <div class="col-lg-6">
+          <label for="text" class="form-label">Enter Text for Voiceover</label>
+          <textarea id="text" class="form-control" rows="4" 
+                    placeholder="Type what you want the avatar to say..."></textarea>
+          <div class="form-text">Maximum 500 characters</div>
+          <div class="mt-2">
+            <button id="previewVoice" class="btn btn-outline-primary btn-sm">
+              <i class="fas fa-play me-1"></i> Preview Voice
+            </button>
+            <small class="text-muted ms-2">Hear it before generating</small>
+          </div>
+        </div>
+        
+        <!-- Voice Options Column -->
+        <div class="col-lg-6">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label for="voiceLang" class="form-label"><i class="fas fa-globe me-1"></i> Language</label>
+              <select id="voiceLang" class="form-select">
+                <option value="en" selected>English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="voiceGender" class="form-label"><i class="fas fa-user me-1"></i> Gender</label>
+              <select id="voiceGender" class="form-select">
+                <option value="male">Male</option>
+                <option value="female" selected>Female</option>
+                <option value="neutral">Neutral</option>
+              </select>
+            </div>
+            <div class="col-12 mt-2">
+              <button id="generateVoice" class="btn btn-warning w-100">
+                <i class="fas fa-robot me-2"></i>Generate & Save Voice
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Audio Preview -->
+      <div class="mt-3" id="audio-preview-container" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0"><i class="fas fa-play-circle me-1"></i>Saved Voice</label>
+          <button id="delete-voice" class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        </div>
+        <audio id="audioPreview" controls class="w-100"></audio>
+        <input type="hidden" id="audio_id" name="audio_id">
+      </div>
+    </div>
   </div>
 
-  <form id="videoForm" class="card p-4 shadow">
-    <!-- Saved Voices -->
-    <div class="mb-3">
-      <label class="form-label">🎵 Select audio from your saved voices:</label>
-      {% if voice_records %}
-        {% for record in voice_records %}
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="audio_choice" value="{{ record.audio_id }}" id="voice{{ loop.index }}">
-            <label class="form-check-label" for="voice{{ loop.index }}">
-              {{ record.text or "Voice " ~ loop.index }}
-            </label>
+  <!-- Voice Recording Section -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-danger text-white">
+      <h5 class="mb-0"><i class="fas fa-microphone-alt me-2"></i>Record Your Voice</h5>
+    </div>
+    <div class="card-body">
+      <div class="d-flex flex-column">
+        <div class="d-flex gap-2 mb-3">
+          <button id="startRecording" class="btn btn-danger flex-grow-1">
+            <i class="fas fa-circle me-1"></i> Start Recording
+          </button>
+          <button id="stopRecording" class="btn btn-secondary flex-grow-1" disabled>
+            <i class="fas fa-stop me-1"></i> Stop
+          </button>
+        </div>
+        <div id="recording-status" class="text-center text-muted mb-2">
+          <i class="fas fa-info-circle me-1"></i> Click start to begin recording
+        </div>
+        <div id="recorded-audio-container" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="form-label mb-0"><i class="fas fa-play-circle me-1"></i>Your Recording</label>
+            <div>
+              <button id="save-recording" class="btn btn-sm btn-success me-2">
+                <i class="fas fa-save"></i> Save
+              </button>
+              <button id="delete-recording" class="btn btn-sm btn-outline-danger">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
           </div>
-        {% endfor %}
+          <audio id="recordedAudio" controls class="w-100"></audio>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saved Voices Section -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0"><i class="fas fa-save me-2"></i>Your Saved Voices</h5>
+    </div>
+    <div class="card-body">
+      {% if voice_records %}
+        <div class="list-group" id="saved-voices-list">
+          {% for record in voice_records %}
+          <div class="list-group-item list-group-item-action voice-item">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="audio_choice" 
+                       value="{{ record.audio_id }}" id="voice{{ loop.index }}">
+                <label class="form-check-label" for="voice{{ loop.index }}">
+                  {{ record.text|truncate(40) or "Voice " ~ loop.index }}
+                  <span class="badge bg-info ms-2">{{ record.lang|upper }}</span>
+                  <span class="badge bg-dark ms-1">{{ record.gender|capitalize }}</span>
+                  {% if record.source == 'recording' %}
+                  <span class="badge bg-danger ms-1">Recording</span>
+                  {% endif %}
+                </label>
+              </div>
+              <small class="text-muted">{{ record.created_at|format_datetime }}</small>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       {% else %}
-        <p class="text-danger">No voice records available.</p>
+        <div class="alert alert-info mb-0">
+          <i class="fas fa-info-circle me-2"></i>You haven't saved any voices yet.
+        </div>
       {% endif %}
     </div>
-
-    <!-- Avatar Selection -->
-    <div class="mb-3">
-      <label class="form-label">🖼️ Select an Avatar:</label>
-      <div class="d-flex flex-wrap gap-3">
-        {% for avatar in avatars %}
-          <label class="text-center">
-            <input type="radio" name="avatar_id" value="{{ avatar._id }}" required>
-            <img src="data:image/png;base64,{{ avatar.image_data }}" class="img-thumbnail" style="width:100px; height:100px;">
-            <p>{{ avatar.avatarname }}</p>
-          </label>
-        {% endfor %}
-      </div>
-    </div>
-
-    <button type="submit" class="btn btn-primary w-100">🎥 Generate Video</button>
-
-    <!-- Progress Bar -->
-    <div id="progress-container" style="display:none;" class="mt-3">
-      <label>Video Generation Progress:</label>
-      <div class="progress">
-        <div id="progress-bar" class="progress-bar" style="width: 0%;" role="progressbar">0%</div>
-      </div>
-      <div id="progress-status" class="text-center mt-2 fw-bold"></div>
-    </div>
-  </form>
-
-  <!-- Video Preview -->
-  <div id="video-preview" class="text-center mt-4">
-    <div class="alert alert-info">Video Preview:</div>
   </div>
 
-  <!-- Hidden Inputs for Context -->
-  {% if session.get("role") == "Student" and request.args.get("source") == "submission" %}
-    <input type="hidden" id="assignmentIdInput" value="{{ request.args.get('assignment_id') }}">
-    <input type="hidden" id="videoIdInput" value="">
-    <div id="submit-section" class="text-center mt-3" style="display: none;">
-      <button id="submitVideoAssignment" class="btn btn-success w-100">📤 Submit Video</button>
+  <!-- Avatar Selection Section -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-purple text-white">
+      <h5 class="mb-0"><i class="fas fa-user-astronaut me-2"></i>Choose Your Avatar</h5>
     </div>
-  {% endif %}
+    <div class="card-body">
+      {% if avatars %}
+        <div class="row g-3" id="avatar-selection">
+          {% for avatar in avatars %}
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="avatar-card card h-100">
+              <div class="card-body text-center">
+                <img src="data:image/png;base64,{{ avatar.image_data }}" 
+                     class="img-fluid rounded-circle mb-2 avatar-img"
+                     style="width: 100px; height: 100px; object-fit: cover;">
+                <h6 class="card-title mb-1">{{ avatar.avatarname }}</h6>
+                <input type="radio" name="avatar_id" value="{{ avatar._id }}" 
+                       class="btn-check" id="avatar{{ loop.index }}" required>
+                <label class="btn btn-outline-primary btn-sm mt-2" for="avatar{{ loop.index }}">
+                  Select
+                </label>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert alert-warning mb-0">
+          <i class="fas fa-exclamation-triangle me-2"></i>No avatars available. Please create one first.
+        </div>
+      {% endif %}
+    </div>
+  </div>
 
-  {% if session.get("role") == "Teacher" and request.args.get("source") == "assignment" %}
-    <div id="publish-section" class="text-center mt-3" style="display: none;">
-      <form id="publishAssignmentForm">
-        <input type="hidden" id="videoIdInput" name="video_id">
-        <input type="hidden" name="classroom_id" value="{{ request.args.get('classroom_id') }}">
-        <button type="submit" class="btn btn-warning w-100">📢 Publish to Assignment</button>
-      </form>
+  <!-- Video Generation Section -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body text-center">
+      <button type="submit" id="generateVideoBtn" class="btn btn-primary btn-lg px-5">
+        <i class="fas fa-film me-2"></i>Generate Video
+      </button>
+      
+      <!-- Progress Bar -->
+      <div id="progress-container" class="mt-4" style="display: none;">
+        <div class="d-flex justify-content-between mb-2">
+          <span id="progress-status">Preparing video generation...</span>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress" style="height: 20px;">
+          <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" style="width: 0%"></div>
+        </div>
+      </div>
     </div>
-  {% endif %}
+  </div>
+
+  <!-- Video Preview Section -->
+  <div id="video-preview-container" class="card mb-4 shadow-sm" style="display: none;">
+    <div class="card-header bg-info text-white">
+      <h5 class="mb-0"><i class="fas fa-play-circle me-2"></i>Video Preview</h5>
+    </div>
+    <div class="card-body text-center">
+      <div id="video-preview"></div>
+      <div class="mt-3" id="video-actions">
+        {% if session.get("role") == "Student" and request.args.get("source") == "submission" %}
+        <button id="submitVideoAssignment" class="btn btn-success me-2">
+          <i class="fas fa-paper-plane me-1"></i>Submit Assignment
+        </button>
+        {% endif %}
+        {% if session.get("role") == "Teacher" and request.args.get("source") == "assignment" %}
+        <button id="publishAssignment" class="btn btn-warning me-2">
+          <i class="fas fa-bullhorn me-1"></i>Publish to Class
+        </button>
+        {% endif %}
+        <button id="downloadVideo" class="btn btn-primary">
+          <i class="fas fa-download me-1"></i>Download Video
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Inputs -->
+  <input type="hidden" id="assignmentIdInput" value="{{ request.args.get('assignment_id') }}">
+  <input type="hidden" id="classroomIdInput" value="{{ request.args.get('classroom_id') }}">
+  <input type="hidden" id="videoIdInput" value="">
 </div>
+
+<style>
+  .bg-purple {
+    background-color: #6f42c1;
+  }
+  .avatar-card:hover {
+    transform: translateY(-5px);
+    transition: transform 0.2s ease;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }
+  .voice-item:hover {
+    background-color: #f8f9fa;
+  }
+  #progress-bar {
+    transition: width 0.3s ease;
+  }
+  .blink {
+    animation: blink-animation 1s steps(2, start) infinite;
+  }
+  @keyframes blink-animation {
+    to { visibility: hidden; }
+  }
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const audioIdInput      = document.getElementById("audio_id");
-  const audioPreview      = document.getElementById("audioPreview");
-  const errorMsg          = document.getElementById("error-message");
-  const videoForm         = document.getElementById("videoForm");
-  const videoPreview      = document.getElementById("video-preview");
-  const progressBar       = document.getElementById("progress-bar");
-  const statusLabel       = document.getElementById("progress-status");
-  const submitSection     = document.getElementById("submit-section");
-  const videoIdInput      = document.getElementById("videoIdInput");
-  const assignmentIdInput = document.getElementById("assignmentIdInput");
+  // DOM Elements
+  const elements = {
+    notification: document.getElementById('notification'),
+    voiceStatus: document.getElementById('voice-status'),
+    audioPreview: document.getElementById('audioPreview'),
+    audioPreviewContainer: document.getElementById('audio-preview-container'),
+    recordedAudio: document.getElementById('recordedAudio'),
+    recordedAudioContainer: document.getElementById('recorded-audio-container'),
+    recordingStatus: document.getElementById('recording-status'),
+    videoPreviewContainer: document.getElementById('video-preview-container'),
+    videoPreview: document.getElementById('video-preview'),
+    progressContainer: document.getElementById('progress-container'),
+    progressBar: document.getElementById('progress-bar'),
+    progressStatus: document.getElementById('progress-status'),
+    progressPercent: document.getElementById('progress-percent'),
+    generateVideoBtn: document.getElementById('generateVideoBtn')
+  };
 
-  // Voice Generation
-  document.getElementById("generateVoice").addEventListener("click", () => {
-    const text = document.getElementById("text").value.trim();
-    if (!text) return alert("⚠ Please enter text for voice generation!");
+  // State Management
+  const state = {
+    mediaRecorder: null,
+    recordedChunks: [],
+    isRecording: false,
+    currentAudio: null,
+    audioContext: null,
+    synthesisChunks: [],
+    synthesisRecorder: null
+  };
 
-    fetch("/generate_voice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        audioIdInput.value = data.audio_id;
-        audioPreview.src = `/stream_audio/${data.audio_id}`;
-        audioPreview.style.display = "block";
-        document.querySelectorAll("input[name='audio_choice']").forEach(el => el.checked = false);
-      } else {
-        alert("❌ Voice generation failed: " + data.error);
-      }
+  // Notification System
+  function showNotification(message, type = 'success') {
+    const notification = elements.notification;
+    notification.textContent = message;
+    notification.className = `alert alert-${type} text-center`;
+    notification.style.display = 'block';
+    
+    setTimeout(() => {
+      notification.style.display = 'none';
+    }, 5000);
+  }
+
+  // Date Formatting Helper
+  function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-  });
+  }
 
-  // Select saved voice
-  document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
-    radio.addEventListener("change", function () {
-      audioIdInput.value = this.value;
-      audioPreview.src = `/stream_audio/${this.value}`;
-      audioPreview.style.display = "block";
-    });
-  });
+  // Voice Preview Functionality
+  document.getElementById('previewVoice').addEventListener('click', () => {
+    const text = document.getElementById('text').value.trim();
+    const lang = document.getElementById('voiceLang').value;
+    const gender = document.getElementById('voiceGender').value;
 
-  // Generate Video
-  videoForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    const text = document.getElementById("text").value.trim();
-    const avatar = document.querySelector("input[name='avatar_id']:checked");
-    const audioId = audioIdInput.value.trim();
-    if (!audioId || !avatar) {
-      errorMsg.innerText = "❌ Please select an avatar and a voice.";
-      errorMsg.style.display = "block";
+    if (!text) {
+      showNotification('Please enter text to preview voice!', 'danger');
       return;
     }
-    errorMsg.style.display = "none";
 
-    const formData = new FormData();
-    formData.append("text", text);
-    formData.append("avatar_id", avatar.value);
-    formData.append("audio_id", audioId);
-    formData.append("source", "{{ request.args.get('source') }}");
-    formData.append("assignment_id", "{{ request.args.get('assignment_id') }}");
-    formData.append("classroom_id", "{{ request.args.get('classroom_id') }}");
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
 
-    progressBar.style.width = "0%";
-    progressBar.textContent = "0%";
-    statusLabel.innerText = "⏳ Starting...";
-    document.getElementById("progress-container").style.display = "block";
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const voice = findBestVoice(voices, lang, gender);
+    
+    if (voice) {
+      utterance.voice = voice;
+      utterance.rate = 0.9;
+      utterance.pitch = gender === 'male' ? 0.8 : 1.2;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      showNotification('No suitable voice found for preview', 'warning');
+    }
+  });
 
-    fetch("/generate_video", { method: "POST", body: formData })
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) {
-        errorMsg.innerText = "❌ " + (data.error || "Video generation failed.");
-        errorMsg.style.display = "block";
+  function findBestVoice(voices, lang, gender) {
+    const filtered = voices.filter(v => {
+      const langMatch = v.lang.startsWith(lang);
+      const genderMatch = gender === 'neutral' ? true : 
+                         (gender === 'male' ? v.name.includes('Male') : v.name.includes('Female'));
+      return langMatch && genderMatch;
+    });
+
+    // Prefer Google voices, then Microsoft, then others
+    filtered.sort((a, b) => {
+      const aScore = a.name.includes('Google') ? 2 : a.name.includes('Microsoft') ? 1 : 0;
+      const bScore = b.name.includes('Google') ? 2 : b.name.includes('Microsoft') ? 1 : 0;
+      return bScore - aScore;
+    });
+
+    return filtered[0] || null;
+  }
+
+  // Voice Generation with Web Speech API
+  document.getElementById('generateVoice').addEventListener('click', async () => {
+    const text = document.getElementById('text').value.trim();
+    const lang = document.getElementById('voiceLang').value;
+    const gender = document.getElementById('voiceGender').value;
+
+    if (!text) {
+      showNotification('Please enter text for voice generation!', 'danger');
+      return;
+    }
+
+    try {
+      elements.voiceStatus.textContent = 'Generating...';
+      elements.voiceStatus.className = 'badge bg-warning text-dark';
+      
+      // Generate speech using Web Speech API
+      const audioBlob = await generateSpeech(text, lang, gender);
+      
+      // Upload to server
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'speech.wav');
+      formData.append('text', text);
+      formData.append('lang', lang);
+      formData.append('gender', gender);
+
+      const response = await fetch("/upload_synthesized_voice", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        document.getElementById('audio_id').value = data.audio_id;
+        elements.audioPreview.src = `/stream_audio/${data.audio_id}`;
+        elements.audioPreviewContainer.style.display = 'block';
+        
+        // Unselect other audio options
+        document.querySelectorAll("input[name='audio_choice']").forEach(el => el.checked = false);
+        elements.recordedAudioContainer.style.display = 'none';
+        
+        elements.voiceStatus.textContent = 'Generated';
+        elements.voiceStatus.className = 'badge bg-success text-white';
+        showNotification('Voice generated and saved successfully!');
+        
+        // Update state
+        state.currentAudio = {
+          type: 'generated',
+          id: data.audio_id
+        };
+        
+        // Refresh saved voices list
+        await refreshSavedVoices();
+      } else {
+        throw new Error(data.error || "Voice upload failed");
+      }
+    } catch (error) {
+      elements.voiceStatus.textContent = 'Error';
+      elements.voiceStatus.className = 'badge bg-danger text-white';
+      showNotification(error.message, 'danger');
+      console.error('Voice generation error:', error);
+    }
+  });
+
+  async function generateSpeech(text, lang, gender) {
+    return new Promise((resolve, reject) => {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      // Get voices and find the best match
+      const voices = window.speechSynthesis.getVoices();
+      const voice = findBestVoice(voices, lang, gender);
+      
+      if (!voice) {
+        reject(new Error(`No suitable voice found for ${gender} ${lang}`));
         return;
       }
 
-      const vid = data.video_id;
-      videoIdInput.value = vid;
+      // Set up audio context for recording
+      state.audioContext = state.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+      const dest = state.audioContext.createMediaStreamDestination();
+      state.synthesisRecorder = new MediaRecorder(dest.stream);
+      state.synthesisChunks = [];
+      
+      state.synthesisRecorder.ondataavailable = evt => {
+        state.synthesisChunks.push(evt.data);
+      };
+      
+      state.synthesisRecorder.onstop = () => {
+        const blob = new Blob(state.synthesisChunks, { type: 'audio/wav' });
+        resolve(blob);
+      };
+      
+      state.synthesisRecorder.start();
+      
+      // Create utterance
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voice;
+      utterance.rate = 1.0;
+      utterance.pitch = gender === 'male' ? 0.9 : 1.1;
+      
+      // Connect to audio context
+      utterance.onend = () => {
+        setTimeout(() => {
+          state.synthesisRecorder.stop();
+        }, 500);
+      };
+      
+      // Speak through Web Audio API
+      window.speechSynthesis.speak(utterance);
+    });
+  }
 
-      return fetch("/save_generated_video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, avatar_id: avatar.value, audio_id: audioId, video_id: vid })
-      }).then(() => {
-        videoPreview.innerHTML =
-          `<video width="400" controls autoplay>
-             <source src="/stream_video/${vid}" type="video/mp4">
-             Your browser does not support the video tag.
-           </video>`;
-        progressBar.style.width = "100%";
-        progressBar.textContent = "100%";
-        statusLabel.innerText = "✅ Completed";
+  // Voice Recording
+  document.getElementById('startRecording').addEventListener('click', async () => {
+    try {
+      state.recordedChunks = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.mediaRecorder = new MediaRecorder(stream);
+      state.isRecording = true;
 
-        if (submitSection) submitSection.style.display = "block";
-        const publishSection = document.getElementById("publish-section");
-        if (publishSection) publishSection.style.display = "block";
+      state.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) state.recordedChunks.push(e.data);
+      };
+
+      state.mediaRecorder.onstop = () => {
+        const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+        elements.recordedAudio.src = URL.createObjectURL(blob);
+        elements.recordedAudioContainer.style.display = 'block';
+        elements.audioPreviewContainer.style.display = 'none';
+        elements.recordingStatus.innerHTML = '<i class="fas fa-check-circle text-success me-1"></i>Recording complete';
+      };
+
+      state.mediaRecorder.start();
+      document.getElementById('startRecording').disabled = true;
+      document.getElementById('stopRecording').disabled = false;
+      elements.recordingStatus.innerHTML = '<i class="fas fa-circle text-danger blink me-1"></i>Recording...';
+
+    } catch (error) {
+      showNotification('Error accessing microphone: ' + error.message, 'danger');
+      console.error('Recording error:', error);
+    }
+  });
+
+  document.getElementById('stopRecording').addEventListener('click', () => {
+    if (state.mediaRecorder && state.isRecording) {
+      state.mediaRecorder.stop();
+      state.isRecording = false;
+      document.getElementById('startRecording').disabled = false;
+      document.getElementById('stopRecording').disabled = true;
+      
+      // Stop all tracks
+      state.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+  });
+
+  // Save Recording
+  document.getElementById('save-recording').addEventListener('click', async () => {
+    if (!state.recordedChunks.length) {
+      showNotification('No recording to save!', 'warning');
+      return;
+    }
+
+    try {
+      const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+      formData.append('text', 'User Recording');
+      formData.append('source', 'recording');
+
+      const response = await fetch('/upload_recorded_voice', {
+        method: 'POST',
+        body: formData
       });
-    });
-  });
 
-  // Submit video assignment
-  document.getElementById("submitVideoAssignment")?.addEventListener("click", function () {
-    const vid = videoIdInput.value;
-    const aid = assignmentIdInput.value;
-
-    fetch(`/submit_video_assignment/${aid}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ video_id: vid })
-    })
-    .then(r => r.json())
-    .then(resp => {
-      if (resp.success && resp.submission_id) {
-        window.location.href = `/student/view_submission/${resp.submission_id}`;
+      const data = await response.json();
+      if (data.success) {
+        document.getElementById('audio_id').value = data.audio_id;
+        showNotification('Recording saved successfully!');
+        await refreshSavedVoices();
       } else {
-        alert("❌ Submission failed: " + (resp.message || "Unknown error."));
+        throw new Error(data.error || 'Save failed');
       }
+    } catch (error) {
+      showNotification(error.message, 'danger');
+    }
+  });
+
+  // Saved Voice Selection
+  document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
+    radio.addEventListener('change', function() {
+      document.getElementById('audio_id').value = this.value;
+      elements.audioPreview.src = `/stream_audio/${this.value}`;
+      elements.audioPreviewContainer.style.display = 'block';
+      elements.recordedAudioContainer.style.display = 'none';
+      
+      // Update state
+      state.currentAudio = {
+        type: 'saved',
+        id: this.value
+      };
     });
   });
+
+  // Delete Buttons
+  document.getElementById('delete-voice').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (state.currentAudio?.type === 'generated') {
+      if (confirm('Delete this generated voice?')) {
+        elements.audioPreviewContainer.style.display = 'none';
+        document.getElementById('audio_id').value = '';
+        state.currentAudio = null;
+        showNotification('Voice deleted');
+      }
+    }
+  });
+
+  document.getElementById('delete-recording').addEventListener('click', (e) => {
+    e.preventDefault();
+    elements.recordedAudioContainer.style.display = 'none';
+    document.getElementById('audio_id').value = '';
+    state.currentAudio = null;
+    state.recordedChunks = [];
+    showNotification('Recording deleted');
+  });
+
+  // Video Generation
+  elements.generateVideoBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    const text = document.getElementById('text').value.trim();
+    const avatar = document.querySelector("input[name='avatar_id']:checked");
+    const audioId = document.getElementById('audio_id').value.trim();
+
+    if (!audioId) {
+      showNotification('Please generate or select a voice first!', 'danger');
+      return;
+    }
+
+    if (!avatar) {
+      showNotification('Please select an avatar!', 'danger');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('avatar_id', avatar.value);
+    formData.append('audio_id', audioId);
+    formData.append('source', "{{ request.args.get('source') }}");
+    formData.append('assignment_id', "{{ request.args.get('assignment_id') }}");
+    formData.append('classroom_id', "{{ request.args.get('classroom_id') }}");
+
+    elements.progressContainer.style.display = 'block';
+    elements.progressBar.style.width = '0%';
+    elements.progressPercent.textContent = '0%';
+    elements.progressStatus.textContent = 'Starting video generation...';
+    elements.generateVideoBtn.disabled = true;
+
+    try {
+      const response = await fetch('/generate_video', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Video generation failed');
+      }
+
+      elements.progressStatus.textContent = 'Processing video...';
+      elements.progressBar.style.width = '50%';
+      elements.progressPercent.textContent = '50%';
+
+      const saveResponse = await fetch('/save_generated_video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          avatar_id: avatar.value,
+          audio_id: audioId,
+          video_id: data.video_id
+        })
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save video record');
+      }
+
+      elements.progressBar.style.width = '100%';
+      elements.progressPercent.textContent = '100%';
+      elements.progressStatus.textContent = 'Video generated successfully!';
+
+      document.getElementById('videoIdInput').value = data.video_id;
+      elements.videoPreview.innerHTML = `
+        <video width="640" controls autoplay class="rounded shadow">
+          <source src="/stream_video/${data.video_id}" type="video/mp4">
+          Your browser does not support HTML5 video.
+        </video>
+      `;
+      elements.videoPreviewContainer.style.display = 'block';
+      elements.videoPreviewContainer.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+      showNotification(error.message, 'danger');
+      console.error('Video generation error:', error);
+    } finally {
+      elements.generateVideoBtn.disabled = false;
+    }
+  });
+
+  // Video Actions
+  document.getElementById('submitVideoAssignment')?.addEventListener('click', async () => {
+    const vid = document.getElementById('videoIdInput').value;
+    const aid = document.getElementById('assignmentIdInput').value;
+
+    if (!vid || !aid) {
+      showNotification('Missing required information', 'danger');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/submit_video_assignment/${aid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: vid })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.submission_id) {
+        window.location.href = `/student/view_submission/${data.submission_id}`;
+      } else {
+        throw new Error(data.message || 'Submission failed');
+      }
+    } catch (error) {
+      showNotification(error.message, 'danger');
+    }
+  });
+
+  document.getElementById('publishAssignment')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const vid = document.getElementById('videoIdInput').value;
+    const cid = document.getElementById('classroomIdInput').value;
+
+    if (!vid || !cid) {
+      showNotification('Missing required information', 'danger');
+      return;
+    }
+
+    try {
+      const response = await fetch('/publish_assignment_video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_id: vid,
+          classroom_id: cid
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showNotification('Video published to assignment successfully!');
+      } else {
+        throw new Error(data.error || 'Publishing failed');
+      }
+    } catch (error) {
+      showNotification(error.message, 'danger');
+    }
+  });
+
+  document.getElementById('downloadVideo')?.addEventListener('click', () => {
+    const vid = document.getElementById('videoIdInput').value;
+    if (vid) {
+      window.open(`/download_video/${vid}`, '_blank');
+    }
+  });
+
+  // Helper Functions
+  async function refreshSavedVoices() {
+    try {
+      const response = await fetch('/get_voice_records');
+      const data = await response.json();
+      
+      if (data.success) {
+        const listContainer = document.getElementById('saved-voices-list');
+        if (listContainer) {
+          listContainer.innerHTML = data.records.map(record => `
+            <div class="list-group-item list-group-item-action voice-item">
+              <div class="d-flex w-100 justify-content-between align-items-center">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="audio_choice" 
+                         value="${record.audio_id}" id="voice${record.audio_id}">
+                  <label class="form-check-label" for="voice${record.audio_id}">
+                    ${record.text ? record.text.substring(0, 40) : "Recording"}
+                    ${record.lang ? `<span class="badge bg-info ms-2">${record.lang.toUpperCase()}</span>` : ''}
+                    ${record.gender ? `<span class="badge bg-dark ms-1">${record.gender.charAt(0).toUpperCase() + record.gender.slice(1)}</span>` : ''}
+                    ${record.source === 'recording' ? `<span class="badge bg-danger ms-1">Recording</span>` : ''}
+                  </label>
+                </div>
+                <small class="text-muted">${formatDate(record.created_at)}</small>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing voices:', error);
+    }
+  }
+
+  // Load voices when page loads
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = () => {
+      console.log("Voices loaded:", speechSynthesis.getVoices());
+    };
+  }
 });
 </script>
 {% endblock %}

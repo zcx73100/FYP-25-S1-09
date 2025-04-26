@@ -17,7 +17,8 @@ from FYP25S109.controller import *
 from FYP25S109.entity import * 
 from bson.errors import InvalidId
 from io import BytesIO
-
+import re
+import ffmpeg
 
 
 
@@ -52,6 +53,8 @@ def retrieve_profile_picture(username):
         if isinstance(profile_pic_data, str):
             return profile_pic_data
     return None
+
+
 
 # Homepage
 class HomePage:
@@ -149,41 +152,78 @@ class HomePage:
             quizzes=quizzes
         )
 
-
-
 class AvatarVideoBoundary:
     # Route: Generate Voice
+    @staticmethod
     @boundary.route("/generate_voice", methods=["POST"])
     def generate_voice():
         data = request.get_json()
         text = data.get("text", "").strip()
+        lang = data.get("lang", "en")
+        gender = data.get("gender", "female")
 
         if not text:
             return jsonify(success=False, error="No text provided."), 400
 
         try:
             controller = GenerateVideoController()
-            audio_id = controller.generate_voice(text)
+            audio_id = controller.generate_voice(text, lang, gender)
 
             if not audio_id:
                 return jsonify(success=False, error="Voice generation failed."), 500
 
-            return jsonify(success=True, audio_id=str(audio_id))  # ✅ Ensures it's a string
+            return jsonify(success=True, audio_id=str(audio_id))
 
         except Exception as e:
             return jsonify(success=False, error=str(e)), 500
-
 
     # Route: Stream audio from GridFS
     @boundary.route("/stream_audio/<audio_id>")
     def stream_audio(audio_id):
         try:
             file = fs.get(ObjectId(audio_id))
-            return send_file(file, mimetype=file.content_type, as_attachment=False, download_name=file.filename)
-        except Exception as e:
-            return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
+            file_size = file.length
 
-    @boundary.route("/generate_video", methods=["GET", "POST"])
+            # Determine content type
+            filename = getattr(file, 'filename', 'audio.webm')
+            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+            # Check for Range header
+            range_header = request.headers.get('Range', None)
+            if range_header:
+                byte1, byte2 = 0, None
+                m = re.search(r'bytes=(\d+)-(\d*)', range_header)
+                if m:
+                    byte1 = int(m.group(1))
+                    if m.group(2):
+                        byte2 = int(m.group(2))
+                
+                byte2 = byte2 if byte2 is not None else file_size - 1
+                length = byte2 - byte1 + 1
+
+                file.seek(byte1)
+                data = file.read(length)
+
+                rv = Response(data,
+                            206,
+                            mimetype=content_type,
+                            direct_passthrough=True)
+                rv.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
+                rv.headers.add('Accept-Ranges', 'bytes')
+                rv.headers.add('Content-Length', str(length))
+                return rv
+            else:
+                # Full file download
+                data = file.read()
+                rv = Response(data, 200, mimetype=content_type)
+                rv.headers.add('Content-Length', str(file_size))
+                rv.headers.add('Accept-Ranges', 'bytes')
+                return rv
+
+        except Exception as e:
+            print(f"Error streaming audio {audio_id}: {str(e)}")
+            return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
+    @staticmethod
     def generate_video():
         username = session.get("username")
         if not username:
@@ -191,11 +231,11 @@ class AvatarVideoBoundary:
 
         # GET: show page
         if request.method == "GET":
-            classroom_id  = request.args.get("classroom_id")
+            classroom_id = request.args.get("classroom_id")
             assignment_id = request.args.get("assignment_id")
-            source        = request.args.get("source")  # e.g. "submission" vs "assignment" vs "general"
+            source = request.args.get("source")
 
-            avatars       = list(mongo.db.avatar.find({"username": username}))
+            avatars = list(mongo.db.avatar.find({"username": username}))
             voice_records = list(mongo.db.voice_records.find({"username": username}))
 
             return render_template(
@@ -209,11 +249,11 @@ class AvatarVideoBoundary:
 
         # POST: generate & (if student) save submission
         try:
-            text       = request.form.get("text", "").strip()
-            avatar_id  = request.form.get("avatar_id")
-            audio_id   = request.form.get("audio_id")
-            source     = request.form.get("source")
-            classroom_id  = request.form.get("classroom_id")
+            text = request.form.get("text", "").strip()
+            avatar_id = request.form.get("avatar_id")
+            audio_id = request.form.get("audio_id")
+            source = request.form.get("source")
+            classroom_id = request.form.get("classroom_id")
             assignment_id = request.form.get("assignment_id")
 
             if not avatar_id or not audio_id:
@@ -225,41 +265,36 @@ class AvatarVideoBoundary:
 
             file_id = avatar_doc["file_id"]
 
-            controller        = GenerateVideoController()
-            video_gridfs_id   = controller.generate_video(text, str(file_id), audio_id)
+            controller = GenerateVideoController()
+            video_gridfs_id = controller.generate_video(text, str(file_id), audio_id)
 
             if not video_gridfs_id:
                 return jsonify({"success": False, "error": "Video generation failed."}), 500
 
-            # ——— student submission hook ———
-            if (
-                        source == "submission" 
-                        and assignment_id 
-                        and session.get("role") == "Student"
-                    ):
-                        student = session["username"]
-                        StudentSendSubmissionController.submit_video_assignment_logic(
-                            assignment_id,
-                            student,
-                            str(video_gridfs_id) 
-                        )
+            # Student submission hook
+            if source == "submission" and assignment_id and session.get("role") == "Student":
+                student = session["username"]
+                StudentSendSubmissionController.submit_video_assignment_logic(
+                    assignment_id,
+                    student,
+                    str(video_gridfs_id)
+                )
             return jsonify({"success": True, "video_id": str(video_gridfs_id)})
 
         except Exception as e:
             print("❌ Error in /generate_video:", str(e))
             return jsonify({"success": False, "error": str(e)}), 500
 
-    
-    # Route: Stream video
+    @staticmethod
     @boundary.route("/stream_video/<video_id>")
     def stream_video(video_id):
         try:
-            file = fs.get(ObjectId(video_id))  # GridFS
+            file = fs.get(ObjectId(video_id))
             return send_file(file, mimetype="video/mp4", as_attachment=False)
         except Exception as e:
             return f"Video not found: {e}", 404
-    
-    # Route: Render generate video page
+
+    @staticmethod
     @boundary.route("/generate_video_page", methods=["GET"])
     def generate_video_page():
         try:
@@ -275,6 +310,7 @@ class AvatarVideoBoundary:
 
         return render_template("generateVideo.html", avatars=avatars, voice_records=audios)
 
+    @staticmethod
     @boundary.route("/save_generated_video", methods=["POST"])
     def save_generated_video():
         try:
@@ -285,13 +321,11 @@ class AvatarVideoBoundary:
             text = data.get("text", "").strip()
             audio_id = data.get("audio_id")
             avatar_id = data.get("avatar_id")
-            video_id = data.get("video_id")  # GridFS ID
+            video_id = data.get("video_id")
 
-            # Validate required fields
             if not all([audio_id, avatar_id, video_id]):
                 return jsonify(success=False, error="Missing required fields.")
 
-            # Save to MongoDB
             saved = mongo.db.video.insert_one({
                 "username": username,
                 "role": role,
@@ -303,7 +337,6 @@ class AvatarVideoBoundary:
                 "is_published": False
             })
 
-            # ✅ Stash video_id in session for redirect
             session["stashed_video_id"] = str(saved.inserted_id)
 
             return jsonify(success=True, saved_id=str(saved.inserted_id))
@@ -312,9 +345,66 @@ class AvatarVideoBoundary:
             print("❌ Error in saving video:", str(e))
             return jsonify(success=False, error=str(e)), 500
 
+    @staticmethod
+    @boundary.route("/upload_recorded_voice", methods=["POST"])
+    def upload_recorded_voice():
+        if "audio" not in request.files:
+            return jsonify(success=False, error="No audio file uploaded.")
+        
+        audio_file = request.files["audio"]
+        if audio_file.filename == "":
+            return jsonify(success=False, error="No selected file.")
 
+        # Save the uploaded webm temporarily
+        filename = secure_filename(str(uuid.uuid4()) + ".webm")
+        temp_path = os.path.join("temp_audio", filename)
+        os.makedirs("temp_audio", exist_ok=True)
+        audio_file.save(temp_path)
 
-    # Publish To Homepage
+        # Convert WebM to MP3
+        mp3_filename = filename.rsplit(".", 1)[0] + ".mp3"
+        mp3_path = os.path.join("saved_audios", mp3_filename)
+        os.makedirs("saved_audios", exist_ok=True)
+        
+        try:
+            # ffmpeg must be installed on the server!
+            subprocess.run([
+                "ffmpeg", "-i", temp_path, "-q:a", "0", "-map", "a", mp3_path
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            return jsonify(success=False, error="Audio conversion failed.")
+
+        # Remove temp webm
+        os.remove(temp_path)
+
+        # Save mp3 info in database, etc. (pseudo-code)
+        audio_id = mongo.db.voice_records
+
+        return jsonify(success=True, audio_id=str(audio_id))
+
+    @staticmethod
+    @boundary.route('/get_voice_records', methods=['GET'])
+    def get_voice_records():
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Not logged in"), 401
+                
+            records = list(mongo.db.voice_records.find(
+                {"username": username},
+                {"_id": 0, "audio_id": 1, "text": 1, "created_at": 1, "source": 1}
+            ).sort("created_at", -1))
+            
+            for record in records:
+                record["audio_id"] = str(record["audio_id"])
+                
+            return jsonify(success=True, records=records)
+            
+        except Exception as e:
+            print(f"Error fetching voice records: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+
+    @staticmethod
     @boundary.route("/publish_to_homepage", methods=["POST"])
     def publish_to_homepage():
         try:
@@ -325,7 +415,7 @@ class AvatarVideoBoundary:
                 return jsonify({"success": False, "error": "Unauthorized"}), 403
 
             data = request.get_json()
-            video_id = data.get("video_id")  # this is the metadata document _id, not the GridFS one
+            video_id = data.get("video_id")
 
             if not video_id:
                 return jsonify({"success": False, "error": "Missing video_id"}), 400
@@ -343,6 +433,42 @@ class AvatarVideoBoundary:
         except Exception as e:
             print("❌ Publish Error:", e)
             return jsonify(success=False, error=str(e)), 500
+    @boundary.route("/upload_synthesized_voice", methods=["POST"])
+    def upload_synthesized_voice():
+        if 'audio' not in request.files:
+            return jsonify(success=False, error="No audio file uploaded"), 400
+
+        audio_file = request.files['audio']
+        text = request.form.get('text', '')
+        lang = request.form.get('lang', 'en')
+        gender = request.form.get('gender', 'female')
+
+        try:
+            # Save to GridFS
+            audio_id = fs.put(
+                audio_file,
+                filename=f"synth_voice_{datetime.now().strftime('%Y%m%d%H%M%S')}.wav",
+                content_type="audio/wav"
+            )
+
+            # Save metadata
+            voice_data = {
+                "audio_id": audio_id,
+                "text": text,
+                "lang": lang,
+                "gender": gender,
+                "created_at": datetime.utcnow(),
+                "username": session.get("username"),
+                "source": "synthesis"
+            }
+            mongo.db.voice_records.insert_one(voice_data)
+
+            return jsonify(success=True, audio_id=str(audio_id))
+
+        except Exception as e:
+            print(f"Error uploading synthesized voice: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+    
 
     
 # Log In

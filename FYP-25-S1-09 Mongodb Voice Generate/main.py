@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 mongo = PyMongo(app)
 
 
+@app.template_filter('format_datetime')
+def format_datetime(value):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    return value.strftime("%b %d, %Y at %I:%M %p")
+
+
 def send_assignment_notification():
     logger.debug("Starting the send_assignment_notification function.")
     

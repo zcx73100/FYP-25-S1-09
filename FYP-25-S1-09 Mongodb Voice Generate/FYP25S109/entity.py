@@ -265,59 +265,75 @@ class GenerateVideoEntity:
         audio_io = BytesIO(audio_bytes)
         file_id = fs.put(audio_io, filename=filename, content_type=content_type)
         return file_id
-
-    def generate_voice(self):
+    
+    def generate_voice(self, lang="en", gender="female"):
         try:
             if not self.text.strip():
                 raise ValueError("Text input is empty.")
 
-            # Create in-memory buffer
-            mp3_buffer = BytesIO()
+            # Enhanced voice configuration
+            voice_config = {
+                "en": {
+                    "male": {"tld": "com", "slow": False},
+                    "female": {"tld": "com.au", "slow": False},
+                    "neutral": {"tld": "co.uk", "slow": False}
+                },
+                "es": {
+                    "male": {"tld": "com.mx", "slow": False},
+                    "female": {"tld": "es", "slow": False}
+                },
+                "fr": {
+                    "male": {"tld": "ca", "slow": False},
+                    "female": {"tld": "fr", "slow": False}
+                }
+            }
 
-            # Generate audio to buffer
-            tts = gTTS(text=self.text, lang="en")
+            # Get settings for requested language and gender
+            lang_config = voice_config.get(lang, voice_config["en"])
+            gender_config = lang_config.get(gender, lang_config["female"])
+            
+            mp3_buffer = BytesIO()
+            tts = gTTS(
+                text=self.text,
+                lang=lang,
+                tld=gender_config["tld"],
+                slow=gender_config["slow"]
+            )
             tts.write_to_fp(mp3_buffer)
             mp3_buffer.seek(0)
 
-            # Save to GridFS
             audio_id = fs.put(
                 mp3_buffer,
                 filename=f"voice_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.mp3",
                 content_type="audio/mpeg"
             )
 
-            # Store audio_id and metadata in the database (e.g., 'voice_records' collection)
             voice_data = {
                 "audio_id": audio_id,
                 "text": self.text,
+                "lang": lang,
+                "gender": gender,
                 "generated_at": datetime.now(),
-                "status": "generated",  # You can add other statuses like 'processing', 'failed', etc.
-                "username" : session.get("username")  # To get the collection of text that has been generated
+                "status": "generated",
+                "username": session.get("username")
             }
 
-            # Save the voice record to the database (adjust your collection name if needed)
             mongo.db.voice_records.insert_one(voice_data)
-
-            # Return the audio_id after saving it to the database
             return audio_id
 
         except Exception as e:
             print(f"❌ Error generating voice: {e}")
             return None
 
-
     def generate_video(self, avatar_id, audio_id):
         try:
             SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
 
-            # Load avatar and audio from GridFS
             avatar_file = fs.get(ObjectId(avatar_id))
             audio_file = fs.get(ObjectId(audio_id))
 
-            # Save temporary files
-            avatar_temp_path = os.path.join(tempfile.gettempdir(), f"avatar_{uuid.uuid4().hex}.png")
-            audio_temp_path = os.path.join(tempfile.gettempdir(), f"audio_{uuid.uuid4().hex}.wav")
-
+            avatar_temp_path = f"avatar_{uuid.uuid4().hex}.png"
+            audio_temp_path = f"audio_{uuid.uuid4().hex}.wav"
             
             with open(avatar_temp_path, "wb") as f:
                 f.write(avatar_file.read())
@@ -325,10 +341,6 @@ class GenerateVideoEntity:
             with open(audio_temp_path, "wb") as f:
                 f.write(audio_file.read())
 
-            print(f"[DEBUG] Avatar saved to {avatar_temp_path}")
-            print(f"[DEBUG] Audio saved to {audio_temp_path}")
-
-            # Prepare POST to SadTalker
             files = {
                 "image_file": ("avatar.png", open(avatar_temp_path, "rb"), "image/png"),
                 "audio_file": ("audio.wav", open(audio_temp_path, "rb"), "audio/wav")
@@ -343,7 +355,6 @@ class GenerateVideoEntity:
             }
 
             response = requests.post(SADTALKER_API, files=files, data=data)
-            print("[DEBUG] SadTalker response status:", response.status_code)
 
             if response.status_code != 200:
                 print("❌ SadTalker failed:", response.text)
@@ -351,14 +362,8 @@ class GenerateVideoEntity:
 
             result = response.json()
             video_path = result.get("video_path")
-            print(f"[DEBUG] SadTalker returned video_path: {video_path}")
-
             safe_video_path = os.path.normpath(video_path.strip())
 
-            safe_video_path = os.path.normpath(video_path.strip())
-            print(f"[DEBUG] Normalized path to check: {safe_video_path}")
-
-            # Retry up to 5 times with short delay in case file write is delayed
             for i in range(5):
                 if os.path.exists(safe_video_path):
                     break
@@ -375,12 +380,11 @@ class GenerateVideoEntity:
                     content_type="video/mp4",
                     metadata={"username": session.get("username")}
                 )
-            
 
-            print(f"[DEBUG] Checking existence of normalized path: {safe_video_path}")
-            print(f"[DEBUG] Exists? {os.path.exists(safe_video_path)}")
+            # Clean up temporary files
+            os.remove(avatar_temp_path)
+            os.remove(audio_temp_path)
 
-            print(f"[✅] Video saved to GridFS with ID: {video_id}")
             return str(video_id)
 
         except Exception as e:

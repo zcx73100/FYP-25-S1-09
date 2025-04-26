@@ -482,16 +482,16 @@ class StudentDeleteSubmissionController:
 
 class GenerateVideoController:
     @staticmethod
-    def generate_voice(text):
+    def generate_voice(text, lang="en", gender="female"):
         entity = GenerateVideoEntity(text=text)
-        audio_id = entity.generate_voice()
+        audio_id = entity.generate_voice(lang=lang, gender=gender)
         return audio_id
 
     @staticmethod
     def generate_video(text, avatar_id, audio_id):
         entity = GenerateVideoEntity(text=text, avatar_path=avatar_id, audio_path=audio_id)
-        video_id = entity.generate_video(avatar_id, audio_id)
-        return video_id  # GridFS ObjectId or string
+        video_id = entity.generate_video()
+        return video_id
 
 
 class AddDiscussionRoomController:
