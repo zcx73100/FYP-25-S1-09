@@ -313,7 +313,7 @@ class GenerateVideoEntity:
                 "text": self.text,
                 "lang": lang,
                 "gender": gender,
-                "generated_at": datetime.now(),
+                "created_at": datetime.now(),
                 "status": "generated",
                 "username": session.get("username")
             }
@@ -323,6 +323,15 @@ class GenerateVideoEntity:
 
         except Exception as e:
             print(f"❌ Error generating voice: {e}")
+            return None
+    
+    def save_recording_to_gridfs(self, audio_bytes, filename="audio.wav"):
+        try:
+            audio_io = BytesIO(audio_bytes)
+            file_id = fs.put(audio_io, filename=filename, content_type="audio/wav")
+            return file_id
+        except Exception as e:
+            print(f"❌ Error saving recording to GridFS: {e}")
             return None
 
     def generate_video(self, avatar_id, audio_id):

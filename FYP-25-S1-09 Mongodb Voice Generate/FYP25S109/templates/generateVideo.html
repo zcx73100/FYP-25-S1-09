@@ -59,8 +59,8 @@
               <label for="voiceGender" class="form-label"><i class="fas fa-user me-1"></i> Gender</label>
               <select id="voiceGender" class="form-select">
                 <option value="male">Male</option>
-                <option value="female" selected>Female</option>
-                <option value="neutral">Neutral</option>
+                <option value="female">Female</option>
+                <option value="neutral" selected>Neutral</option>
               </select>
             </div>
             <div class="col-12 mt-2">
@@ -432,6 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+
   async function generateSpeech(text, lang, gender) {
     return new Promise((resolve, reject) => {
       // Cancel any ongoing speech
@@ -554,22 +555,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       showNotification(error.message, 'danger');
     }
-  });
-
-  // Saved Voice Selection
-  document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
-    radio.addEventListener('change', function() {
-      document.getElementById('audio_id').value = this.value;
-      elements.audioPreview.src = `/stream_audio/${this.value}`;
-      elements.audioPreviewContainer.style.display = 'block';
-      elements.recordedAudioContainer.style.display = 'none';
-      
-      // Update state
-      state.currentAudio = {
-        type: 'saved',
-        id: this.value
-      };
-    });
   });
 
   // Delete Buttons
@@ -786,6 +771,121 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Voices loaded:", speechSynthesis.getVoices());
     };
   }
+
+  // Enhanced Saved Voice Selection with Audio Preview
+document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
+  radio.addEventListener('change', async function() {
+    if (!this.checked) return;
+    
+    const audioId = this.value;
+    if (!audioId) return;
+
+    // Show loading state
+    elements.audioPreviewContainer.style.display = 'block';
+    elements.audioPreview.controls = false;
+    elements.audioPreview.innerHTML = 'Loading audio...';
+
+    // Pause any currently playing audio
+    elements.audioPreview.pause();
+    elements.recordedAudio.pause();
+
+    // Update UI
+    document.getElementById('audio_id').value = audioId;
+    console.log('Selected audio ID:', audioId);
+    elements.recordedAudioContainer.style.display = 'none';
+
+    // Create new audio element to avoid caching issues
+    const newAudio = new Audio();
+    newAudio.controls = true;
+    newAudio.preload = "auto";
+    
+    // Set source with cache-busting parameter
+    const audioUrl = `/stream_audio/${audioId}`;
+    newAudio.src = audioUrl;
+
+    // Replace the old audio element with the new one
+    elements.audioPreview.replaceWith(newAudio);
+    elements.audioPreview = newAudio;  // Update the reference to the new audio element
+
+    // Handle audio loading
+    try {
+      // Wait for enough data to play
+      await new Promise((resolve, reject) => {
+        newAudio.onloadedmetadata = resolve;
+        newAudio.onerror = reject;
+        
+        // Some browsers need this to properly load
+        newAudio.load();
+      });
+
+      // Attempt to play (may be blocked by browser autoplay policies)
+      const playPromise = newAudio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Autoplay prevented, showing controls');
+          showNotification('Click the play button to preview', 'info');
+        });
+      }
+    } catch (error) {
+      console.error('Audio loading error:', error);
+      showNotification('Error loading audio preview', 'danger');
+    }
+  });
 });
+const voiceLang = document.getElementById('voiceLang');
+  const voiceGender = document.getElementById('voiceGender');
+  const genderHelp = document.createElement('small'); // Create help text dynamically
+  genderHelp.id = 'genderHelp';
+  genderHelp.className = 'form-text';
+  voiceGender.parentNode.appendChild(genderHelp);
+
+  const genderOptions = {
+    male: 'Male',
+    female: 'Female',
+    neutral: 'Neutral'
+  };
+
+  const languageRules = {
+    en: ['male', 'female', 'neutral'],
+    default: ['neutral']
+  };
+
+  function updateGenderDropdown() {
+    const lang = voiceLang.value;
+    const allowedGenders = languageRules[lang] || languageRules.default;
+    const currentGender = voiceGender.value;
+
+    voiceGender.innerHTML = '';
+    allowedGenders.forEach(gender => {
+      const option = document.createElement('option');
+      option.value = gender;
+      option.textContent = genderOptions[gender];
+      voiceGender.appendChild(option);
+    });
+
+    if (!allowedGenders.includes(currentGender)) {
+      voiceGender.value = 'neutral';
+    }
+
+    voiceGender.disabled = allowedGenders.length <= 1;
+    
+    if (lang === 'en') {
+      genderHelp.textContent = 'Choose voice gender';
+      genderHelp.style.color = '';
+    } else {
+      genderHelp.textContent = 'Only neutral voice available for this language';
+      genderHelp.style.color = '#6c757d';
+    }
+  }
+
+  // Initialize
+  updateGenderDropdown();
+  voiceLang.addEventListener('change', updateGenderDropdown);
+
+});
+
+
+
 </script>
 {% endblock %}

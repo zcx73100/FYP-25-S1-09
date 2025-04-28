@@ -10,6 +10,7 @@ import base64
 import mimetypes
 import threading
 import time
+import datetime
 from datetime import timedelta,datetime
 from flask import Flask, send_file, Response
 from gradio_client import Client
@@ -151,6 +152,11 @@ class HomePage:
             assignments=assignments,
             quizzes=quizzes
         )
+    @staticmethod
+    @boundary.route('/my_videos')
+    def my_videos():
+        pass
+
 
 class AvatarVideoBoundary:
     # Route: Generate Voice
@@ -184,11 +190,14 @@ class AvatarVideoBoundary:
             file = fs.get(ObjectId(audio_id))
             file_size = file.length
 
-            # Determine content type
+            # Determine content type based on filename
             filename = getattr(file, 'filename', 'audio.webm')
-            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+            content_type = mimetypes.guess_type(filename)[0]
+            if not content_type:
+                # fallback if guessing fails
+                content_type = "audio/mpeg"
 
-            # Check for Range header
+            # Check for Range header (for partial streaming)
             range_header = request.headers.get('Range', None)
             if range_header:
                 byte1, byte2 = 0, None
@@ -204,16 +213,13 @@ class AvatarVideoBoundary:
                 file.seek(byte1)
                 data = file.read(length)
 
-                rv = Response(data,
-                            206,
-                            mimetype=content_type,
-                            direct_passthrough=True)
+                rv = Response(data, 206, mimetype=content_type, direct_passthrough=True)
                 rv.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
                 rv.headers.add('Accept-Ranges', 'bytes')
                 rv.headers.add('Content-Length', str(length))
                 return rv
             else:
-                # Full file download
+                # Full file
                 data = file.read()
                 rv = Response(data, 200, mimetype=content_type)
                 rv.headers.add('Content-Length', str(file_size))
@@ -354,13 +360,13 @@ class AvatarVideoBoundary:
         audio_file = request.files["audio"]
         if audio_file.filename == "":
             return jsonify(success=False, error="No selected file.")
-
+        
         # Save the uploaded webm temporarily
         filename = secure_filename(str(uuid.uuid4()) + ".webm")
         temp_path = os.path.join("temp_audio", filename)
         os.makedirs("temp_audio", exist_ok=True)
         audio_file.save(temp_path)
-
+        
         # Convert WebM to MP3
         mp3_filename = filename.rsplit(".", 1)[0] + ".mp3"
         mp3_path = os.path.join("saved_audios", mp3_filename)
@@ -371,16 +377,29 @@ class AvatarVideoBoundary:
             subprocess.run([
                 "ffmpeg", "-i", temp_path, "-q:a", "0", "-map", "a", mp3_path
             ], check=True)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             return jsonify(success=False, error="Audio conversion failed.")
-
+        
         # Remove temp webm
         os.remove(temp_path)
+        
+        # Save MP3 file to GridFS
+        with open(mp3_path, "rb") as f:
+            file_id = fs.put(f, filename=mp3_filename)
+        
+        # Remove the local mp3 file after storing it in GridFS
+        os.remove(mp3_path)
 
-        # Save mp3 info in database, etc. (pseudo-code)
-        audio_id = mongo.db.voice_records
-
-        return jsonify(success=True, audio_id=str(audio_id))
+        # Save metadata about the audio file to a separate collection (optional)
+        audio_record = {
+            "filename": mp3_filename,
+            "file_id": file_id,
+            "created_at": datetime.now(),
+            "username": session.get("username")
+        }
+        audio_id = mongo.db.voice_records.insert_one(audio_record)
+        
+        return jsonify(success=True, audio_id=str(audio_id.inserted_id))
 
     @staticmethod
     @boundary.route('/get_voice_records', methods=['GET'])
@@ -392,7 +411,7 @@ class AvatarVideoBoundary:
                 
             records = list(mongo.db.voice_records.find(
                 {"username": username},
-                {"_id": 0, "audio_id": 1, "text": 1, "created_at": 1, "source": 1}
+                {}
             ).sort("created_at", -1))
             
             for record in records:
@@ -435,39 +454,26 @@ class AvatarVideoBoundary:
             return jsonify(success=False, error=str(e)), 500
     @boundary.route("/upload_synthesized_voice", methods=["POST"])
     def upload_synthesized_voice():
-        if 'audio' not in request.files:
-            return jsonify(success=False, error="No audio file uploaded"), 400
-
-        audio_file = request.files['audio']
-        text = request.form.get('text', '')
-        lang = request.form.get('lang', 'en')
-        gender = request.form.get('gender', 'female')
+        if 'audio' not in request.files and not request.form.get('text'):
+            return jsonify(success=False, error="No audio file or text provided"), 400
 
         try:
-            # Save to GridFS
-            audio_id = fs.put(
-                audio_file,
-                filename=f"synth_voice_{datetime.now().strftime('%Y%m%d%H%M%S')}.wav",
-                content_type="audio/wav"
-            )
+            text = request.form.get('text', '')
+            lang = request.form.get('lang', 'en')
+            gender = request.form.get('gender', 'female')
 
-            # Save metadata
-            voice_data = {
-                "audio_id": audio_id,
-                "text": text,
-                "lang": lang,
-                "gender": gender,
-                "created_at": datetime.utcnow(),
-                "username": session.get("username"),
-                "source": "synthesis"
-            }
-            mongo.db.voice_records.insert_one(voice_data)
+            # 👉 Use Controller
+            audio_id = GenerateVideoController.generate_voice(text=text, lang=lang, gender=gender)
+            
+            if not audio_id:
+                return jsonify(success=False, error="Failed to generate voice"), 500
 
             return jsonify(success=True, audio_id=str(audio_id))
 
         except Exception as e:
             print(f"Error uploading synthesized voice: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
+
     
 
     
