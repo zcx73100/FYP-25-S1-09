@@ -152,24 +152,23 @@ class HomePage:
             assignments=assignments,
             quizzes=quizzes
         )
-    @staticmethod
+
+
+class AvatarVideoBoundary:
     @boundary.route('/my_videos')
     def my_videos():
         username = session.get("username")
+        if not username:
+            return redirect(url_for('boundary.login'))
+
         role = session.get("role")
         videos = GenerateVideoController.get_videos(username)
         print(videos)
 
-        if not username:
-            return redirect(url_for('boundary.login'))
+        return render_template("myVideos.html", username=username, videos=videos, role=role)
         
 
         return render_template("myVideos.html", username=username,videos=videos, role=role)
-
-        # Fetch videos uploaded by the user
-
-
-class AvatarVideoBoundary:
     # Route: Generate Voice
     @staticmethod
     @boundary.route("/generate_voice", methods=["POST"])
@@ -489,14 +488,37 @@ class AvatarVideoBoundary:
     @boundary.route("/delete_generated_video/<video_id>", methods=["POST"])
     def delete_generated_video(video_id):
         try:
-            result = mongo.db.generated_videos.delete_one({"_id": ObjectId(video_id)})
-            if result.deleted_count == 0:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Unauthorized"), 401
+
+            # First get the video document to verify ownership
+            video = mongo.db.generated_videos.find_one({
+                "_id": ObjectId(video_id),
+                "username": username
+            })
+            
+            if not video:
                 return jsonify(success=False, error="Video not found"), 404
-            return jsonify(success=True)
+
+            # Delete from GridFS first
+            fs.delete(ObjectId(video["video_id"]))
+            
+            # Then delete the metadata document
+            result = mongo.db.generated_videos.delete_one({
+                "_id": ObjectId(video_id),
+                "username": username
+            })
+
+            if result.deleted_count == 1:
+                return jsonify(success=True)
+            else:
+                return jsonify(success=False, error="Deletion failed"), 500
+
         except Exception as e:
             print(f"Error deleting video: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
-    
+    @staticmethod
     @boundary.route('/generated_video/<video_id>')
     def serve_generated_video(video_id):
         try:

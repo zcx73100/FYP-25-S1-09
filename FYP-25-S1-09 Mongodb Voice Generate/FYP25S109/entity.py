@@ -391,8 +391,8 @@ class GenerateVideoEntity:
                 )
             mongo.db.generated_videos.insert_one({
                 "video_id": video_id,
-                "avatar_id": avatar_id,
-                "audio_id": audio_id,
+                "avatar_id": ObjectId(avatar_id),
+                "audio_id": ObjectId(audio_id),
                 "created_at": datetime.now(),
                 "status": "generated",
                 "username": session.get("username")
@@ -410,22 +410,20 @@ class GenerateVideoEntity:
     @staticmethod    
     def get_videos(username):
         try:
-            videos = mongo.db.generated_videos.find({"username": username})
+            videos = mongo.db.generated_videos.find({"username": username}).sort("created_at", -1)
             video_list = []
             for video in videos:
-                video_data = fs.get(video["video_id"])
                 video_list.append({
-                    "video_id": video["_id"],
-                    "avatar_id": video["avatar_id"],
-                    "audio_id": video["audio_id"],
+                    "video_id": str(video["video_id"]),  # Convert ObjectId to string
                     "created_at": video["created_at"],
-                    "status": video["status"],
-                    "video_file": video_data.read()
+                    "status": video["status"]
+                    # Don't include the actual file content here
                 })
             return video_list
-        except:
-            print("❌ Error fetching videos")
+        except Exception as e:
+            print(f"❌ Error fetching videos: {e}")
             return []
+
 
 
 
