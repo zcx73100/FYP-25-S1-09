@@ -230,7 +230,8 @@ class AvatarVideoBoundary:
             print(f"Error streaming audio {audio_id}: {str(e)}")
             return jsonify(success=False, error=f"Audio not found: {str(e)}"), 404
     @staticmethod
-    def generate_video():
+    @boundary.route("/generate_video/<avatar_id>/<audio_id>", methods=["GET", "POST"])
+    def generate_video(avatar_id, audio_id):
         username = session.get("username")
         if not username:
             return redirect(url_for("boundary.login"))
@@ -266,7 +267,7 @@ class AvatarVideoBoundary:
                 return jsonify({"success": False, "error": "Avatar and Audio are required."}), 400
 
             avatar_doc = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
-            if not avatar_doc or not avatar_doc.get("file_id"):
+            if not avatar_doc:
                 return jsonify({"success": False, "error": "Avatar file not found."}), 400
 
             file_id = avatar_doc["file_id"]
@@ -393,7 +394,7 @@ class AvatarVideoBoundary:
         # Save metadata about the audio file to a separate collection (optional)
         audio_record = {
             "filename": mp3_filename,
-            "file_id": file_id,
+            "audio_id": file_id,
             "created_at": datetime.now(),
             "username": session.get("username")
         }
@@ -965,7 +966,7 @@ class AddAvatarBoundary:
 
             return redirect(url_for('boundary.create_avatar'))
 
-        return render_template("admin_add_avatar.html")
+        return render_template("addAvatar.html")
 
 # Delete Avatar    
 class DeleteAvatarBoundary:

@@ -45,8 +45,10 @@
           <div class="row g-2">
             <div class="col-md-6">
               <label for="voiceLang" class="form-label"><i class="fas fa-globe me-1"></i> Language</label>
+              <!-- In your HTML, update the voiceLang select options -->
               <select id="voiceLang" class="form-select">
                 <option value="en" selected>English</option>
+                <option value="id">Indonesian</option>
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <option value="de">German</option>
@@ -248,22 +250,85 @@
   .bg-purple {
     background-color: #6f42c1;
   }
+  
+  /* Avatar Card Styling */
+  .avatar-card {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  
   .avatar-card:hover {
     transform: translateY(-5px);
-    transition: transform 0.2s ease;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-color: rgba(111, 66, 193, 0.3);
   }
+  
+  /* Selected Avatar State */
+  .avatar-card.selected {
+    border-color: #6f42c1;
+    box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.3);
+  }
+  
+  .avatar-card.selected::after {
+    content: "✓ Selected";
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #6f42c1;
+    color: white;
+    padding: 2px 8px;
+    font-size: 12px;
+    border-bottom-left-radius: 5px;
+  }
+  
+  .avatar-img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  
+  .avatar-card:hover .avatar-img {
+    transform: scale(1.05);
+  }
+  
+  .avatar-card.selected .avatar-img {
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(111, 66, 193, 0.5);
+  }
+  
+  /* Voice Items */
   .voice-item:hover {
     background-color: #f8f9fa;
   }
+  
+  /* Progress Bar */
   #progress-bar {
     transition: width 0.3s ease;
   }
+  
+  /* Animation */
   .blink {
     animation: blink-animation 1s steps(2, start) infinite;
   }
+  
   @keyframes blink-animation {
     to { visibility: hidden; }
+  }
+  
+  /* Checkbox Styling */
+  .btn-check:checked + .btn-outline-primary {
+    background-color: #6f42c1;
+    color: white;
+    border-color: #6f42c1;
+  }
+  
+  /* Visual feedback for selected radio */
+  .btn-check:focus + .btn-outline-primary {
+    box-shadow: 0 0 0 0.25rem rgba(111, 66, 193, 0.25);
   }
 </style>
 
@@ -435,50 +500,69 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function generateSpeech(text, lang, gender) {
     return new Promise((resolve, reject) => {
-      // Cancel any ongoing speech
+      // Cancel any ongoing speech immediately
       window.speechSynthesis.cancel();
       
-      // Get voices and find the best match
-      const voices = window.speechSynthesis.getVoices();
-      const voice = findBestVoice(voices, lang, gender);
-      
-      if (!voice) {
-        reject(new Error(`No suitable voice found for ${gender} ${lang}`));
-        return;
+      // Get voices - ensure they're loaded
+      let voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          voices = window.speechSynthesis.getVoices();
+          continueGeneration();
+        };
+      } else {
+        continueGeneration();
       }
 
-      // Set up audio context for recording
-      state.audioContext = state.audioContext || new (window.AudioContext || window.webkitAudioContext)();
-      const dest = state.audioContext.createMediaStreamDestination();
-      state.synthesisRecorder = new MediaRecorder(dest.stream);
-      state.synthesisChunks = [];
-      
-      state.synthesisRecorder.ondataavailable = evt => {
-        state.synthesisChunks.push(evt.data);
-      };
-      
-      state.synthesisRecorder.onstop = () => {
-        const blob = new Blob(state.synthesisChunks, { type: 'audio/wav' });
-        resolve(blob);
-      };
-      
-      state.synthesisRecorder.start();
-      
-      // Create utterance
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.voice = voice;
-      utterance.rate = 1.0;
-      utterance.pitch = gender === 'male' ? 0.9 : 1.1;
-      
-      // Connect to audio context
-      utterance.onend = () => {
-        setTimeout(() => {
-          state.synthesisRecorder.stop();
-        }, 500);
-      };
-      
-      // Speak through Web Audio API
-      window.speechSynthesis.speak(utterance);
+      function continueGeneration() {
+        const voice = findBestVoice(voices, lang, gender);
+        if (!voice) {
+          reject(new Error(`No suitable voice found for ${gender} ${lang}`));
+          return;
+        }
+
+        // Set up audio context with optimized settings
+        state.audioContext = state.audioContext || new (window.AudioContext || window.webkitAudioContext)({
+          latencyHint: 'playback',
+          sampleRate: 24000 // Lower sample rate for faster processing
+        });
+        
+        const dest = state.audioContext.createMediaStreamDestination();
+        state.synthesisRecorder = new MediaRecorder(dest.stream, {
+          mimeType: 'audio/webm', // More efficient than wav
+          audioBitsPerSecond: 64000 // Lower bitrate for smaller files
+        });
+        
+        state.synthesisChunks = [];
+        
+        state.synthesisRecorder.ondataavailable = evt => {
+          state.synthesisChunks.push(evt.data);
+        };
+        
+        state.synthesisRecorder.onstop = () => {
+          const blob = new Blob(state.synthesisChunks, { type: 'audio/webm' });
+          resolve(blob);
+        };
+        
+        state.synthesisRecorder.start();
+        
+        // Create optimized utterance
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = voice;
+        utterance.rate = 1.2; // Slightly faster speech
+        utterance.pitch = gender === 'male' ? 0.9 : 1.1;
+        utterance.volume = 0.9; // Slightly lower volume for better quality
+        
+        // Shorter timeout for onend
+        utterance.onend = () => {
+          setTimeout(() => {
+            state.synthesisRecorder.stop();
+          }, 200); // Reduced from 500ms
+        };
+        
+        // Speak immediately
+        window.speechSynthesis.speak(utterance);
+      }
     });
   }
 
@@ -604,6 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append('source', "{{ request.args.get('source') }}");
     formData.append('assignment_id', "{{ request.args.get('assignment_id') }}");
     formData.append('classroom_id', "{{ request.args.get('classroom_id') }}");
+    console.log('Form Data:', formData);
 
     elements.progressContainer.style.display = 'block';
     elements.progressBar.style.width = '0%';
@@ -612,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.generateVideoBtn.disabled = true;
 
     try {
-      const response = await fetch('/generate_video', {
+      const response = await fetch("/generate_video/<avatar_id>/<audio_id>", {
         method: 'POST',
         body: formData
       });
@@ -882,6 +967,29 @@ const voiceLang = document.getElementById('voiceLang');
   // Initialize
   updateGenderDropdown();
   voiceLang.addEventListener('change', updateGenderDropdown);
+
+
+  document.querySelectorAll('.avatar-card').forEach(card => {
+    const radio = card.querySelector('input[type="radio"]');
+    const label = card.querySelector('label');
+    
+    radio.addEventListener('change', function() {
+      // Remove selected class from all cards
+      document.querySelectorAll('.avatar-card').forEach(c => {
+        c.classList.remove('selected');
+      });
+      
+      // Add selected class to current card
+      if (this.checked) {
+        card.classList.add('selected');
+      }
+    });
+    
+    // Initialize selected state
+    if (radio.checked) {
+      card.classList.add('selected');
+    }
+  });
 
 });
 
