@@ -12,13 +12,13 @@
                 <div class="col-md-4 mb-4">
                     <div class="card h-100 shadow-sm">
                         <video class="card-img-top" controls>
-                            <source src="{{ video.filename }}" type="video/mp4">
+                            <source src="{{ url_for('boundary.serve_generated_video', video_id=video.video_id) }}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
                         <div class="card-body">
                             <h5 class="card-title">{{ video.title }}</h5>
                             <p class="card-text">{{ video.description }}</p>
-                            <small class="text-muted d-block mb-2">Uploaded on {{ video.upload_date.strftime('%B %d, %Y') }}</small>
+                            <small class="text-muted d-block mb-2">Uploaded on {{ video.created_at.strftime('%B %d, %Y') }}</small>
 
                             <!-- 🧹 Delete Button -->
                             <form method="POST" action="{{ url_for('boundary.delete_generated_video', video_id=video._id) }}" onsubmit="return confirm('Are you sure you want to delete this video?');">

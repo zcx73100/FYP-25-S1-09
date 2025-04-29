@@ -155,7 +155,18 @@ class HomePage:
     @staticmethod
     @boundary.route('/my_videos')
     def my_videos():
-        pass
+        username = session.get("username")
+        role = session.get("role")
+        videos = GenerateVideoController.get_videos(username)
+        print(videos)
+
+        if not username:
+            return redirect(url_for('boundary.login'))
+        
+
+        return render_template("myVideos.html", username=username,videos=videos, role=role)
+
+        # Fetch videos uploaded by the user
 
 
 class AvatarVideoBoundary:
@@ -474,6 +485,46 @@ class AvatarVideoBoundary:
         except Exception as e:
             print(f"Error uploading synthesized voice: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
+    
+    @boundary.route("/delete_generated_video/<video_id>", methods=["POST"])
+    def delete_generated_video(video_id):
+        try:
+            result = mongo.db.generated_videos.delete_one({"_id": ObjectId(video_id)})
+            if result.deleted_count == 0:
+                return jsonify(success=False, error="Video not found"), 404
+            return jsonify(success=True)
+        except Exception as e:
+            print(f"Error deleting video: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+    
+    @boundary.route('/generated_video/<video_id>')
+    def serve_generated_video(video_id):
+        try:
+            grid_out = fs.get(ObjectId(video_id))
+            file_size = grid_out.length
+            range_header = request.headers.get('Range')
+
+            if range_header:
+                start, end = range_header.replace('bytes=', '').split('-')
+                start = int(start)
+                end = int(end) if end else file_size - 1
+                length = end - start + 1
+
+                grid_out.seek(start)  # Move to the requested byte position
+                data = grid_out.read(length)
+
+                response = Response(data, status=206, mimetype=grid_out.content_type)
+                response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+                response.headers.add('Accept-Ranges', 'bytes')
+                response.headers.add('Content-Length', str(length))
+                return response
+
+            # Full video response (if no Range header)
+            return Response(grid_out.read(), mimetype=grid_out.content_type)
+
+        except Exception as e:
+            logging.error(f"Failed to serve video: {str(e)}")
+            return "Video not found", 404
 
     
 

@@ -389,6 +389,14 @@ class GenerateVideoEntity:
                     content_type="video/mp4",
                     metadata={"username": session.get("username")}
                 )
+            mongo.db.generated_videos.insert_one({
+                "video_id": video_id,
+                "avatar_id": avatar_id,
+                "audio_id": audio_id,
+                "created_at": datetime.now(),
+                "status": "generated",
+                "username": session.get("username")
+            })
 
             # Clean up temporary files
             os.remove(avatar_temp_path)
@@ -399,6 +407,25 @@ class GenerateVideoEntity:
         except Exception as e:
             print(f"❌ Error during video generation: {e}")
             return None
+    @staticmethod    
+    def get_videos(username):
+        try:
+            videos = mongo.db.generated_videos.find({"username": username})
+            video_list = []
+            for video in videos:
+                video_data = fs.get(video["video_id"])
+                video_list.append({
+                    "video_id": video["_id"],
+                    "avatar_id": video["avatar_id"],
+                    "audio_id": video["audio_id"],
+                    "created_at": video["created_at"],
+                    "status": video["status"],
+                    "video_file": video_data.read()
+                })
+            return video_list
+        except:
+            print("❌ Error fetching videos")
+            return []
 
 
 
