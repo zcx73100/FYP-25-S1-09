@@ -21,7 +21,7 @@
                             <small class="text-muted d-block mb-2">Uploaded on {{ video.created_at.strftime('%B %d, %Y') }}</small>
 
                             <!-- 🧹 Delete Button -->
-                            <form method="POST" action="{{ url_for('boundary.delete_generated_video', video_id=video._id) }}" onsubmit="return confirm('Are you sure you want to delete this video?');">
+                            <form method="POST" action="{{ url_for('boundary.delete_generated_video', video_id=video.video_id) }}" onsubmit="return confirm('Are you sure you want to delete this video?');">
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                             </form>
 
@@ -36,4 +36,15 @@
         </div>
     {% endif %}
 </div>
+<script>
+    async function deleteVideo(videoId) {
+    const response = await fetch(`/delete_generated_video/${videoId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    return await response.json();
+}
+</script>
 {% endblock %}

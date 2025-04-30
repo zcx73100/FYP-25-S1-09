@@ -167,16 +167,14 @@ class AvatarVideoBoundary:
 
         return render_template("myVideos.html", username=username, videos=videos, role=role)
         
-
-        return render_template("myVideos.html", username=username,videos=videos, role=role)
     # Route: Generate Voice
     @staticmethod
     @boundary.route("/generate_voice", methods=["POST"])
     def generate_voice():
         data = request.get_json()
-        text = data.get("text", "").strip()
-        lang = data.get("lang", "en")
-        gender = data.get("gender", "female")
+        text = data.get("text").strip()
+        lang = data.get("lang")
+        gender = data.get("gender")
 
         if not text:
             return jsonify(success=False, error="No text provided."), 400
@@ -494,7 +492,7 @@ class AvatarVideoBoundary:
 
             # First get the video document to verify ownership
             video = mongo.db.generated_videos.find_one({
-                "_id": ObjectId(video_id),
+                "video_id": ObjectId(video_id),
                 "username": username
             })
             
@@ -506,14 +504,14 @@ class AvatarVideoBoundary:
             
             # Then delete the metadata document
             result = mongo.db.generated_videos.delete_one({
-                "_id": ObjectId(video_id),
+                "video_id": ObjectId(video_id),
                 "username": username
             })
 
             if result.deleted_count == 1:
-                return jsonify(success=True)
+                return redirect(url_for('boundary.my_videos'))
             else:
-                return jsonify(success=False, error="Deletion failed"), 500
+                return redirect(url_for('boundary.my_videos'))
 
         except Exception as e:
             print(f"Error deleting video: {str(e)}")
@@ -547,6 +545,134 @@ class AvatarVideoBoundary:
         except Exception as e:
             logging.error(f"Failed to serve video: {str(e)}")
             return "Video not found", 404
+    @staticmethod
+    @boundary.route("/get_voice/<audio_id>")
+    def get_voice(audio_id):
+        """Stream a specific voice recording from GridFS"""
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Not logged in"), 401
+                
+            # Verify the voice belongs to the user
+            voice_record = mongo.db.voice_records.find_one({
+                "audio_id": ObjectId(audio_id),
+                "username": username
+            })
+            
+            if not voice_record:
+                return jsonify(success=False, error="Voice not found"), 404
+
+            file = fs.get(ObjectId(audio_id))
+            file_size = file.length
+
+            # Determine content type based on filename
+            filename = getattr(file, 'filename', 'audio.mp3')
+            content_type = mimetypes.guess_type(filename)[0] or "audio/mpeg"
+
+            # Handle range requests for partial content
+            range_header = request.headers.get('Range', None)
+            if range_header:
+                byte1, byte2 = 0, None
+                m = re.search(r'bytes=(\d+)-(\d*)', range_header)
+                if m:
+                    byte1 = int(m.group(1))
+                    if m.group(2):
+                        byte2 = int(m.group(2))
+                
+                byte2 = byte2 if byte2 is not None else file_size - 1
+                length = byte2 - byte1 + 1
+
+                file.seek(byte1)
+                data = file.read(length)
+
+                rv = Response(data, 206, mimetype=content_type, direct_passthrough=True)
+                rv.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
+                rv.headers.add('Accept-Ranges', 'bytes')
+                rv.headers.add('Content-Length', str(length))
+                return rv
+            else:
+                # Full file response
+                data = file.read()
+                rv = Response(data, 200, mimetype=content_type)
+                rv.headers.add('Content-Length', str(file_size))
+                rv.headers.add('Accept-Ranges', 'bytes')
+                return rv
+
+        except Exception as e:
+            print(f"Error streaming voice {audio_id}: {str(e)}")
+            return jsonify(success=False, error=f"Voice not found: {str(e)}"), 404
+
+    @staticmethod
+    @boundary.route("/update_voice_name/<audio_id>", methods=["POST"])
+    def update_voice_name(audio_id):
+        """Update the name/title of a voice recording"""
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Not logged in"), 401
+
+            data = request.get_json()
+            new_name = data.get("new_name", "").strip()
+
+            if not new_name:
+                return jsonify(success=False, error="New name cannot be empty"), 400
+
+            # Verify the voice belongs to the user before updating
+            result = mongo.db.voice_records.update_one(
+                {
+                    "audio_id": ObjectId(audio_id),
+                    "username": username
+                },
+                {
+                    "$set": {"text": new_name}
+                }
+            )
+
+            if result.modified_count == 0:
+                return jsonify(success=False, error="Voice not found or no changes made"), 404
+
+            return jsonify(success=True, message="Voice name updated")
+
+        except Exception as e:
+            print(f"Error updating voice name {audio_id}: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+
+    @staticmethod
+    @boundary.route("/delete_voice/<audio_id>", methods=["DELETE"])
+    def delete_voice(audio_id):
+        """Delete a voice recording and its metadata"""
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Not logged in"), 401
+
+            # First verify the voice belongs to the user
+            voice_record = mongo.db.voice_records.find_one({
+                "audio_id": ObjectId(audio_id),
+                "username": username
+            })
+            
+            if not voice_record:
+                return jsonify(success=False, error="Voice not found"), 404
+
+            # Delete from GridFS
+            fs.delete(ObjectId(audio_id))
+
+            # Delete the metadata record
+            result = mongo.db.voice_records.delete_one({
+                "audio_id": ObjectId(audio_id),
+                "username": username
+            })
+
+            if result.deleted_count == 1:
+                return jsonify(success=True, message="Voice deleted")
+            else:
+                return jsonify(success=False, error="Failed to delete voice record"), 500
+
+        except Exception as e:
+            print(f"Error deleting voice {audio_id}: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
 
     
 
@@ -665,11 +791,12 @@ class CreateAccountBoundary:
                     "date_of_birth": dob_obj.strftime('%Y-%m-%d'),
                     "role": role,
                     "status": "active",
-                    "profile_pic": profile_pic_path
+                    "profile_pic": profile_pic_path,
+                    "first_time_login": True,
                 })
 
                 flash(f'Account created successfully with role: {role}', 'success')
-                return redirect(url_for('boundary.login'))
+                return redirect(url_for('boundary.home'))
 
             except Exception as e:
                 flash(f"Error creating account: {str(e)}", "error")

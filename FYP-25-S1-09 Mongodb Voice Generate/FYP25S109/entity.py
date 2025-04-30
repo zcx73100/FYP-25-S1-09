@@ -266,7 +266,7 @@ class GenerateVideoEntity:
         file_id = fs.put(audio_io, filename=filename, content_type=content_type)
         return file_id
     
-    def generate_voice(self, lang="en", gender="female"):
+    def generate_voice(self, lang, gender):
         try:
             if not self.text.strip():
                 raise ValueError("Text input is empty.")
@@ -274,23 +274,38 @@ class GenerateVideoEntity:
             # Enhanced voice configuration
             voice_config = {
                 "en": {
-                    "male": {"tld": "com", "slow": False},
-                    "female": {"tld": "com.au", "slow": False},
-                    "neutral": {"tld": "co.uk", "slow": False}
+                    "male": {"tld": "com", "lang": "en", "slow": False, "gender_enforced": True},
+                    "female": {"tld": "com.au", "lang": "en", "slow": False, "gender_enforced": True},
+                    "neutral": {"tld": "co.uk", "lang": "en", "slow": False, "gender_enforced": False}
                 },
                 "es": {
-                    "male": {"tld": "com.mx", "slow": False},
-                    "female": {"tld": "es", "slow": False}
+                    "male": {"tld": "com.mx", "lang": "es", "slow": False, "gender_enforced": True},
+                    "female": {"tld": "es", "lang": "es", "slow": False, "gender_enforced": True}
                 },
                 "fr": {
-                    "male": {"tld": "ca", "slow": False},
-                    "female": {"tld": "fr", "slow": False}
+                    "female": {"tld": "fr", "lang": "fr", "slow": False, "gender_enforced": True},
+                    "neutral": {"tld": "fr", "lang": "fr", "slow": False, "gender_enforced": False}
+                },
+                "de": {
+                    "neutral": {"tld": "de", "lang": "de", "slow": False, "gender_enforced": False}
+                },
+                "it": {
+                    "neutral": {"tld": "it", "lang": "it", "slow": False, "gender_enforced": False}
+                },
+                "ja": {
+                    "neutral": {"tld": "co.jp", "lang": "ja", "slow": False, "gender_enforced": False}
+                },
+                "ko": {
+                    "neutral": {"tld": "co.kr", "lang": "ko", "slow": False, "gender_enforced": False}
+                },
+                "id": {
+                    "neutral": {"tld": "co.id", "lang": "id", "slow": False, "gender_enforced": False}
                 }
             }
 
             # Get settings for requested language and gender
-            lang_config = voice_config.get(lang, voice_config["en"])
-            gender_config = lang_config.get(gender, lang_config["female"])
+            lang_config = voice_config.get(lang)
+            gender_config = lang_config.get(gender)
             
             mp3_buffer = BytesIO()
             tts = gTTS(
@@ -341,18 +356,12 @@ class GenerateVideoEntity:
             avatar_file = fs.get(ObjectId(avatar_id))
             audio_file = fs.get(ObjectId(audio_id))
 
-            avatar_temp_path = f"avatar_{uuid.uuid4().hex}.png"
-            audio_temp_path = f"audio_{uuid.uuid4().hex}.wav"
-            
-            with open(avatar_temp_path, "wb") as f:
-                f.write(avatar_file.read())
-
-            with open(audio_temp_path, "wb") as f:
-                f.write(audio_file.read())
+            avatar_bytes = BytesIO(avatar_file.read())
+            audio_bytes = BytesIO(audio_file.read())
 
             files = {
-                "image_file": ("avatar.png", open(avatar_temp_path, "rb"), "image/png"),
-                "audio_file": ("audio.wav", open(audio_temp_path, "rb"), "audio/wav")
+                "image_file": ("avatar.png", avatar_bytes, "image/png"),
+                "audio_file": ("audio.wav", audio_bytes, "audio/wav")
             }
             data = {
                 "preprocess_type": "crop",
@@ -383,12 +392,15 @@ class GenerateVideoEntity:
                 return None
 
             with open(safe_video_path, "rb") as vf:
-                video_id = fs.put(
-                    vf,
-                    filename=os.path.basename(safe_video_path),
-                    content_type="video/mp4",
-                    metadata={"username": session.get("username")}
-                )
+                video_bytes = BytesIO(vf.read())
+
+            video_id = fs.put(
+                video_bytes,
+                filename=os.path.basename(safe_video_path),
+                content_type="video/mp4",
+                metadata={"username": session.get("username")}
+            )
+
             mongo.db.generated_videos.insert_one({
                 "video_id": video_id,
                 "avatar_id": ObjectId(avatar_id),
@@ -398,15 +410,15 @@ class GenerateVideoEntity:
                 "username": session.get("username")
             })
 
-            # Clean up temporary files
-            os.remove(avatar_temp_path)
-            os.remove(audio_temp_path)
+            # Remove the generated video file if needed
+            os.remove(safe_video_path)
 
             return str(video_id)
 
         except Exception as e:
             print(f"❌ Error during video generation: {e}")
             return None
+
     @staticmethod    
     def get_videos(username):
         try:

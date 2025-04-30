@@ -18,76 +18,6 @@
   </div>
   {% endif %}
 
-  <!-- Voice Generation Section -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-      <h5 class="mb-0"><i class="fas fa-microphone me-2"></i>Voice Settings</h5>
-      <span class="badge bg-light text-primary" id="voice-status">Not Generated</span>
-    </div>
-    <div class="card-body">
-      <div class="row g-3">
-        <!-- Text Input Column -->
-        <div class="col-lg-6">
-          <label for="text" class="form-label">Enter Text for Voiceover</label>
-          <textarea id="text" class="form-control" rows="4" 
-                    placeholder="Type what you want the avatar to say..."></textarea>
-          <div class="form-text">Maximum 500 characters</div>
-          <div class="mt-2">
-            <button id="previewVoice" class="btn btn-outline-primary btn-sm">
-              <i class="fas fa-play me-1"></i> Preview Voice
-            </button>
-            <small class="text-muted ms-2">Hear it before generating</small>
-          </div>
-        </div>
-        
-        <!-- Voice Options Column -->
-        <div class="col-lg-6">
-          <div class="row g-2">
-            <div class="col-md-6">
-              <label for="voiceLang" class="form-label"><i class="fas fa-globe me-1"></i> Language</label>
-              <!-- In your HTML, update the voiceLang select options -->
-              <select id="voiceLang" class="form-select">
-                <option value="en" selected>English</option>
-                <option value="id">Indonesian</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label for="voiceGender" class="form-label"><i class="fas fa-user me-1"></i> Gender</label>
-              <select id="voiceGender" class="form-select">
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="neutral" selected>Neutral</option>
-              </select>
-            </div>
-            <div class="col-12 mt-2">
-              <button id="generateVoice" class="btn btn-warning w-100">
-                <i class="fas fa-robot me-2"></i>Generate & Save Voice
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Audio Preview -->
-      <div class="mt-3" id="audio-preview-container" style="display: none;">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <label class="form-label mb-0"><i class="fas fa-play-circle me-1"></i>Saved Voice</label>
-          <button id="delete-voice" class="btn btn-sm btn-outline-danger">
-            <i class="fas fa-trash"></i> Delete
-          </button>
-        </div>
-        <audio id="audioPreview" controls class="w-100"></audio>
-        <input type="hidden" id="audio_id" name="audio_id">
-      </div>
-    </div>
-  </div>
-
   <!-- Voice Recording Section -->
   <div class="card mb-4 shadow-sm">
     <div class="card-header bg-danger text-white">
@@ -119,6 +49,9 @@
             </div>
           </div>
           <audio id="recordedAudio" controls class="w-100"></audio>
+          <div class="mt-2">
+            <input type="text" id="recording-name" class="form-control form-control-sm" placeholder="Name your recording (optional)">
+          </div>
         </div>
       </div>
     </div>
@@ -139,16 +72,30 @@
                 <input class="form-check-input" type="radio" name="audio_choice" 
                        value="{{ record.audio_id }}" id="voice{{ loop.index }}">
                 <label class="form-check-label" for="voice{{ loop.index }}">
-                  {{ record.text|truncate(40) or "Voice " ~ loop.index }}
-                  <span class="badge bg-info ms-2">{{ record.lang|upper }}</span>
-                  <span class="badge bg-dark ms-1">{{ record.gender|capitalize }}</span>
+                  <span class="voice-name">{{ record.text|truncate(40) or "Voice " ~ loop.index }}</span>
                   {% if record.source == 'recording' %}
                   <span class="badge bg-danger ms-1">Recording</span>
                   {% endif %}
                 </label>
               </div>
-              <small class="text-muted">{{ record.created_at|format_datetime }}</small>
+              <div class="d-flex align-items-center">
+                <button class="btn btn-sm btn-outline-primary play-voice me-2" 
+                        data-audio-id="{{ record.audio_id }}">
+                  <i class="fas fa-play"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary edit-voice me-2" 
+                        data-audio-id="{{ record.audio_id }}"
+                        data-current-name="{{ record.text }}">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-voice" 
+                        data-audio-id="{{ record.audio_id }}">
+                  <i class="fas fa-trash"></i>
+                </button>
+                <small class="text-muted ms-2">{{ record.created_at|format_datetime }}</small>
+              </div>
             </div>
+            <audio id="audio-{{ record.audio_id }}" src="/get_voice/{{ record.audio_id }}" preload="none"></audio>
           </div>
           {% endfor %}
         </div>
@@ -244,6 +191,45 @@
   <input type="hidden" id="assignmentIdInput" value="{{ request.args.get('assignment_id') }}">
   <input type="hidden" id="classroomIdInput" value="{{ request.args.get('classroom_id') }}">
   <input type="hidden" id="videoIdInput" value="">
+
+  <!-- Edit Voice Name Modal -->
+  <div class="modal fade" id="editVoiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Voice Name</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="edit-voice-name-input" class="form-control" placeholder="Enter new name">
+          <input type="hidden" id="edit-voice-id-input">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="save-voice-name">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal fade" id="deleteVoiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Confirm Deletion</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete this voice recording? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="confirm-delete-voice">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -330,16 +316,33 @@
   .btn-check:focus + .btn-outline-primary {
     box-shadow: 0 0 0 0.25rem rgba(111, 66, 193, 0.25);
   }
+
+  /* Voice Play Button */
+  .play-voice.playing {
+    background-color: #0d6efd;
+    color: white;
+  }
+
+  /* Voice Name */
+  .voice-name {
+    max-width: 200px;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
 </style>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  // Initialize Bootstrap modals
+  const editVoiceModal = new bootstrap.Modal(document.getElementById('editVoiceModal'));
+  const deleteVoiceModal = new bootstrap.Modal(document.getElementById('deleteVoiceModal'));
+
   // DOM Elements
   const elements = {
     notification: document.getElementById('notification'),
-    voiceStatus: document.getElementById('voice-status'),
-    audioPreview: document.getElementById('audioPreview'),
-    audioPreviewContainer: document.getElementById('audio-preview-container'),
     recordedAudio: document.getElementById('recordedAudio'),
     recordedAudioContainer: document.getElementById('recorded-audio-container'),
     recordingStatus: document.getElementById('recording-status'),
@@ -349,7 +352,10 @@ document.addEventListener("DOMContentLoaded", () => {
     progressBar: document.getElementById('progress-bar'),
     progressStatus: document.getElementById('progress-status'),
     progressPercent: document.getElementById('progress-percent'),
-    generateVideoBtn: document.getElementById('generateVideoBtn')
+    generateVideoBtn: document.getElementById('generateVideoBtn'),
+    recordingNameInput: document.getElementById('recording-name'),
+    editVoiceNameInput: document.getElementById('edit-voice-name-input'),
+    editVoiceIdInput: document.getElementById('edit-voice-id-input')
   };
 
   // State Management
@@ -358,9 +364,8 @@ document.addEventListener("DOMContentLoaded", () => {
     recordedChunks: [],
     isRecording: false,
     currentAudio: null,
-    audioContext: null,
-    synthesisChunks: [],
-    synthesisRecorder: null
+    currentlyPlaying: null,
+    voiceToDelete: null
   };
 
   // Notification System
@@ -387,185 +392,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Voice Preview Functionality
-  document.getElementById('previewVoice').addEventListener('click', () => {
-    const text = document.getElementById('text').value.trim();
-    const lang = document.getElementById('voiceLang').value;
-    const gender = document.getElementById('voiceGender').value;
-
-    if (!text) {
-      showNotification('Please enter text to preview voice!', 'danger');
-      return;
-    }
-
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const voice = findBestVoice(voices, lang, gender);
-    
-    if (voice) {
-      utterance.voice = voice;
-      utterance.rate = 0.9;
-      utterance.pitch = gender === 'male' ? 0.8 : 1.2;
-      window.speechSynthesis.speak(utterance);
-    } else {
-      showNotification('No suitable voice found for preview', 'warning');
-    }
-  });
-
-  function findBestVoice(voices, lang, gender) {
-    const filtered = voices.filter(v => {
-      const langMatch = v.lang.startsWith(lang);
-      const genderMatch = gender === 'neutral' ? true : 
-                         (gender === 'male' ? v.name.includes('Male') : v.name.includes('Female'));
-      return langMatch && genderMatch;
-    });
-
-    // Prefer Google voices, then Microsoft, then others
-    filtered.sort((a, b) => {
-      const aScore = a.name.includes('Google') ? 2 : a.name.includes('Microsoft') ? 1 : 0;
-      const bScore = b.name.includes('Google') ? 2 : b.name.includes('Microsoft') ? 1 : 0;
-      return bScore - aScore;
-    });
-
-    return filtered[0] || null;
-  }
-
-  // Voice Generation with Web Speech API
-  document.getElementById('generateVoice').addEventListener('click', async () => {
-    const text = document.getElementById('text').value.trim();
-    const lang = document.getElementById('voiceLang').value;
-    const gender = document.getElementById('voiceGender').value;
-
-    if (!text) {
-      showNotification('Please enter text for voice generation!', 'danger');
-      return;
-    }
-
-    try {
-      elements.voiceStatus.textContent = 'Generating...';
-      elements.voiceStatus.className = 'badge bg-warning text-dark';
-      
-      // Generate speech using Web Speech API
-      const audioBlob = await generateSpeech(text, lang, gender);
-      
-      // Upload to server
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'speech.wav');
-      formData.append('text', text);
-      formData.append('lang', lang);
-      formData.append('gender', gender);
-
-      const response = await fetch("/upload_synthesized_voice", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        document.getElementById('audio_id').value = data.audio_id;
-        elements.audioPreview.src = `/stream_audio/${data.audio_id}`;
-        elements.audioPreviewContainer.style.display = 'block';
-        
-        // Unselect other audio options
-        document.querySelectorAll("input[name='audio_choice']").forEach(el => el.checked = false);
-        elements.recordedAudioContainer.style.display = 'none';
-        
-        elements.voiceStatus.textContent = 'Generated';
-        elements.voiceStatus.className = 'badge bg-success text-white';
-        showNotification('Voice generated and saved successfully!');
-        
-        // Update state
-        state.currentAudio = {
-          type: 'generated',
-          id: data.audio_id
-        };
-        
-        // Refresh saved voices list
-        await refreshSavedVoices();
-      } else {
-        throw new Error(data.error || "Voice upload failed");
-      }
-    } catch (error) {
-      elements.voiceStatus.textContent = 'Error';
-      elements.voiceStatus.className = 'badge bg-danger text-white';
-      showNotification(error.message, 'danger');
-      console.error('Voice generation error:', error);
-    }
-  });
-
-
-  async function generateSpeech(text, lang, gender) {
-    return new Promise((resolve, reject) => {
-      // Cancel any ongoing speech immediately
-      window.speechSynthesis.cancel();
-      
-      // Get voices - ensure they're loaded
-      let voices = window.speechSynthesis.getVoices();
-      if (voices.length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
-          voices = window.speechSynthesis.getVoices();
-          continueGeneration();
-        };
-      } else {
-        continueGeneration();
-      }
-
-      function continueGeneration() {
-        const voice = findBestVoice(voices, lang, gender);
-        if (!voice) {
-          reject(new Error(`No suitable voice found for ${gender} ${lang}`));
-          return;
-        }
-
-        // Set up audio context with optimized settings
-        state.audioContext = state.audioContext || new (window.AudioContext || window.webkitAudioContext)({
-          latencyHint: 'playback',
-          sampleRate: 24000 // Lower sample rate for faster processing
-        });
-        
-        const dest = state.audioContext.createMediaStreamDestination();
-        state.synthesisRecorder = new MediaRecorder(dest.stream, {
-          mimeType: 'audio/webm', // More efficient than wav
-          audioBitsPerSecond: 64000 // Lower bitrate for smaller files
-        });
-        
-        state.synthesisChunks = [];
-        
-        state.synthesisRecorder.ondataavailable = evt => {
-          state.synthesisChunks.push(evt.data);
-        };
-        
-        state.synthesisRecorder.onstop = () => {
-          const blob = new Blob(state.synthesisChunks, { type: 'audio/webm' });
-          resolve(blob);
-        };
-        
-        state.synthesisRecorder.start();
-        
-        // Create optimized utterance
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.voice = voice;
-        utterance.rate = 1.2; // Slightly faster speech
-        utterance.pitch = gender === 'male' ? 0.9 : 1.1;
-        utterance.volume = 0.9; // Slightly lower volume for better quality
-        
-        // Shorter timeout for onend
-        utterance.onend = () => {
-          setTimeout(() => {
-            state.synthesisRecorder.stop();
-          }, 200); // Reduced from 500ms
-        };
-        
-        // Speak immediately
-        window.speechSynthesis.speak(utterance);
-      }
-    });
-  }
-
   // Voice Recording
   document.getElementById('startRecording').addEventListener('click', async () => {
     try {
@@ -582,7 +408,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
         elements.recordedAudio.src = URL.createObjectURL(blob);
         elements.recordedAudioContainer.style.display = 'block';
-        elements.audioPreviewContainer.style.display = 'none';
         elements.recordingStatus.innerHTML = '<i class="fas fa-check-circle text-success me-1"></i>Recording complete';
       };
 
@@ -616,11 +441,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const voiceName = elements.recordingNameInput.value.trim() || 'My Recording';
+
     try {
       const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
       const formData = new FormData();
       formData.append('audio', blob, 'recording.webm');
-      formData.append('text', 'User Recording');
+      formData.append('text', voiceName);
       formData.append('source', 'recording');
 
       const response = await fetch('/upload_recorded_voice', {
@@ -630,9 +457,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await response.json();
       if (data.success) {
-        document.getElementById('audio_id').value = data.audio_id;
         showNotification('Recording saved successfully!');
         await refreshSavedVoices();
+        elements.recordingNameInput.value = '';
       } else {
         throw new Error(data.error || 'Save failed');
       }
@@ -642,37 +469,129 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Delete Buttons
-  document.getElementById('delete-voice').addEventListener('click', (e) => {
+  document.getElementById('delete-recording').addEventListener('click', (e) => {
     e.preventDefault();
-    if (state.currentAudio?.type === 'generated') {
-      if (confirm('Delete this generated voice?')) {
-        elements.audioPreviewContainer.style.display = 'none';
-        document.getElementById('audio_id').value = '';
-        state.currentAudio = null;
-        showNotification('Voice deleted');
+    elements.recordedAudioContainer.style.display = 'none';
+    state.recordedChunks = [];
+    showNotification('Recording deleted');
+  });
+
+  // Play Voice Buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.play-voice')) {
+      const button = e.target.closest('.play-voice');
+      const audioId = button.dataset.audioId;
+      const audioElement = document.getElementById(`audio-${audioId}`);
+
+      // Stop any currently playing audio
+      if (state.currentlyPlaying && state.currentlyPlaying !== audioElement) {
+        state.currentlyPlaying.pause();
+        const prevButton = document.querySelector(`.play-voice[data-audio-id="${state.currentlyPlaying.id.split('-')[1]}"]`);
+        if (prevButton) prevButton.classList.remove('playing');
+      }
+
+      if (audioElement.paused) {
+        audioElement.play();
+        button.classList.add('playing');
+        state.currentlyPlaying = audioElement;
+        
+        audioElement.onended = () => {
+          button.classList.remove('playing');
+          state.currentlyPlaying = null;
+        };
+      } else {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+        button.classList.remove('playing');
+        state.currentlyPlaying = null;
       }
     }
   });
 
-  document.getElementById('delete-recording').addEventListener('click', (e) => {
-    e.preventDefault();
-    elements.recordedAudioContainer.style.display = 'none';
-    document.getElementById('audio_id').value = '';
-    state.currentAudio = null;
-    state.recordedChunks = [];
-    showNotification('Recording deleted');
+  // Edit Voice Name Buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.edit-voice')) {
+      const button = e.target.closest('.edit-voice');
+      elements.editVoiceIdInput.value = button.dataset.audioId;
+      elements.editVoiceNameInput.value = button.dataset.currentName;
+      editVoiceModal.show();
+    }
+  });
+
+  // Save Edited Voice Name
+  document.getElementById('save-voice-name').addEventListener('click', async () => {
+    const audioId = elements.editVoiceIdInput.value;
+    const newName = elements.editVoiceNameInput.value.trim();
+
+    if (!newName) {
+      showNotification('Please enter a name for your voice recording', 'warning');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/update_voice_name/${audioId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_name: newName })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showNotification('Voice name updated successfully!');
+        await refreshSavedVoices();
+        editVoiceModal.hide();
+      } else {
+        throw new Error(data.error || 'Update failed');
+      }
+    } catch (error) {
+      showNotification(error.message, 'danger');
+    }
+  });
+
+  // Delete Voice Buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.delete-voice')) {
+      const button = e.target.closest('.delete-voice');
+      state.voiceToDelete = button.dataset.audioId;
+      deleteVoiceModal.show();
+    }
+  });
+
+  // Confirm Voice Deletion
+  document.getElementById('confirm-delete-voice').addEventListener('click', async () => {
+    if (!state.voiceToDelete) return;
+
+    try {
+      const response = await fetch(`/delete_voice/${state.voiceToDelete}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showNotification('Voice recording deleted successfully!');
+        await refreshSavedVoices();
+      } else {
+        throw new Error(data.error || 'Deletion failed');
+      }
+    } catch (error) {
+      showNotification(error.message, 'danger');
+    } finally {
+      deleteVoiceModal.hide();
+      state.voiceToDelete = null;
+    }
   });
 
   // Video Generation
   elements.generateVideoBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     
-    const text = document.getElementById('text').value.trim();
     const avatar = document.querySelector("input[name='avatar_id']:checked");
-    const audioId = document.getElementById('audio_id').value.trim();
+    const audioChoice = document.querySelector("input[name='audio_choice']:checked");
 
-    if (!audioId) {
-      showNotification('Please generate or select a voice first!', 'danger');
+    if (!audioChoice) {
+      showNotification('Please select or record an audio first!', 'danger');
       return;
     }
 
@@ -682,13 +601,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const formData = new FormData();
-    formData.append('text', text);
     formData.append('avatar_id', avatar.value);
-    formData.append('audio_id', audioId);
+    formData.append('audio_id', audioChoice.value);
     formData.append('source', "{{ request.args.get('source') }}");
     formData.append('assignment_id', "{{ request.args.get('assignment_id') }}");
     formData.append('classroom_id', "{{ request.args.get('classroom_id') }}");
-    console.log('Form Data:', formData);
 
     elements.progressContainer.style.display = 'block';
     elements.progressBar.style.width = '0%';
@@ -716,9 +633,8 @@ document.addEventListener("DOMContentLoaded", () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
           avatar_id: avatar.value,
-          audio_id: audioId,
+          audio_id: audioChoice.value,
           video_id: data.video_id
         })
       });
@@ -833,14 +749,28 @@ document.addEventListener("DOMContentLoaded", () => {
                   <input class="form-check-input" type="radio" name="audio_choice" 
                          value="${record.audio_id}" id="voice${record.audio_id}">
                   <label class="form-check-label" for="voice${record.audio_id}">
-                    ${record.text ? record.text.substring(0, 40) : "Recording"}
-                    ${record.lang ? `<span class="badge bg-info ms-2">${record.lang.toUpperCase()}</span>` : ''}
-                    ${record.gender ? `<span class="badge bg-dark ms-1">${record.gender.charAt(0).toUpperCase() + record.gender.slice(1)}</span>` : ''}
+                    <span class="voice-name">${record.text ? record.text.substring(0, 40) : "Recording"}</span>
                     ${record.source === 'recording' ? `<span class="badge bg-danger ms-1">Recording</span>` : ''}
                   </label>
                 </div>
-                <small class="text-muted">${formatDate(record.created_at)}</small>
+                <div class="d-flex align-items-center">
+                  <button class="btn btn-sm btn-outline-primary play-voice me-2" 
+                          data-audio-id="${record.audio_id}">
+                    <i class="fas fa-play"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary edit-voice me-2" 
+                          data-audio-id="${record.audio_id}"
+                          data-current-name="${record.text}">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger delete-voice" 
+                          data-audio-id="${record.audio_id}">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <small class="text-muted ms-2">${formatDate(record.created_at)}</small>
+                </div>
               </div>
+              <audio id="audio-${record.audio_id}" src="/get_voice/${record.audio_id}" preload="none"></audio>
             </div>
           `).join('');
         }
@@ -850,124 +780,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Load voices when page loads
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = () => {
-      console.log("Voices loaded:", speechSynthesis.getVoices());
-    };
-  }
-
   // Enhanced Saved Voice Selection with Audio Preview
-document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
-  radio.addEventListener('change', async function() {
-    if (!this.checked) return;
-    
-    const audioId = this.value;
-    if (!audioId) return;
-
-    // Show loading state
-    elements.audioPreviewContainer.style.display = 'block';
-    elements.audioPreview.controls = false;
-    elements.audioPreview.innerHTML = 'Loading audio...';
-
-    // Pause any currently playing audio
-    elements.audioPreview.pause();
-    elements.recordedAudio.pause();
-
-    // Update UI
-    document.getElementById('audio_id').value = audioId;
-    console.log('Selected audio ID:', audioId);
-    elements.recordedAudioContainer.style.display = 'none';
-
-    // Create new audio element to avoid caching issues
-    const newAudio = new Audio();
-    newAudio.controls = true;
-    newAudio.preload = "auto";
-    
-    // Set source with cache-busting parameter
-    const audioUrl = `/stream_audio/${audioId}`;
-    newAudio.src = audioUrl;
-
-    // Replace the old audio element with the new one
-    elements.audioPreview.replaceWith(newAudio);
-    elements.audioPreview = newAudio;  // Update the reference to the new audio element
-
-    // Handle audio loading
-    try {
-      // Wait for enough data to play
-      await new Promise((resolve, reject) => {
-        newAudio.onloadedmetadata = resolve;
-        newAudio.onerror = reject;
-        
-        // Some browsers need this to properly load
-        newAudio.load();
-      });
-
-      // Attempt to play (may be blocked by browser autoplay policies)
-      const playPromise = newAudio.play();
+  document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
+    radio.addEventListener('change', async function() {
+      if (!this.checked) return;
       
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Autoplay prevented, showing controls');
-          showNotification('Click the play button to preview', 'info');
-        });
-      }
-    } catch (error) {
-      console.error('Audio loading error:', error);
-      showNotification('Error loading audio preview', 'danger');
-    }
-  });
-});
-const voiceLang = document.getElementById('voiceLang');
-  const voiceGender = document.getElementById('voiceGender');
-  const genderHelp = document.createElement('small'); // Create help text dynamically
-  genderHelp.id = 'genderHelp';
-  genderHelp.className = 'form-text';
-  voiceGender.parentNode.appendChild(genderHelp);
+      const audioId = this.value;
+      if (!audioId) return;
 
-  const genderOptions = {
-    male: 'Male',
-    female: 'Female',
-    neutral: 'Neutral'
-  };
-
-  const languageRules = {
-    en: ['male', 'female', 'neutral'],
-    default: ['neutral']
-  };
-
-  function updateGenderDropdown() {
-    const lang = voiceLang.value;
-    const allowedGenders = languageRules[lang] || languageRules.default;
-    const currentGender = voiceGender.value;
-
-    voiceGender.innerHTML = '';
-    allowedGenders.forEach(gender => {
-      const option = document.createElement('option');
-      option.value = gender;
-      option.textContent = genderOptions[gender];
-      voiceGender.appendChild(option);
+      // Pause any currently playing audio
+      elements.recordedAudio.pause();
     });
-
-    if (!allowedGenders.includes(currentGender)) {
-      voiceGender.value = 'neutral';
-    }
-
-    voiceGender.disabled = allowedGenders.length <= 1;
-    
-    if (lang === 'en') {
-      genderHelp.textContent = 'Choose voice gender';
-      genderHelp.style.color = '';
-    } else {
-      genderHelp.textContent = 'Only neutral voice available for this language';
-      genderHelp.style.color = '#6c757d';
-    }
-  }
-
-  // Initialize
-  updateGenderDropdown();
-  voiceLang.addEventListener('change', updateGenderDropdown);
-
+  });
 
   document.querySelectorAll('.avatar-card').forEach(card => {
     const radio = card.querySelector('input[type="radio"]');
@@ -990,10 +814,6 @@ const voiceLang = document.getElementById('voiceLang');
       card.classList.add('selected');
     }
   });
-
 });
-
-
-
 </script>
 {% endblock %}
