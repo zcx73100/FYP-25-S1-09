@@ -36,7 +36,7 @@
           <!-- published video -->
           {% if item.video_id %}
             <video controls class="avatar-showcase-video">
-              <source src="{{ url_for('boundary.serve_video', file_id=item.video_id) }}" type="video/mp4">
+              <source src="{{ url_for('boundary.serve_published_video', file_id=item.video_id) }}" type="video/mp4">
               Your browser does not support the video tag.
             </video>
           {% else %}

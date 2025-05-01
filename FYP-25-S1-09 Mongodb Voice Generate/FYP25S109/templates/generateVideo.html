@@ -17,6 +17,29 @@
     Assignment ID: <code>{{ request.args.get("assignment_id") }}</code>
   </div>
   {% endif %}
+  <!-- MP3 Upload Section -->
+<div class="card mb-4 shadow-sm">
+  <div class="card-header bg-info text-white">
+    <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload MP3 Voice</h5>
+  </div>
+  <div class="card-body">
+    <form id="mp3UploadForm" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="mp3File" class="form-label">Select MP3 File</label>
+        <input class="form-control" type="file" id="mp3File" accept=".mp3,audio/mpeg" required>
+        <div class="form-text">Maximum file size: 10MB</div>
+      </div>
+      <div class="mb-3">
+        <label for="voiceName" class="form-label">Voice Name (optional)</label>
+        <input type="text" class="form-control" id="voiceName" placeholder="My Custom Voice">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-upload me-1"></i> Upload Voice
+      </button>
+    </form>
+    <div id="mp3UploadStatus" class="mt-3 alert" style="display: none;"></div>
+  </div>
+</div>
 
   <!-- Voice Recording Section -->
   <div class="card mb-4 shadow-sm">
@@ -736,49 +759,53 @@ document.addEventListener("DOMContentLoaded", () => {
   // Helper Functions
   async function refreshSavedVoices() {
     try {
-      const response = await fetch('/get_voice_records');
-      const data = await response.json();
-      
-      if (data.success) {
-        const listContainer = document.getElementById('saved-voices-list');
-        if (listContainer) {
-          listContainer.innerHTML = data.records.map(record => `
-            <div class="list-group-item list-group-item-action voice-item">
-              <div class="d-flex w-100 justify-content-between align-items-center">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="audio_choice" 
-                         value="${record.audio_id}" id="voice${record.audio_id}">
-                  <label class="form-check-label" for="voice${record.audio_id}">
-                    <span class="voice-name">${record.text ? record.text.substring(0, 40) : "Recording"}</span>
-                    ${record.source === 'recording' ? `<span class="badge bg-danger ms-1">Recording</span>` : ''}
-                  </label>
-                </div>
-                <div class="d-flex align-items-center">
-                  <button class="btn btn-sm btn-outline-primary play-voice me-2" 
-                          data-audio-id="${record.audio_id}">
-                    <i class="fas fa-play"></i>
-                  </button>
-                  <button class="btn btn-sm btn-outline-secondary edit-voice me-2" 
-                          data-audio-id="${record.audio_id}"
-                          data-current-name="${record.text}">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger delete-voice" 
-                          data-audio-id="${record.audio_id}">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                  <small class="text-muted ms-2">${formatDate(record.created_at)}</small>
-                </div>
-              </div>
-              <audio id="audio-${record.audio_id}" src="/get_voice/${record.audio_id}" preload="none"></audio>
-            </div>
-          `).join('');
+        const response = await fetch('/get_voice_records');
+        const data = await response.json();
+        
+        if (data.success) {
+            const listContainer = document.getElementById('saved-voices-list');
+            if (listContainer) {
+                listContainer.innerHTML = data.records.map(record => `
+                    <div class="list-group-item list-group-item-action voice-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="audio_choice" 
+                                       value="${record.audio_id}" id="voice${record.audio_id}">
+                                <label class="form-check-label" for="voice${record.audio_id}">
+                                    <span class="voice-name">${record.text ? record.text.substring(0, 40) : "Voice"}</span>
+                                    ${record.source === 'recording' ? 
+                                      '<span class="badge bg-danger ms-1">Recording</span>' : 
+                                      record.source === 'upload' ? 
+                                      '<span class="badge bg-info ms-1">Upload</span>' : 
+                                      '<span class="badge bg-secondary ms-1">Generated</span>'}
+                                </label>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-sm btn-outline-primary play-voice me-2" 
+                                        data-audio-id="${record.audio_id}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary edit-voice me-2" 
+                                        data-audio-id="${record.audio_id}"
+                                        data-current-name="${record.text}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-voice" 
+                                        data-audio-id="${record.audio_id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <small class="text-muted ms-2">${formatDate(record.created_at)}</small>
+                            </div>
+                        </div>
+                        <audio id="audio-${record.audio_id}" src="/get_voice/${record.audio_id}" preload="none"></audio>
+                    </div>
+                `).join('');
+            }
         }
-      }
     } catch (error) {
-      console.error('Error refreshing voices:', error);
+        console.error('Error refreshing voices:', error);
     }
-  }
+}
 
   // Enhanced Saved Voice Selection with Audio Preview
   document.querySelectorAll("input[name='audio_choice']").forEach(radio => {
@@ -814,6 +841,61 @@ document.addEventListener("DOMContentLoaded", () => {
       card.classList.add('selected');
     }
   });
+  // MP3 Upload Handling
+document.getElementById('mp3UploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('mp3File');
+    const nameInput = document.getElementById('voiceName');
+    const statusDiv = document.getElementById('mp3UploadStatus');
+    
+    if (!fileInput.files.length) {
+        showNotification('Please select an MP3 file first!', 'warning');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        showNotification('File size exceeds 10MB limit', 'danger');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('audio', file);
+    formData.append('name', nameInput.value.trim());
+    
+    statusDiv.textContent = 'Uploading...';
+    statusDiv.className = 'mt-3 alert alert-info';
+    statusDiv.style.display = 'block';
+    
+    try {
+        const response = await fetch('/upload_mp3_voice', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.textContent = 'Upload successful!';
+            statusDiv.className = 'mt-3 alert alert-success';
+            showNotification('MP3 voice uploaded successfully!');
+            await refreshSavedVoices();
+            fileInput.value = '';
+            nameInput.value = '';
+        } else {
+            throw new Error(data.error || 'Upload failed');
+        }
+    } catch (error) {
+        statusDiv.textContent = `Error: ${error.message}`;
+        statusDiv.className = 'mt-3 alert alert-danger';
+        console.error('MP3 upload error:', error);
+    }
+    
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 5000);
+});
 });
 </script>
 {% endblock %}

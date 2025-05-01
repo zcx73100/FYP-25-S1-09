@@ -217,6 +217,12 @@
         height: 2px;
         border-radius: 8px;
     }
+
+    .message-bot strong,
+    .message-user strong {
+        font-weight: bold;
+        color: inherit;
+    }
 </style>
 
 <!-- MathJax Configuration -->
@@ -678,10 +684,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message-${sender}`;
         
+        // Process markdown bold syntax before displaying
+        const processedMessage = processMarkdownBold(message);
+        
         // Create a temporary container to process the message
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = message;
+        tempDiv.innerHTML = processedMessage;  // Use processed message here
         messageDiv.appendChild(tempDiv);
+
 
         if (sender === 'bot') {
             // Create avatar container with mouth element
@@ -769,7 +779,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let text = clone.textContent || clone.innerText;
         text = text.replace(/\s+/g, ' ').trim();
         
-        // Simple replacements for common math symbols
+        // Remove markdown bold syntax for TTS
+        text = text.replace(/\*\*(.*?)\*\*/g, '$1');
         const symbolMap = {
             '\\frac': ' divided by ',
             '\\sqrt': ' square root of ',
@@ -942,6 +953,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn('No TTS voices available');
         }
     });
+
+    // Add this function to your script section
+    function processMarkdownBold(text) {
+        // Replace **text** with <strong>text</strong>
+        return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
 });
 </script>
 

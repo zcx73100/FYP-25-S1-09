@@ -20,6 +20,19 @@
                             <p class="card-text">{{ video.description }}</p>
                             <small class="text-muted d-block mb-2">Uploaded on {{ video.created_at.strftime('%B %d, %Y') }}</small>
 
+                            {% if role == 'Admin' %}
+                                <!-- Publish Button (Visible for admins) -->
+                                {% if not video.is_published %}
+                                    <form method="POST" action="{{ url_for('boundary.publish_video', video_id=video._id) }}">
+                                        <button type="submit" class="btn btn-success btn-sm">Publish</button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge bg-success">Published</span>
+                                {% endif %}
+                                
+                            {% endif %}
+                            
+
                             <!-- 🧹 Delete Button -->
                             <form method="POST" action="{{ url_for('boundary.delete_generated_video', video_id=video.video_id) }}" onsubmit="return confirm('Are you sure you want to delete this video?');">
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>

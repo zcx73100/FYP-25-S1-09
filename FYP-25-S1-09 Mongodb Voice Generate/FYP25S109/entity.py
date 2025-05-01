@@ -407,7 +407,8 @@ class GenerateVideoEntity:
                 "audio_id": ObjectId(audio_id),
                 "created_at": datetime.now(),
                 "status": "generated",
-                "username": session.get("username")
+                "username": session.get("username"),
+                "is_published": False
             })
 
             # Remove the generated video file if needed
@@ -426,6 +427,7 @@ class GenerateVideoEntity:
             video_list = []
             for video in videos:
                 video_list.append({
+                    "_id": video["_id"],  # Convert ObjectId to string
                     "video_id": str(video["video_id"]),  # Convert ObjectId to string
                     "created_at": video["created_at"],
                     "status": video["status"]

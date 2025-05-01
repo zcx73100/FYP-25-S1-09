@@ -94,10 +94,10 @@ class HomePage:
             print(f"🔍 Looking for video with avatar_id={avatar_id} (type: {type(avatar_id)})")
 
             # Lookup published video linked to this avatar
-            video = mongo.db.video.find_one({
+            video = mongo.db.generated_videos.find_one({
                 "avatar_id": avatar_id,
                 "is_published": True
-            })
+            },{})
 
             if video:
                 print(f"✅ Found video for {avatar_data['avatarname']}: {video.get('_id')}")
@@ -281,7 +281,7 @@ class AvatarVideoBoundary:
             file_id = avatar_doc["file_id"]
 
             controller = GenerateVideoController()
-            video_gridfs_id = controller.generate_video(text, str(file_id), audio_id)
+            video_gridfs_id = controller.generate_video(text, avatar_id=avatar_id, audio_id=audio_id)
 
             if not video_gridfs_id:
                 return jsonify({"success": False, "error": "Video generation failed."}), 500
@@ -673,8 +673,96 @@ class AvatarVideoBoundary:
         except Exception as e:
             print(f"Error deleting voice {audio_id}: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
-
     
+    @staticmethod
+    @boundary.route("/upload_mp3_voice", methods=["POST"])
+    def upload_mp3_voice():
+        """Handle MP3 file uploads for avatar voices"""
+        try:
+            username = session.get("username")
+            if not username:
+                return jsonify(success=False, error="Not logged in"), 401
+                
+            if 'audio' not in request.files:
+                return jsonify(success=False, error="No audio file uploaded"), 400
+                
+            audio_file = request.files['audio']
+            if audio_file.filename == '':
+                return jsonify(success=False, error="No selected file"), 400
+                
+            # Validate file extension
+            if not audio_file.filename.lower().endswith('.mp3'):
+                return jsonify(success=False, error="Only MP3 files are allowed"), 400
+                
+            # Get optional name from form
+            voice_name = request.form.get('name', '').strip() or f"Uploaded Voice {datetime.now().strftime('%Y-%m-%d')}"
+            
+            # Save to GridFS
+            file_id = fs.put(
+                audio_file,
+                filename=secure_filename(audio_file.filename),
+                content_type='audio/mpeg'
+            )
+            
+            # Create voice record
+            voice_record = {
+                "username": username,
+                "audio_id": file_id,
+                "text": voice_name,
+                "source": "upload",
+                "created_at": datetime.utcnow()
+            }
+            
+            inserted_id = mongo.db.voice_records.insert_one(voice_record).inserted_id
+            
+            return jsonify(
+                success=True,
+                audio_id=str(file_id),
+                record_id=str(inserted_id),
+                name=voice_name
+            )
+            
+        except Exception as e:
+            print(f"Error uploading MP3 voice: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+        
+    @staticmethod
+    @boundary.route("/serve_published_video/<video_id>")
+    def serve_published_video(video_id):
+        try:
+            video = mongo.db.video.find_one({"_id": ObjectId(video_id), "is_published": True})
+            if not video:
+                return jsonify(success=False, error="Video not found or not published"), 404
+
+            # Get the GridFS file ID
+            gridfs_id = video.get("video_gridfs_id") or video.get("file_id")
+            if not gridfs_id:
+                return jsonify(success=False, error="Video file not found"), 404
+
+            # Stream the video from GridFS
+            file = fs.get(ObjectId(gridfs_id))
+            return send_file(file, mimetype="video/mp4", as_attachment=False)
+        except Exception as e:
+            print(f"Error serving published video {video_id}: {str(e)}")
+            return jsonify(success=False, error=str(e)), 500
+    @boundary.route("/publish_video/<video_id>", methods=["POST"])
+    def publish_video(video_id):
+        try:
+            video = mongo.db.generated_videos.find_one({"_id": ObjectId(video_id)})
+            if video and video["username"] == session.get("username"):  # Ensure it's the correct user's video
+                mongo.db.generated_videos.update_one(
+                    {"_id": ObjectId(video_id)},
+                    {"$set": {"is_published": True}}
+                )
+                flash("Video published successfully!", "success")
+                return redirect(url_for("boundary.my_videos"))
+            else:
+                flash("Video not found or unauthorized action.", "danger")
+        except Exception as e:
+            flash(f"An error occurred: {str(e)}", "danger")
+
+        return redirect(url_for("boundary.my_videos"))
+
 
     
 # Log In
