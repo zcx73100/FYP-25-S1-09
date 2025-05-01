@@ -37,7 +37,7 @@
         
         <!-- published video -->
         {% if item.video_id %}
-            <video controls class="avatar-showcase-video" id="avatar-video-{{ loop.index }}" loop muted>
+            <video controls  class="avatar-showcase-video" id="avatar-video-{{ loop.index }}" >
                 <source src="{{ url_for('boundary.serve_published_video', file_id=item.video_id) }}" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
@@ -399,9 +399,9 @@
     /* Avatar icons */
     .avatar {
     flex: 0 0 auto;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    border-radius: 100%;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     cursor: pointer;
     object-fit: cover;
@@ -413,11 +413,11 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     }
     .avatar-card img {
-        width: 120px;
-        height: 120px;
+        width: 240px;
+        height: 240px;
         object-fit: cover;
         object-position: center top;
-        border-radius: 50%;
+        border-radius: 100%;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         transition: transform 0.3s ease-in-out; /* Add transition for smooth scaling */
     }
@@ -448,28 +448,24 @@
         transform: translateY(-5px);
     }
     
+    /* Updated Avatar Showcase Styles */
     .avatar-showcase-img {
-        width: 140px;
-        height: 140px;
+        width: 180px;  /* Increased from 140px */
+        height: 180px; /* Increased from 140px */
         object-fit: cover;
+        object-position: center top; /* This ensures faces are centered and visible */
         border-radius: 50%;
         margin-bottom: 10px;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
         cursor: pointer;
         transition: opacity 0.3s ease;
     }
-    
-    .avatar-video-name {
-        font-size: 16px;
-        font-weight: bold;
-        color: #444;
-        margin-bottom: 10px;
-    }
-    
+
     .avatar-showcase-video {
-        width: 140px;            
-        height: 140px;
-        object-fit: cover;     
+        width: 180px;  /* Increased from 140px */         
+        height: 180px; /* Increased from 140px */
+        object-fit: cover;
+        object-position: center top; /* Focus on faces in videos too */
         border-radius: 50%;      
         display: block;         
         margin: 0 auto 10px;     
@@ -480,6 +476,11 @@
         transform: translateX(-50%);
         opacity: 0;
         transition: opacity 0.3s ease;
+    }
+
+    /* Adjust card padding to accommodate larger avatars */
+    .avatar-video-card {
+        padding: 25px 20px; /* Increased top padding */
     }
     
     .avatar-video-card:hover .avatar-showcase-video {

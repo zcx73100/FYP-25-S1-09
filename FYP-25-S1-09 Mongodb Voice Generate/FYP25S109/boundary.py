@@ -817,7 +817,33 @@ class LoginBoundary:
                     session['role'] = user_info['role']
                     session['user_authenticated'] = True
                     flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
-                    return redirect(url_for('boundary.home'))
+                    if user_info.get('first_time_login'):
+                        admin_users = [u["username"] for u in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
+                        
+                        # Get all admin avatars with their associated videos
+                        avatars = []
+                        for avatar_doc in mongo.db.avatar.find({"username": {"$in": admin_users}}):
+                            avatar_data = {
+                                "username": avatar_doc.get("username"),
+                                "avatarname": avatar_doc.get("avatarname"),
+                                "image_data": avatar_doc.get("image_data"),
+                                "video_id": None
+                            }
+                            
+                            # Find associated published video
+                            file_id = avatar_doc.get('file_id')
+                            if file_id:
+                                video = mongo.db.generated_videos.find_one({
+                                    "avatar_id": file_id,
+                                    "is_published": True
+                                })
+                                if video:
+                                    avatar_data["video_id"] = str(video.get("_id"))
+                            
+                            avatars.append(avatar_data)
+                        return render_template("first_time_login.html", username=username,avatars=avatars,video=video)
+                    else:
+                        return redirect(url_for('boundary.home'))
                 else:
                     flash('Wrong password.', category='error')
             else:
@@ -904,6 +930,7 @@ class CreateAccountBoundary:
                     "status": "active",
                     "profile_pic": profile_pic_path,
                     "first_time_login": True,
+                    "assistant": "" # Determine the avatar (objectID) for the floating head chatbot
                 })
 
                 flash(f'Account created successfully with role: {role}', 'success')
