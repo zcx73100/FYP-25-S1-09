@@ -93,15 +93,20 @@ class HomePage:
 
             print(f"🔍 Looking for video with avatar_id={avatar_id} (type: {type(avatar_id)})")
 
+            file_id = mongo.db.avatar.find_one({"_id": avatar_id},{"_id":0})
+            a_id = file_id['file_id'] if file_id else None #This is an identifier for the avatar
+
+            print(f"🔍 Looking for video with file_id={a_id} (type: {type(a_id)})")
             # Lookup published video linked to this avatar
             video = mongo.db.generated_videos.find_one({
-                "avatar_id": avatar_id,
+                "avatar_id": a_id,
                 "is_published": True
             },{})
 
             if video:
                 print(f"✅ Found video for {avatar_data['avatarname']}: {video.get('_id')}")
-                avatar_data["video_id"] = str(video.get("video_gridfs_id") or video.get("file_id"))
+                avatar_data["video_id"] = video.get("_id")
+                print(f"Video ID: {avatar_data['video_id']}")
             else:
                 print(f"❌ No video found for avatar {avatar_data['avatarname']} with ID {avatar_id}")
                 avatar_data["video_id"] = None
@@ -281,7 +286,7 @@ class AvatarVideoBoundary:
             file_id = avatar_doc["file_id"]
 
             controller = GenerateVideoController()
-            video_gridfs_id = controller.generate_video(text, avatar_id=avatar_id, audio_id=audio_id)
+            video_gridfs_id = controller.generate_video(text, file_id, audio_id=audio_id)
 
             if not video_gridfs_id:
                 return jsonify({"success": False, "error": "Video generation failed."}), 500
@@ -727,15 +732,16 @@ class AvatarVideoBoundary:
             return jsonify(success=False, error=str(e)), 500
         
     @staticmethod
-    @boundary.route("/serve_published_video/<video_id>")
-    def serve_published_video(video_id):
+    @boundary.route("/serve_published_video/<file_id>")
+    def serve_published_video(file_id):
         try:
-            video = mongo.db.video.find_one({"_id": ObjectId(video_id), "is_published": True})
+            print(f"🔍  Looking for published video with _id={file_id} (type: {type(file_id)})")
+            video = mongo.db.generated_videos.find_one({"_id": ObjectId(file_id), "is_published": True},{})
             if not video:
                 return jsonify(success=False, error="Video not found or not published"), 404
 
             # Get the GridFS file ID
-            gridfs_id = video.get("video_gridfs_id") or video.get("file_id")
+            gridfs_id = video.get("video_id")
             if not gridfs_id:
                 return jsonify(success=False, error="Video file not found"), 404
 
@@ -743,25 +749,42 @@ class AvatarVideoBoundary:
             file = fs.get(ObjectId(gridfs_id))
             return send_file(file, mimetype="video/mp4", as_attachment=False)
         except Exception as e:
-            print(f"Error serving published video {video_id}: {str(e)}")
+            print(f"Error serving published video {file_id}: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
+    #This function is used to publish the video to the homepage (1 video 1 avatar)
     @boundary.route("/publish_video/<video_id>", methods=["POST"])
     def publish_video(video_id):
         try:
             video = mongo.db.generated_videos.find_one({"_id": ObjectId(video_id)})
-            if video and video["username"] == session.get("username"):  # Ensure it's the correct user's video
+
+            if video and video["username"] == session.get("username"):
+                avatar_id = video.get("avatar_id")
+
+                # Check if the user has already published a video with this avatar
+                existing_published = mongo.db.generated_videos.find_one({
+                    "username": session.get("username"),
+                    "avatar_id": avatar_id,
+                    "is_published": True,
+                    "_id": {"$ne": ObjectId(video_id)}  # exclude current video
+                })
+
+                if existing_published:
+                    flash("You have already published a video using this avatar.", "warning")
+                    return redirect(url_for("boundary.my_videos"))
+
+                # Proceed with publishing
                 mongo.db.generated_videos.update_one(
                     {"_id": ObjectId(video_id)},
                     {"$set": {"is_published": True}}
                 )
                 flash("Video published successfully!", "success")
-                return redirect(url_for("boundary.my_videos"))
             else:
                 flash("Video not found or unauthorized action.", "danger")
         except Exception as e:
             flash(f"An error occurred: {str(e)}", "danger")
 
         return redirect(url_for("boundary.my_videos"))
+
 
 
     
