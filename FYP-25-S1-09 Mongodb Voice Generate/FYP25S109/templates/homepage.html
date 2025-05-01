@@ -20,31 +20,33 @@
     {% endif %}
 </div>
 
-    <!-- ✅ Admin Avatar Showcase -->
-    <h3 class="section-subtitle">🎥 AI‑Powered Admin Avatars</h3>
-    <div class="avatar-video-grid">
-      {% for item in avatar_showcase %}
-        <div class="avatar-video-card">
-          <!-- circular avatar thumbnail (base64) -->
-          <img
+<!-- ✅ Admin Avatar Showcase -->
+<h3 class="section-subtitle">🎥 AI‑Powered Admin Avatars</h3>
+<div class="avatar-video-grid">
+    {% for item in avatar_showcase %}
+    <div class="avatar-video-card">
+        <!-- circular avatar thumbnail (base64) -->
+        <img
             src="data:image/png;base64,{{ item.image_data }}"
             alt="{{ item.avatarname }}"
             class="avatar-showcase-img"
-          />
-          <div class="avatar-video-name">{{ item.avatarname }}</div>
-          
-          <!-- published video -->
-          {% if item.video_id %}
-            <video controls class="avatar-showcase-video">
-              <source src="{{ url_for('boundary.serve_published_video', file_id=item.video_id) }}" type="video/mp4">
-              Your browser does not support the video tag.
+            onmouseover="playAvatarVideo(this)"
+            onmouseout="pauseAvatarVideo(this)"
+        />
+        <div class="avatar-video-name">{{ item.avatarname }}</div>
+        
+        <!-- published video -->
+        {% if item.video_id %}
+            <video controls class="avatar-showcase-video" id="avatar-video-{{ loop.index }}" loop muted>
+                <source src="{{ url_for('boundary.serve_published_video', file_id=item.video_id) }}" type="video/mp4">
+                Your browser does not support the video tag.
             </video>
-          {% else %}
+        {% else %}
             <p class="text-muted">No video published</p>
-          {% endif %}
-        </div>
-      {% endfor %}
+        {% endif %}
     </div>
+    {% endfor %}
+</div>
 
 <!-- ✅ Classroom Section -->
 {% if session['username'] %}
@@ -439,6 +441,7 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
         text-align: center;
         transition: transform 0.3s ease;
+        position: relative;
     }
     
     .avatar-video-card:hover {
@@ -452,6 +455,8 @@
         border-radius: 50%;
         margin-bottom: 10px;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+        transition: opacity 0.3s ease;
     }
     
     .avatar-video-name {
@@ -468,10 +473,41 @@
         border-radius: 50%;      
         display: block;         
         margin: 0 auto 10px;     
-        box-shadow: 0 3px 10px rgba(0,0,0,0.15); 
-      }
-      
-
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .avatar-video-card:hover .avatar-showcase-video {
+        opacity: 1;
+    }
+    
+    .avatar-video-card:hover .avatar-showcase-img {
+        opacity: 0;
+    }
 </style>    
+
+<script>
+    function playAvatarVideo(imgElement) {
+        // Find the video element that's a sibling of the image
+        const videoElement = imgElement.nextElementSibling.nextElementSibling;
+        if (videoElement && videoElement.tagName === 'VIDEO') {
+            videoElement.currentTime = 0; // Rewind to start
+            videoElement.play().catch(e => console.log("Video play failed:", e));
+        }
+    }
+    
+    function pauseAvatarVideo(imgElement) {
+        // Find the video element that's a sibling of the image
+        const videoElement = imgElement.nextElementSibling.nextElementSibling;
+        if (videoElement && videoElement.tagName === 'VIDEO') {
+            videoElement.pause();
+        }
+    }
+</script>
 
 {% endblock %}
