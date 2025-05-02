@@ -850,6 +850,39 @@ class LoginBoundary:
                 flash('Username does not exist.', category='error')
 
         return render_template("login.html")
+    @staticmethod
+    @boundary.route('/select_avatar', methods=['POST'])
+    def select_avatar():
+        data = request.get_json()
+        print("[DEBUG] Avatar selection data:", data)
+        
+        if not data:
+            return jsonify(success=False, message='No data received'), 400
+            
+        avatar_id = data.get('avatar_id')
+        username = session.get('username')
+
+        if not avatar_id:
+            return jsonify(success=False, message='No avatar ID provided'), 400
+        if not username:
+            return jsonify(success=False, message='User not logged in'), 401
+
+        try:
+            # Store the avatar selection in the session and database
+            session['selected_avatar'] = avatar_id
+            result = mongo.db.useraccount.update_one(
+                {"username": username},
+                {"$set": {"assistant": avatar_id}}
+            )
+            
+            if result.modified_count == 1:
+                return jsonify(success=True, message='Avatar selected successfully')
+            else:
+                return jsonify(success=False, message='Failed to update user record'), 500
+                
+        except Exception as e:
+            print("[ERROR] Failed to select avatar:", str(e))
+            return jsonify(success=False, message='Server error'), 500
 
 # Profile Pic    
 @boundary.route('/profile_pic/<username>')
