@@ -817,7 +817,7 @@ class LoginBoundary:
                     session['role'] = user_info['role']
                     session['user_authenticated'] = True
                     flash(f'Login successful! You are logged in as {user_info["role"].capitalize()}.', category='success')
-                    if user_info.get('first_time_login'):
+                    if user_info.get('first_time_login') == True:
                         admin_users = [u["username"] for u in mongo.db.useraccount.find({"role": "Admin"}, {"username": 1})]
                         
                         # Get all admin avatars with their associated videos
@@ -827,12 +827,14 @@ class LoginBoundary:
                                 "username": avatar_doc.get("username"),
                                 "avatarname": avatar_doc.get("avatarname"),
                                 "image_data": avatar_doc.get("image_data"),
+                                "avatar_id" : avatar_doc.get('file_id'),
                                 "video_id": None
                             }
                             
                             # Find associated published video
                             file_id = avatar_doc.get('file_id')
                             if file_id:
+                                
                                 video = mongo.db.generated_videos.find_one({
                                     "avatar_id": file_id,
                                     "is_published": True
@@ -841,6 +843,8 @@ class LoginBoundary:
                                     avatar_data["video_id"] = str(video.get("_id"))
                             
                             avatars.append(avatar_data)
+                            for avatar in avatars:
+                                print(f"Avatar: {avatar['avatarname']}, Video ID: {avatar['video_id']} avatar_id: {avatar['avatar_id']}")
                         return render_template("first_time_login.html", username=username,avatars=avatars,video=video)
                     else:
                         return redirect(url_for('boundary.home'))
@@ -851,38 +855,31 @@ class LoginBoundary:
 
         return render_template("login.html")
     @staticmethod
-    @boundary.route('/select_avatar', methods=['POST'])
-    def select_avatar():
-        data = request.get_json()
-        print("[DEBUG] Avatar selection data:", data)
+    @boundary.route('/select_avatar/<avatar_id>', methods=['POST'])
+    def select_avatar(avatar_id):
+        print("[DEBUG] Avatar ID from URL:", avatar_id)
         
-        if not data:
-            return jsonify(success=False, message='No data received'), 400
-            
-        avatar_id = data.get('avatar_id')
         username = session.get('username')
-
-        if not avatar_id:
-            return jsonify(success=False, message='No avatar ID provided'), 400
         if not username:
             return jsonify(success=False, message='User not logged in'), 401
 
         try:
-            # Store the avatar selection in the session and database
+            # Store the avatar selection in the session and DB
             session['selected_avatar'] = avatar_id
             result = mongo.db.useraccount.update_one(
                 {"username": username},
                 {"$set": {"assistant": avatar_id}}
             )
-            
+
             if result.modified_count == 1:
-                return jsonify(success=True, message='Avatar selected successfully')
+                return redirect(url_for('boundary.home'))
             else:
                 return jsonify(success=False, message='Failed to update user record'), 500
-                
+
         except Exception as e:
             print("[ERROR] Failed to select avatar:", str(e))
             return jsonify(success=False, message='Server error'), 500
+
 
 # Profile Pic    
 @boundary.route('/profile_pic/<username>')
@@ -975,22 +972,39 @@ class CreateAccountBoundary:
         is_admin = session.get("role") == "Admin"
         return render_template("createAccount.html", is_admin=is_admin)
 
-# User Account Details
-class AccountDetailsBoundary:
+    # User Account Details
     @staticmethod
     @boundary.route('/accountDetails', methods=['GET'])
     def accDetails():
         if 'username' not in session:
             flash("You must be logged in to view account details.", category='error')
             return redirect(url_for('boundary.login'))
+
         username = session.get('username')
         user_info = DisplayUserDetailController.get_user_info(username)
-        if not user_info:
-            flash("User details not found.", category='error')
-            return redirect(url_for('boundary.home'))
-        
-        else:
-            return render_template("accountDetails.html", user_info=user_info)
+
+        avtr_id = user_info.get('assistant')
+        print("[DEBUG] Avatar ID from user_info:", avtr_id)
+
+        current_avatar = None
+        if avtr_id:
+            try:
+                avatar_file = mongo.db.fs.files.find_one({"_id": ObjectId(avtr_id)})
+                if avatar_file:
+                    chunks = mongo.db.fs.chunks.find({"files_id": avatar_file["_id"]}).sort("n", 1)
+                    binary_data = b"".join(chunk["data"] for chunk in chunks)
+                    current_avatar = {
+                        "image_data": base64.b64encode(binary_data).decode("utf-8"),
+                        "avatarname": "My Avatar"  # You might want to store this in metadata
+                    }
+            except Exception as e:
+                print("[ERROR] Avatar loading failed:", e)
+
+            if not user_info:
+                flash("User details not found.", category='error')
+                return redirect(url_for('boundary.home'))
+
+            return render_template("accountDetails.html", user_info=user_info, current_avatar=current_avatar)
 
 # Edit Account Details
 class UpdateAccountBoundary:

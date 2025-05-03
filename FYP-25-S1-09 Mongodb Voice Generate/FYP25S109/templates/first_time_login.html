@@ -5,7 +5,8 @@
 <div class="container mt-5">
     <h1 class="text-center">Welcome to AI-NTERACTIVE</h1>
     <h2 class="text-center mb-5">To get started, choose your talking assistant</h2>
-    
+    <h3 class="text-center mb-5">Hover and preview your candidates for your future assistant!</h3>
+    <h4 class="text-center mb-5">Don't worry, you can still change in your settings!</h4>
     <div class="row">
         {% for avatar in avatars %}
         <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
@@ -38,7 +39,7 @@
                     
                     <h5 class="mt-2">{{ avatar.avatarname }}</h5>
                     <button class="btn btn-primary mt-2 select-avatar-btn" 
-                            data-avatar-id="{{ avatar._id }}">
+                            data-avatar-id="{{ avatar.avatar_id }}">
                         Select
                     </button>
                 </div>
@@ -113,7 +114,7 @@
             console.log('Attempting to select avatar:', avatarId);
             
             try {
-                const response = await fetch('/select_avatar', {
+                const response = await fetch(`/select_avatar/${avatarId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -144,4 +145,5 @@
         });
     });
 </script>
+
 {% endblock %}

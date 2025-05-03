@@ -42,8 +42,15 @@
         </tr>
         <tr>
             <th>Avatar Assistant</th>
-            <td><strong class="text-primary">{{user_info.assistant}}</strong></td>
+            <td>
+                {% if current_avatar and current_avatar.image_base64 %}
+                    <img src="data:image/png;base64,{{ current_avatar.image_data }}" alt="Avatar Assistant" class="img-thumbnail" width="50">
+                {% else %}
+                    <em>No avatar selected.</em>
+                {% endif %}
+            </td>
         </tr>
+        
     </table>
 
     <!-- ✅ Button Styling & Layout -->
