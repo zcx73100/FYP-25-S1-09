@@ -24,6 +24,7 @@ import gridfs
 import uuid
 import tempfile
 import time
+from gridfs import GridFS
 fs = gridfs.GridFS(mongo.db)
 
 
@@ -50,37 +51,44 @@ def setup_indexes():
     print("Unique index on 'username' field created.")
 
 class UserAccount:
-    def __init__(self, username, password, name, surname, email, date_of_birth, role, status='active', profile_pic=None):
+    def __init__(self, username, password, name, surname, email, date_of_birth,
+             role, status='active', profile_pic=None):
         self.username = username
-        self.password = password  # Raw password (will be hashed before insertion)
+        self.password = password
         self.name = name
         self.surname = surname
         self.email = email
         self.date_of_birth = date_of_birth
         self.role = role
         self.status = status
-        self.profile_pic = profile_pic  # File object (optional)
+        self.profile_pic = profile_pic
 
     def create_user_acc(self):
-        """Inserts user data into the database"""
         try:
-            logging.debug(f"Attempting to insert user: {self.username}, {self.email}, {self.role}")
-
-
-            # Check if username already exists
+            # 1. Check for duplicate username
             if mongo.db.useraccount.find_one({"username": self.username}):
-                logging.error("Username already exists.")
+                logging.warning(f"Username '{self.username}' already exists.")
                 return False
 
+            # 2. Hash password
             hashed_password = generate_password_hash(self.password)
 
-            # Convert profile picture to Base64 if provided
-            profile_pic_data = None
-            if self.profile_pic:
-                profile_pic_data = base64.b64encode(self.profile_pic.read()).decode('utf-8')
+            # 3. Handle profile_pic (can be ObjectId or file object)
+            profile_pic_id = None
 
-            # Insert into MongoDB
-            mongo.db.useraccount.insert_one({
+            if isinstance(self.profile_pic, ObjectId):
+                profile_pic_id = self.profile_pic
+
+            elif self.profile_pic and hasattr(self.profile_pic, 'content_type'):
+                fs = GridFS(mongo.db)
+                profile_pic_id = fs.put(
+                    self.profile_pic,
+                    filename=f"{self.username}_profile_pic",
+                    content_type=self.profile_pic.content_type
+                )
+
+            # 4. Prepare user document
+            user_doc = {
                 "username": self.username,
                 "password": hashed_password,
                 "name": self.name,
@@ -89,23 +97,27 @@ class UserAccount:
                 "date_of_birth": self.date_of_birth,
                 "role": self.role,
                 "status": self.status,
-                "profile_pic": profile_pic_data
-            })
+                "first_time_login": True,
+                "profile_pic": profile_pic_id,
+                "assistant": ""
+            }
 
-            logging.info("User created successfully.")
+            # 5. Insert into MongoDB
+            mongo.db.useraccount.insert_one(user_doc)
+            logging.info(f"User '{self.username}' created successfully.")
             return True
-        except DuplicateKeyError:
-            logging.error("Username already exists.")
-            return False
+
         except Exception as e:
             logging.error(f"Error creating user: {e}")
+            print(f"⚠️ Account creation error: {e}")
             return False
 
+
+    # All static methods remain unchanged:
     @staticmethod
     def login(username, password):
         try:
             user = mongo.db.useraccount.find_one({"username": username})
-
             if user and check_password_hash(user["password"], password):
                 return user["username"], user["role"]
             return None
@@ -121,13 +133,11 @@ class UserAccount:
                 return False
 
             update_result = mongo.db.useraccount.update_one({"username": username}, {"$set": updated_data})
-
             if update_result.modified_count > 0:
                 logging.debug(f"User Update: Username={username} | Updated Fields={updated_data}")
                 return True
             logging.warning(f"No changes made for {username}.")
             return False
-
         except Exception as e:
             logging.error(f"Failed to update user info: {str(e)}")
             return False
@@ -136,8 +146,7 @@ class UserAccount:
     def find_by_username(username):
         try:
             logging.debug(f"Finding user by username: {username}")
-            user = mongo.db.useraccount.find_one({"username": username})
-            return user
+            return mongo.db.useraccount.find_one({"username": username})
         except Exception as e:
             logging.error(f"Failed to find user by username: {str(e)}")
             return None
@@ -145,14 +154,12 @@ class UserAccount:
     @staticmethod
     def search_account(query):
         try:
-            users = list(mongo.db.useraccount.find({
+            return list(mongo.db.useraccount.find({
                 "$or": [
                     {"username": {"$regex": query, "$options": "i"}},
                     {"email": {"$regex": query, "$options": "i"}}
                 ]
-            }, {"_id": 0}))  # Exclude MongoDB's _id from the result
-
-            return users
+            }, {"_id": 0}))
         except Exception as e:
             logging.error(f"Error searching users: {e}")
             return []

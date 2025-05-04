@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory, make_response, send_file
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify, send_from_directory, make_response, send_file, abort
 from . import mongo
 import os
 from werkzeug.utils import secure_filename
@@ -20,6 +20,7 @@ from bson.errors import InvalidId
 from io import BytesIO
 import re
 import ffmpeg
+from gridfs import GridFS
 
 
 
@@ -40,22 +41,6 @@ os.makedirs(GENERATE_FOLDER_VIDEOS, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def retrieve_profile_picture(username):
-    user_info = mongo.db.useraccount.find_one({"username": username}, {"profile_pic": 1})
-    print("DEBUG: Retrieved user_info:", user_info)  # Debugging
-
-    if user_info and "profile_pic" in user_info:
-        profile_pic_data = user_info["profile_pic"]
-        print("DEBUG: Retrieved profile_pic:", profile_pic_data)  # Debugging
-
-        if isinstance(profile_pic_data, Binary):
-            return base64.b64encode(profile_pic_data).decode('utf-8')
-        if isinstance(profile_pic_data, str):
-            return profile_pic_data
-    return None
-
-
 
 # Homepage
 class HomePage:
@@ -466,6 +451,7 @@ class AvatarVideoBoundary:
         except Exception as e:
             print("❌ Publish Error:", e)
             return jsonify(success=False, error=str(e)), 500
+    
     @boundary.route("/upload_synthesized_voice", methods=["POST"])
     def upload_synthesized_voice():
         if 'audio' not in request.files and not request.form.get('text'):
@@ -521,6 +507,7 @@ class AvatarVideoBoundary:
         except Exception as e:
             print(f"Error deleting video: {str(e)}")
             return jsonify(success=False, error=str(e)), 500
+    
     @staticmethod
     @boundary.route('/generated_video/<video_id>')
     def serve_generated_video(video_id):
@@ -550,6 +537,7 @@ class AvatarVideoBoundary:
         except Exception as e:
             logging.error(f"Failed to serve video: {str(e)}")
             return "Video not found", 404
+    
     @staticmethod
     @boundary.route("/get_voice/<audio_id>")
     def get_voice(audio_id):
@@ -784,10 +772,24 @@ class AvatarVideoBoundary:
             flash(f"An error occurred: {str(e)}", "danger")
 
         return redirect(url_for("boundary.my_videos"))
-
-
-
     
+    @boundary.route('/download_video/<video_id>')
+    def download_video(video_id):
+        try:
+            fs = GridFS(mongo.db)  # ✅ Use the whole database, not a collection
+            file = fs.get(ObjectId(video_id))  # This must be the GridFS file's _id
+            return send_file(
+                io.BytesIO(file.read()),
+                download_name=f"{file.filename or 'video'}.mp4",
+                mimetype='video/mp4',
+                as_attachment=True
+            )
+        except Exception as e:
+            logging.error(f"Download error: {e}")
+            abort(500)
+
+
+ 
 # Log In
 class LoginBoundary:
     @staticmethod
@@ -857,6 +859,7 @@ class LoginBoundary:
                 flash('Username does not exist.', category='error')
 
         return render_template("login.html")
+    
     @staticmethod
     @boundary.route('/select_avatar/<avatar_id>', methods=['POST'])
     def select_avatar(avatar_id):
@@ -885,12 +888,14 @@ class LoginBoundary:
 
 
 # Profile Pic    
-@boundary.route('/profile_pic/<username>')
-def get_profile_pic(username):
-    profile_pic = retrieve_profile_picture(username)
-    if profile_pic:
-        return send_file(BytesIO(base64.b64decode(profile_pic)), mimetype='image/jpeg')
-    return '', 404  # Not Found
+@boundary.route('/profile_pic/<file_id>')
+def get_profile_pic(file_id):
+    try:
+        fs = GridFS(mongo.db)
+        file = fs.get(ObjectId(file_id))
+        return send_file(file, mimetype='image/jpeg')  # or use file.content_type if available
+    except:
+        return "Image not found", 404
 
 
 # Log Out
@@ -915,105 +920,85 @@ class CreateAccountBoundary:
             date_of_birth = request.form.get('date_of_birth')
             password1 = request.form.get('password1')
             password2 = request.form.get('password2')
-            role = request.form.get('role')  # ✅ capture selected role
+            role = request.form.get('role')  # May be None
             profile_pic = request.files.get('profile_pic')
-            profile_pic_path = ""
 
-            # ✅ Default role if not submitted (e.g. from student self-registration)
+            is_admin = session.get("role") == "Admin"
+            is_teacher = session.get("role") == "Teacher"
+
+            # Set default role if not selected
             if not role:
-                if session.get('role') == 'Teacher':
-                    role = 'Student'
+                if is_teacher:
+                    role = "Student"
+                elif is_admin:
+                    role = "Admin"
                 else:
-                    role = 'User'
+                    role = "Teacher"  # Self-registered defaults to teacher request
 
-            # ✅ Validation
+            # Validation
             if mongo.db.useraccount.find_one({"username": username}):
-                flash('Username already taken.', 'error')
+                flash("Username already taken.", "error")
                 return redirect(url_for('boundary.sign_up'))
             if mongo.db.useraccount.find_one({"email": email}):
-                flash('Email already registered.', 'error')
+                flash("Email already registered.", "error")
                 return redirect(url_for('boundary.sign_up'))
             if password1 != password2:
-                flash('Passwords do not match.', 'error')
+                flash("Passwords do not match.", "error")
                 return redirect(url_for('boundary.sign_up'))
             if len(password1) < 7:
-                flash('Password must be at least 7 characters.', 'error')
+                flash("Password must be at least 7 characters.", "error")
                 return redirect(url_for('boundary.sign_up'))
 
-            # ✅ Save profile picture if uploaded
+            # Upload profile picture to GridFS
+            profile_pic_id = None
             if profile_pic and profile_pic.filename != "":
-                filename = secure_filename(f"{username}_{profile_pic.filename}")
-                profile_pic_path = os.path.join("uploads/profile_pics", filename)
-                abs_path = os.path.join("FYP25S109/static", profile_pic_path)
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                profile_pic.save(abs_path)
+                try:
+                    fs = GridFS(mongo.db)
+                    filename = secure_filename(f"{username}_{profile_pic.filename}")
+                    profile_pic_id = fs.put(profile_pic, filename=filename, content_type=profile_pic.content_type)
+                except Exception as e:
+                    flash(f"Failed to upload profile picture: {str(e)}", "error")
+                    return redirect(url_for('boundary.sign_up'))
 
-            try:
-                dob_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
-                hashed_pw = generate_password_hash(password1)
+            # Prepare user data
+            hashed_pw = generate_password_hash(password1)
+            dob_obj = datetime.strptime(date_of_birth, '%Y-%m-%d')
 
-                mongo.db.useraccount.insert_one({
-                    "username": username,
-                    "password": hashed_pw,
-                    "email": email,
-                    "name": name,
-                    "surname": surname,
-                    "date_of_birth": dob_obj.strftime('%Y-%m-%d'),
-                    "role": role,
-                    "status": "active",
-                    "profile_pic": profile_pic_path,
-                    "first_time_login": True,
-                    "assistant": "" # Determine the avatar (objectID) for the floating head chatbot
-                })
+            user_data = {
+                "username": username,
+                "password": password1,  # Let controller hash
+                "email": email,
+                "name": name,
+                "surname": surname,
+                "date_of_birth": dob_obj.strftime('%Y-%m-%d'),
+                "role": role,
+                "profile_pic": profile_pic_id,
+                "registered_by": session.get("role") if session.get("role") else None
+            }
 
-                flash(f'Account created successfully with role: {role}', 'success')
-                return redirect(url_for('boundary.home'))
+            # Delegate to Controller
+            success = CreateUserAccController.register_user(user_data)
 
-            except Exception as e:
-                flash(f"Error creating account: {str(e)}", "error")
+            if success:
+                flash(f"Account created successfully with role: {role}", "success")
+                return redirect(url_for('boundary.login'))
+            else:
+                flash("Failed to create account.", "error")
 
         is_admin = session.get("role") == "Admin"
         return render_template("createAccount.html", is_admin=is_admin)
 
-    # User Account Details
-    @staticmethod
     @boundary.route('/accountDetails', methods=['GET'])
     def accDetails():
         if 'username' not in session:
             flash("You must be logged in to view account details.", category='error')
             return redirect(url_for('boundary.login'))
 
-        username = session.get('username')
+        username = session['username']
         user_info = DisplayUserDetailController.get_user_info(username)
-        
-        if not user_info:
-            flash("User details not found.", category='error')
-            return redirect(url_for('boundary.home'))
 
-        avtr_id = user_info.get('assistant')
-        print("[DEBUG] Avatar ID from user_info:", avtr_id)
+        return render_template("accountDetails.html", user_info=user_info)
 
-        current_avatar = None
-        if avtr_id:
-            try:
-                fs = gridfs.GridFS(mongo.db)
-                avatar_file = fs.find_one({"_id": ObjectId(avtr_id)})
-                avatarname = mongo.db.avatar.find_one({"file_id": ObjectId(avtr_id)})
-                avtr_name = avatarname.get("avatarname")
-                
-                if avatar_file:
-                    binary_data = avatar_file.read()
-                    current_avatar = {
-                        "image_data": base64.b64encode(binary_data).decode("utf-8"),
-                        "avatarname": avtr_name
-                    }
-            except Exception as e:
-                print("[ERROR] Avatar loading failed:", e)
-                current_avatar = None
-
-        return render_template("accountDetails.html", 
-                            user_info=user_info, 
-                            current_avatar=current_avatar)
 # Edit Account Details
 class UpdateAccountBoundary:
     @staticmethod
@@ -1032,7 +1017,7 @@ class UpdateAccountBoundary:
 
         if request.method == 'POST':
             update_data = {}
-            
+
             name = request.form.get("name")
             surname = request.form.get("surname")
             date_of_birth = request.form.get("date_of_birth")
@@ -1045,11 +1030,18 @@ class UpdateAccountBoundary:
             if date_of_birth:
                 update_data["date_of_birth"] = date_of_birth
 
-            # Convert Profile Picture to Base64 and Store Directly
-            if profile_picture:
-                update_data["profile_pic"] = base64.b64encode(profile_picture.read()).decode('utf-8')
+            # ✅ Save new profile picture to GridFS if uploaded
+            if profile_picture and profile_picture.filename != "":
+                try:
+                    fs = GridFS(mongo.db)
+                    filename = secure_filename(f"{username}_updated_profile_{profile_picture.filename}")
+                    file_id = fs.put(profile_picture, filename=filename, content_type=profile_picture.content_type)
+                    update_data["profile_pic"] = file_id
+                except Exception as e:
+                    flash(f"Failed to update profile picture: {str(e)}", category="error")
+                    return redirect(url_for('boundary.update_account_detail'))
 
-            if update_data:  # Ensure update_data is not empty
+            if update_data:
                 success = UpdateAccountDetailController.update_account_detail(username, update_data)
                 if success:
                     flash("Account updated successfully!", category='success')
@@ -1062,6 +1054,7 @@ class UpdateAccountBoundary:
 
         return render_template("updateAccDetail.html", user_info=user_info)
 
+# Change Avatar Assistant 
 class ChangeAssistantBoundary:
     @staticmethod
     @boundary.route('/change_assistant', methods=['GET', 'POST'])
@@ -1101,6 +1094,7 @@ class ChangeAssistantBoundary:
         user_avatars = list(mongo.db.avatar.find({"username": username}))
         avatars = admin_avatars + user_avatars
         return render_template("changeAssistant.html", avatars=avatars, user_info=user_info)
+    
     @staticmethod
     @boundary.route('/set_first_time_login_false', methods=['POST'])
     def set_first_time_login_false():   
@@ -1234,7 +1228,12 @@ class ConfirmTeacherBoundary:
         if session.get('role') != "Admin":
             flash("Access Denied! Only Admins can confirm teachers.", category="error")
             return redirect(url_for("boundary.home"))
-        users = list(mongo.db.useraccount.find({"role": "User"}, {"_id": 0, "username": 1, "email": 1}))
+
+        # Show users with pending approval
+        users = list(mongo.db.useraccount.find(
+            {"role": "User"},
+            {"_id": 0, "username": 1, "email": 1, "certificate": 1}
+        ))
         return render_template("confirmTeacher.html", users=users)
 
     @staticmethod
@@ -1243,16 +1242,23 @@ class ConfirmTeacherBoundary:
         if session.get('role') != "Admin":
             flash("Access Denied!", category="error")
             return redirect(url_for("boundary.home"))
+
         update_result = mongo.db.useraccount.update_one(
             {"username": username, "role": "User"},
-            {"$set": {"role": "Teacher"}}
+            {
+                "$set": {"role": "Teacher"}
+            }
         )
+
         if update_result.modified_count > 0:
             flash(f"{username} is now a Teacher!", category="success")
         else:
-            flash("Failed to update role. Ensure the username exists and is not already a Teacher.", category="error")
+            flash("Failed to confirm. Ensure the username exists and is pending approval.", category="error")
+
         return redirect(url_for("boundary.confirm_teacher_page"))
 
+
+    
 # Admin Upload Tutorial Video
 class UploadTutorialBoundary:
     UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'

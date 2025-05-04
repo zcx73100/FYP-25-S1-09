@@ -194,15 +194,25 @@
       <div id="video-preview"></div>
       <div class="mt-3" id="video-actions">
         {% if session.get("role") == "Student" and request.args.get("source") == "submission" %}
-        <button id="submitVideoAssignment" class="btn btn-success me-2">
-          <i class="fas fa-paper-plane me-1"></i>Submit Assignment
-        </button>
+            <button id="submitVideoAssignment" class="btn btn-success me-2">
+                <i class="fas fa-paper-plane me-1"></i>Submit Assignment
+            </button>
+        {% elif session.get("role") == "Teacher" and request.args.get("source") == "assignment" %}
+            <button id="publishAssignment" class="btn btn-warning me-2">
+                <i class="fas fa-bullhorn me-1"></i>Publish to Class
+            </button>
+        {% elif session.get("role") == "Admin" %}
+            <a href="{{ url_for('boundary.my_videos') }}" class="btn btn-primary me-2">
+                <i class="fas fa-video me-1"></i>Go to My Videos for Publishing
+            </a>
         {% endif %}
-        {% if session.get("role") == "Teacher" and request.args.get("source") == "assignment" %}
-        <button id="publishAssignment" class="btn btn-warning me-2">
-          <i class="fas fa-bullhorn me-1"></i>Publish to Class
+        
+        <button id="downloadVideo" class="btn btn-secondary">
+            <i class="fas fa-download me-1"></i>Download Video
         </button>
-        {% endif %}
+    </div>
+    
+
         <button id="downloadVideo" class="btn btn-primary">
           <i class="fas fa-download me-1"></i>Download Video
         </button>
@@ -480,11 +490,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await response.json();
       if (data.success) {
-        showNotification('Recording saved successfully!');
-        await refreshSavedVoices();
-        elements.recordingNameInput.value = '';
+        showNotification('Video published to assignment successfully!');
+        window.location.href = `/teacher/upload_assignment/${cid}`;
       } else {
-        throw new Error(data.error || 'Save failed');
+        throw new Error(data.error || 'Publishing failed');
       }
     } catch (error) {
       showNotification(error.message, 'danger');
@@ -717,37 +726,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.getElementById('publishAssignment')?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    const vid = document.getElementById('videoIdInput').value;
-    const cid = document.getElementById('classroomIdInput').value;
+  document.getElementById("publishAssignment")?.addEventListener("click", async () => {
+    const videoId = document.getElementById("videoIdInput").value;
+    const classroomId = document.getElementById("classroomIdInput").value;
 
-    if (!vid || !cid) {
-      showNotification('Missing required information', 'danger');
-      return;
+    if (!videoId || !classroomId) {
+        alert("Missing video ID or classroom ID.");
+        return;
     }
 
     try {
-      const response = await fetch('/publish_assignment_video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          video_id: vid,
-          classroom_id: cid
-        })
-      });
+        const response = await fetch("/publish_assignment_video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                video_id: videoId,
+                classroom_id: classroomId
+            })
+        });
 
-      const data = await response.json();
-
-      if (data.success) {
-        showNotification('Video published to assignment successfully!');
-      } else {
-        throw new Error(data.error || 'Publishing failed');
-      }
-    } catch (error) {
-      showNotification(error.message, 'danger');
+        const result = await response.json();
+        if (result.success) {
+            alert("Video stashed successfully. Redirecting to upload page...");
+            window.location.href = `/teacher/upload_assignment/${classroomId}`;
+        } else {
+            alert("Failed to publish: " + result.error);
+        }
+    } catch (err) {
+        alert("Error publishing: " + err.message);
     }
-  });
+});
 
   document.getElementById('downloadVideo')?.addEventListener('click', () => {
     const vid = document.getElementById('videoIdInput').value;

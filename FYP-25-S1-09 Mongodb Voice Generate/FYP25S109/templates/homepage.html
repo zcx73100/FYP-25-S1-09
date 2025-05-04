@@ -49,7 +49,7 @@
 </div>
 
 <!-- ✅ Classroom Section -->
-{% if session['username'] %}
+{% if session['username'] and session['role'] != 'User' %}
 <h3 class="section-subtitle">Classrooms</h3>
 <div class="classroom-container">
     {% for classroom in classrooms %}

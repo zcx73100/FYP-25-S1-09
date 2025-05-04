@@ -33,26 +33,31 @@ class LoginController:
 class CreateUserAccController:
     @staticmethod
     def register_user(data):
-        """Receives user registration data and passes it to the Entity for insertion."""
         try:
-            # Create UserAccount entity
+            is_self_registered = data.get("registered_by") is None
+            role = data.get("role")
+
+            # Assign 'User' role to self-registered non-admin/teacher
+            if is_self_registered and role == "Teacher":
+                data["role"] = "User"
+
             user_acc = UserAccount(
                 username=data["username"],
-                password=data["password"],  # Password hashing handled in the Entity
+                password=data["password"],
                 name=data["name"],
                 surname=data["surname"],
                 email=data["email"],
                 date_of_birth=data["date_of_birth"],
                 role=data["role"],
-                profile_pic=data.get("profile_pic")  # Optional file upload
+                profile_pic=data.get("profile_pic")
             )
 
-            # Call the Entity to insert into DB
             return user_acc.create_user_acc()
 
         except Exception as e:
             logging.error(f"Registration failed: {e}")
             return False
+
 
 class DisplayUserDetailController:
     @staticmethod

@@ -25,7 +25,8 @@
             <tr>
                 <th>Username</th>
                 <th>Email</th>
-                <th>Action</th>
+                <th>Certificate</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -33,12 +34,23 @@
             <tr>
                 <td>{{ user.username }}</td>
                 <td>{{ user.email }}</td>
-                
+
+                <!-- ✅ View Certificate if Uploaded -->
                 <td>
-                    <form action="{{ url_for('boundary.confirm_teacher', username=user.username) }}" method="POST">
-                        <button type="submit" class="btn btn-success">Confirm as Teacher</button>
-                    </form>
+                    {% if user.certificate %}
+                        <a href="{{ url_for('boundary.get_certificate', file_id=user.certificate) }}" target="_blank" class="btn btn-sm btn-primary">
+                            View Certificate
+                        </a>
+                    {% else %}
+                        <span class="text-muted">No Certificate</span>
+                    {% endif %}
                 </td>
+
+                <!-- ✅ Confirm / Reject Actions -->
+                <td>
+                    <form action="{{ url_for('boundary.confirm_teacher', username=user.username) }}" method="POST" style="display:inline-block;">
+                        <button type="submit" class="btn btn-success btn-sm">Confirm</button>
+                    </form>
             </tr>
             {% endfor %}
         </tbody>
