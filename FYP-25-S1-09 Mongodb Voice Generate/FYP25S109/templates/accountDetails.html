@@ -43,8 +43,12 @@
         <tr>
             <th>Avatar Assistant</th>
             <td>
-                {% if current_avatar and current_avatar.image_base64 %}
-                    <img src="data:image/png;base64,{{ current_avatar.image_data }}" alt="Avatar Assistant" class="img-thumbnail" width="50">
+                {% if current_avatar and current_avatar.image_data %}
+                    <img src="data:image/png;base64,{{ current_avatar.image_data }}" 
+                         alt="Avatar Assistant" 
+                         class="img-thumbnail" 
+                         width="50">
+                    <span>{{ current_avatar.avatarname }}</span>
                 {% else %}
                     <em>No avatar selected.</em>
                 {% endif %}
@@ -59,6 +63,8 @@
         <a href="{{ url_for('boundary.update_account_detail') }}" class="btn btn-primary">Update Account Details</a>
         <a href="{{ url_for('boundary.update_password') }}" class="btn btn-warning">Update Password</a>
         <a href="{{ url_for('boundary.view_notifications') }}" class="btn btn-info">View Notifications</a>
+        <a href="{{ url_for('boundary.manage_avatars') }}" class="btn btn-success">Manage Avatars</a>
+        <a href="{{ url_for('boundary.change_assistant') }}" class="btn btn-danger">Change Avatar Assistant</a>
     </div>
 
 </div>

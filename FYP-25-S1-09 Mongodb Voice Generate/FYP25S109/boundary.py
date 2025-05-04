@@ -982,6 +982,10 @@ class CreateAccountBoundary:
 
         username = session.get('username')
         user_info = DisplayUserDetailController.get_user_info(username)
+        
+        if not user_info:
+            flash("User details not found.", category='error')
+            return redirect(url_for('boundary.home'))
 
         avtr_id = user_info.get('assistant')
         print("[DEBUG] Avatar ID from user_info:", avtr_id)
@@ -989,23 +993,24 @@ class CreateAccountBoundary:
         current_avatar = None
         if avtr_id:
             try:
-                avatar_file = mongo.db.fs.files.find_one({"_id": ObjectId(avtr_id)})
+                fs = gridfs.GridFS(mongo.db)
+                avatar_file = fs.find_one({"_id": ObjectId(avtr_id)})
+                avatarname = mongo.db.avatar.find_one({"file_id": ObjectId(avtr_id)})
+                avtr_name = avatarname.get("avatarname")
+                
                 if avatar_file:
-                    chunks = mongo.db.fs.chunks.find({"files_id": avatar_file["_id"]}).sort("n", 1)
-                    binary_data = b"".join(chunk["data"] for chunk in chunks)
+                    binary_data = avatar_file.read()
                     current_avatar = {
                         "image_data": base64.b64encode(binary_data).decode("utf-8"),
-                        "avatarname": "My Avatar"  # You might want to store this in metadata
+                        "avatarname": avtr_name
                     }
             except Exception as e:
                 print("[ERROR] Avatar loading failed:", e)
+                current_avatar = None
 
-            if not user_info:
-                flash("User details not found.", category='error')
-                return redirect(url_for('boundary.home'))
-
-            return render_template("accountDetails.html", user_info=user_info, current_avatar=current_avatar)
-
+        return render_template("accountDetails.html", 
+                            user_info=user_info, 
+                            current_avatar=current_avatar)
 # Edit Account Details
 class UpdateAccountBoundary:
     @staticmethod
@@ -1053,6 +1058,41 @@ class UpdateAccountBoundary:
             return redirect(url_for('boundary.accDetails'))
 
         return render_template("updateAccDetail.html", user_info=user_info)
+
+class ChangeAssistantBoundary:
+    @staticmethod
+    @boundary.route('/change_assistant', methods=['GET', 'POST'])
+    def change_assistant():
+        if 'username' not in session:
+            flash("You must be logged in to change your assistant.", category='error')
+            return redirect(url_for('boundary.login'))
+
+        username = session['username']
+        user_info = mongo.db.useraccount.find_one({"username": username})
+
+        if not user_info:
+            flash("User not found.", category='error')
+            return redirect(url_for('boundary.accDetails'))
+
+        if request.method == 'POST':
+            new_avatar_id = request.form.get("avatar_id")
+            if new_avatar_id:
+                update_result = mongo.db.useraccount.update_one(
+                    {"username": username},
+                    {"$set": {"assistant": new_avatar_id}}
+                )
+                if update_result.modified_count > 0:
+                    flash("Assistant updated successfully!", category='success')
+                else:
+                    flash("Failed to update assistant. Try again.", category='error')
+            else:
+                flash("No avatar selected.", category='error')
+
+            return redirect(url_for('boundary.accDetails'))
+
+        # Fetch available avatars for the user
+        avatars = list(mongo.db.avatar.find({}))
+        return render_template("changeAssistant.html", avatars=avatars, user_info=user_info)
 
 # Update Password
 class UpdatePasswordBoundary:
