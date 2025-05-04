@@ -46,7 +46,12 @@
             </div>
         </div>
         {% endfor %}
-    </div>
+        <div class="col-12 text-center mt-4">
+            <form action="{{ url_for('boundary.set_first_time_login_false') }}" method="POST">
+                <button type="submit" class="btn btn-success">Skip for now</button>
+            </form>
+            <p class="text-muted mt-2">You can always select an assistant later from your settings.</p>
+        </div>
 </div>
 
 <style>

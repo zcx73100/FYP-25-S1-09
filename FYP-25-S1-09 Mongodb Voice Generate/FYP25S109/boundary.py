@@ -793,6 +793,9 @@ class LoginBoundary:
     @staticmethod
     @boundary.route('/login', methods=['GET', 'POST'])
     def login():
+        if session.get('user_authenticated'):
+            flash('You are already logged in.', category='info')
+            return redirect(url_for('boundary.home'))
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
@@ -1091,8 +1094,37 @@ class ChangeAssistantBoundary:
             return redirect(url_for('boundary.accDetails'))
 
         # Fetch available avatars for the user
-        avatars = list(mongo.db.avatar.find({}))
+        admin_users = list(mongo.db.useraccount.find({"role": "Admin"}, {"username": 1}))
+        admin_usernames = [u['username'] for u in admin_users]  # <-- FIX HERE
+
+        admin_avatars = list(mongo.db.avatar.find({"username": {"$in": admin_usernames}}))
+        user_avatars = list(mongo.db.avatar.find({"username": username}))
+        avatars = admin_avatars + user_avatars
         return render_template("changeAssistant.html", avatars=avatars, user_info=user_info)
+    @staticmethod
+    @boundary.route('/set_first_time_login_false', methods=['POST'])
+    def set_first_time_login_false():   
+        if 'username' not in session:
+            flash("You must be logged in to change your assistant.", category='error')
+            return redirect(url_for('boundary.login'))
+
+        username = session['username']
+        user_info = mongo.db.useraccount.find_one({"username": username})
+
+        if not user_info:
+            flash("User not found.", category='error')
+            return redirect(url_for('boundary.accDetails'))
+
+        update_result = mongo.db.useraccount.update_one(
+            {"username": username},
+            {"$set": {"first_time_login": False}}
+        )
+        if update_result.modified_count > 0:
+            flash("First time login status updated successfully!", category='success')
+        else:
+            flash("Failed to update first time login status. Try again.", category='error')
+
+        return redirect(url_for('boundary.home'))
 
 # Update Password
 class UpdatePasswordBoundary:
