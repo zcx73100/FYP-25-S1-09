@@ -788,7 +788,29 @@ class AvatarVideoBoundary:
             logging.error(f"Download error: {e}")
             abort(500)
 
+    @staticmethod
+    @boundary.route("/generate_video", methods=["GET"])
+    def generate_video_redirect():
+        username = session.get("username")
+        if not username:
+            return redirect(url_for("boundary.login"))
 
+        avatars = list(mongo.db.avatar.find({"username": username}))
+        voice_records = list(mongo.db.voice_records.find({"username": username}))
+
+        classroom_id = request.args.get("classroom_id")
+        assignment_id = request.args.get("assignment_id")
+        source = request.args.get("source")
+
+        return render_template(
+            "generateVideo.html",
+            avatars=avatars,
+            voice_records=voice_records,
+            classroom_id=classroom_id,
+            assignment_id=assignment_id,
+            source=source,
+            debug_mode=True
+        )
  
 # Log In
 class LoginBoundary:
@@ -2024,41 +2046,45 @@ class ViewUserDetailsBoundary:
 class TeacherAssignmentBoundary:
     @boundary.route('/teacher/upload_assignment/<classroom_id>', methods=['GET', 'POST'])
     def upload_assignment(classroom_id):
-        # GET → render the form (with a hidden video_id if one was stashed)
         if request.method == 'GET':
-            meta_id    = session.pop('stashed_video_id', None)
-            gridfs_id  = None
+            meta_id = session.pop('stashed_video_id', None)
+            video_id = None
 
             if meta_id:
-                vid_doc = mongo.db.video.find_one({'_id': ObjectId(meta_id)})
-                if vid_doc:
-                    # whichever field holds your actual GridFS file
-                    real_oid = vid_doc.get('video_gridfs_id') or vid_doc.get('file_id')
-                    if real_oid:
-                        gridfs_id = str(real_oid)
+                try:
+                    vid_doc = mongo.db.video.find_one({'_id': ObjectId(meta_id)})
+                    if vid_doc:
+                        # Make sure to use the actual GridFS ID
+                        video_id = str(vid_doc.get('video_gridfs_id') or vid_doc.get('file_id'))
+                except Exception:
+                    flash("⚠️ Failed to load video preview.", "warning")
 
             return render_template(
-                'uploadAssignment.html',
+                "uploadAssignment.html",
                 classroom_id=classroom_id,
-                video_id=gridfs_id  # this becomes your hidden input value
+                video_id=video_id
             )
 
-        # POST → handle the submitted form
+        # POST: process form submission
         title       = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
         deadline    = request.form.get("deadline")
         upload_file = request.files.get("file")
-        video_id    = request.form.get("video_id")  # from the <input type="hidden">
+        video_id    = request.form.get("video_id")  # Hidden input from form
 
-        # basic validation
-        if not title or not upload_file or not allowed_file(upload_file.filename):
-            flash("❌ Please enter a title and upload a supported file.", "danger")
+        if not title or (not upload_file and not video_id):
+            flash("❌ Please enter a title and upload a file or attach a video.", "danger")
             return redirect(request.url)
 
-        filename = secure_filename(upload_file.filename)
+        filename = secure_filename(upload_file.filename) if upload_file else None
 
-        # turn the string back into an ObjectId (or None)
-        video_oid = ObjectId(video_id) if video_id else None
+        video_oid = None
+        if video_id:
+            try:
+                video_oid = ObjectId(video_id)
+            except Exception:
+                flash("Invalid video ID.", "danger")
+                return redirect(request.url)
 
         result = UploadAssignmentController.upload_assignment(
             title        = title,
@@ -2077,30 +2103,28 @@ class TeacherAssignmentBoundary:
             flash(result.get("message", "Something went wrong"), "danger")
             return redirect(request.url)
 
+
     @boundary.route("/publish_assignment_video", methods=["POST"])
     def publish_assignment_video():
         data = request.get_json()
-        video_id = data.get("video_id")
+        gridfs_id = data.get("video_id")  # This is the GridFS ID
         classroom_id = data.get("classroom_id")
 
-        if not video_id or not classroom_id:
+        if not gridfs_id or not classroom_id:
             return jsonify({"success": False, "error": "Missing video ID or classroom ID"}), 400
 
         try:
-            # Validate IDs
-            ObjectId(video_id)
-            ObjectId(classroom_id)
-        except Exception:
-            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+            # Look up the video document by the GridFS ID
+            video_doc = mongo.db.video.find_one({"video_gridfs_id": ObjectId(gridfs_id)})
+            if not video_doc:
+                return jsonify({"success": False, "error": "Video not found"}), 404
 
-        try:
-            # Just stash it for next page
-            session["stashed_video_id"] = video_id
+            # Store the video document _id (not the GridFS ID)
+            session["stashed_video_id"] = str(video_doc["_id"])
             return jsonify({"success": True})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
-
-
+    
     @staticmethod
     @boundary.route('/teacher/manage_assignments/<classroom_id>', methods=['GET', 'POST'])
     def manage_assignments(classroom_id):
@@ -2220,49 +2244,60 @@ class TeacherAssignmentBoundary:
 
         return redirect(url_for('boundary.manage_assignments', classroom_id=classroom_id))
     
+    @boundary.route('/teacher/view_submissions/<classroom_id>/<assignment_id>')
+    def view_submissions(classroom_id, assignment_id):
+        submissions = list(mongo.db.submissions.find({"assignment_id": ObjectId(assignment_id)}))
+        assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
+        return render_template(
+            "viewSubmissions.html",
+            submissions=submissions,
+            assignment=assignment,
+            classroom_id=classroom_id,
+            assignment_id=assignment_id
+        )
     
-    @boundary.route('/view-student-submission/<submission_id>/<filename>',methods=['GET','POST'])
-    def view_submitted_assignment(submission_id,filename):
-        """Allows a student to view their own submission."""
+    @boundary.route('/view-student-submission/<submission_id>/<filename>', methods=['GET', 'POST'])
+    def view_submitted_assignment(submission_id, filename):
+        """Allows a student or teacher to view a single submission."""
         student_doc = mongo.db.submissions.find_one(
             {"_id": ObjectId(submission_id)},
             {"student": 1, "_id": 0, "assignment_id": 1}
         )
-        
-        student_username = student_doc["student"] if student_doc else None
-        assignment_id = student_doc["assignment_id"] if student_doc else None
+
+        student_username = student_doc.get("student") if student_doc else None
+        assignment_id = student_doc.get("assignment_id") if student_doc else None
 
         assignment_doc = mongo.db.assignments.find_one(
             {"_id": ObjectId(assignment_id)},
             {"classroom_id": 1, "_id": 0}
         )
-        classroom_id = assignment_doc["classroom_id"] if assignment_doc else None
+        classroom_id = assignment_doc.get("classroom_id") if assignment_doc else None
 
-        #This will be used to allow teachers to return to the submissions management page for the assignment.
-
-        # Fetch the submission from the database by submission_id and student username
         submission = TeacherViewSubmissionController.get_submission_by_student_and_id(student_username, submission_id)
-        
+
         if not submission:
             flash("Submission not found.", "danger")
-            return redirect(url_for('boundary.home'))  # Redirect if the submission is not found
+            return redirect(url_for('boundary.home'))
 
-        # Fetch the file content from the student's submission
-        file_data = Submission.get_submission_file(submission["file_id"])  # Correct method to get submission file
-        file_extension = submission["file_name"].split(".")[-1]  # Get file extension from student's submission file name
-        
-        # Handle different file types
-        if file_extension in ["pdf", "txt", "md"]:
-            file_base64 = base64.b64encode(file_data).decode("utf-8")
-            text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
-        else:
-            file_base64 = None
-            text_content = None
+        # Set defaults
+        file_base64 = None
+        text_content = None
+        file_extension = None
 
-        # Render the submission details page
+        file_name = submission.get("file_name")
+        file_id = submission.get("file_id")
+
+        if file_name and "." in file_name and file_id:
+            file_extension = file_name.rsplit(".", 1)[-1]
+            file_data = Submission.get_submission_file(file_id)
+
+            if file_extension in ["pdf", "txt", "md"]:
+                file_base64 = base64.b64encode(file_data).decode("utf-8")
+                text_content = file_data.decode("utf-8") if file_extension in ["txt", "md"] else None
+
         return render_template(
             "viewStudentSubmission.html",
-            submission=submission,
+            student_submission=submission,
             file_base64=file_base64,
             text_content=text_content,
             file_extension=file_extension,

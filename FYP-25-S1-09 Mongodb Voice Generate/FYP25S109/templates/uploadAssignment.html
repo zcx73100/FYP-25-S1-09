@@ -13,10 +13,11 @@
   {% endif %}
 {% endwith %}
 
-<form action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}"
+<form id="assignment-form"
+      action="{{ url_for('boundary.upload_assignment', classroom_id=classroom_id) }}"
       method="POST" enctype="multipart/form-data" class="upload-form">
 
-  <!-- 👇 Carry the generated video ID through submission -->
+  <!-- Hidden Video ID if generated -->
   <input type="hidden" name="video_id" value="{{ video_id }}">
 
   <!-- Title -->
@@ -24,7 +25,7 @@
   <input type="text" name="title" id="title" placeholder="Enter assignment title"
          class="input-field" required>
 
-  <!-- Description + Generate Video Button -->
+  <!-- Description and Generate Video -->
   <div class="d-flex justify-content-between align-items-center mb-2">
     <label for="description">Assignment Description:</label>
     <a href="{{ url_for('boundary.generate_video_page') }}?classroom_id={{ classroom_id }}&source=assignment"
@@ -35,14 +36,14 @@
   <input type="text" name="description" id="description" placeholder="Enter description"
          class="input-field">
 
-  <!-- ✅ Video Preview (if video_id is present) -->
+  <!-- ✅ Video Preview -->
   {% if video_id %}
-    <div class="video-preview mt-3">
+    <div class="video-preview mt-2">
       <p><strong>🎥 Generated Instructional Video:</strong></p>
       <video controls class="video-player">
-        <source src="{{ url_for('boundary.stream_video', video_id=video_id) }}"
-                type="video/mp4">
+        <source src="{{ url_for('boundary.stream_video', video_id=video_id) }}" type="video/mp4">
         Your browser does not support the video tag.
+        <a href="{{ url_for('boundary.stream_video', video_id=video_id) }}">Download video</a>
       </video>
     </div>
   {% endif %}
@@ -52,11 +53,11 @@
   <input type="datetime-local" name="deadline" id="deadline"
          class="input-field" required>
 
-  <!-- File Upload -->
-  <label for="file">Upload File:</label>
-  <input type="file" name="file" id="file" class="file-input" required>
+  <!-- File Upload (Optional) -->
+  <label for="file">Upload File (Optional if video attached):</label>
+  <input type="file" name="file" id="file" class="file-input">
 
-  <!-- Submit Button -->
+  <!-- Submit -->
   <button type="submit" class="upload-button">📤 Upload Assignment</button>
 </form>
 
@@ -65,6 +66,19 @@
    class="btn btn-secondary mt-3">
   ⬅️ Return to Classroom
 </a>
+
+<!-- JS: Prevent submission if neither file nor video provided -->
+<script>
+document.getElementById('assignment-form').addEventListener('submit', function (e) {
+  const fileInput = document.getElementById('file');
+  const hasVideo = "{{ video_id }}" !== "";
+
+  if (!fileInput.value && !hasVideo) {
+    alert("Please upload a file or attach a video.");
+    e.preventDefault();
+  }
+});
+</script>
 
 <!-- Style -->
 <style>
@@ -123,6 +137,13 @@
   width: 100%;
   border: 1px solid #ccc;
   border-radius: 6px;
+}
+
+.video-preview {
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
 }
 
 .alert {

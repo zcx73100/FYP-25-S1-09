@@ -44,9 +44,10 @@
                 <td>{{ assignment.due_date }}</td>
                 <td>
                     <!-- View Submissions -->
-                    <a href="{{ url_for('boundary.view_submissions', classroom_id=classroom_id, assignment_id=assignment._id) }}" 
-                       class="btn btn-info btn-sm">View Submissions</a>
-
+                    <a href="{{ url_for('boundary.view_submissions',
+                    classroom_id=classroom_id,
+                    assignment_id=assignment._id) }}"
+   class="btn btn-info btn-sm">View Submissions</a>
                     <!-- Delete Assignment -->
                     <a href="{{ url_for('boundary.delete_assignment', classroom_id=classroom_id, assignment_id=assignment._id) }}" 
                        class="btn btn-danger btn-sm">Delete</a>
