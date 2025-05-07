@@ -152,10 +152,19 @@ class AvatarVideoBoundary:
             return redirect(url_for('boundary.login'))
 
         role = session.get("role")
-        videos = GenerateVideoController.get_videos(username)
-        print(videos)
+        search_query = request.args.get("search", "").strip().lower()
+
+        # Get all videos for the user
+        all_videos = GenerateVideoController.get_videos(username)
+
+        # Filter videos by search query if present
+        if search_query:
+            videos = [video for video in all_videos if search_query in video["title"].lower()]
+        else:
+            videos = all_videos
 
         return render_template("myVideos.html", username=username, videos=videos, role=role)
+
         
     # Route: Generate Voice
     @staticmethod
@@ -257,6 +266,7 @@ class AvatarVideoBoundary:
             text = request.form.get("text", "").strip()
             avatar_id = request.form.get("avatar_id")
             audio_id = request.form.get("audio_id")
+            video_title = request.form.get("video_title")  # Get the title
             source = request.form.get("source")
             classroom_id = request.form.get("classroom_id")
             assignment_id = request.form.get("assignment_id")
@@ -271,7 +281,7 @@ class AvatarVideoBoundary:
             file_id = avatar_doc["file_id"]
 
             controller = GenerateVideoController()
-            video_gridfs_id = controller.generate_video(text, file_id, audio_id=audio_id)
+            video_gridfs_id = controller.generate_video(text, file_id, audio_id=audio_id,title=video_title)
 
             if not video_gridfs_id:
                 return jsonify({"success": False, "error": "Video generation failed."}), 500
@@ -811,6 +821,56 @@ class AvatarVideoBoundary:
             source=source,
             debug_mode=True
         )
+    @staticmethod
+    @boundary.route("/search_video", methods=["POST"])
+    def search_video():
+        search_query = request.form.get("search_query", "").strip()
+        username = session.get("username")
+
+        if not search_query:
+            return redirect(url_for("boundary.my_videos"))
+
+        # Search in the video collection
+        videos = list(mongo.db.generated_videos.find({
+            "$or": [
+                {"text": {"$regex": search_query, "$options": "i"}},
+                {"username": username}
+            ]
+        }))
+
+        return render_template("myVideos.html", videos=videos, search_query=search_query, username=username)
+    
+    @boundary.route('/update_video_title/<video_id>', methods=['POST'])
+    def update_video_title(video_id):
+        if 'username' not in session:
+            flash('Please login to update videos', 'error')
+            return redirect(url_for('auth.login'))
+        
+        new_title = request.form.get('new_title')
+        if not new_title:
+            flash('Title cannot be empty', 'error')
+            return redirect(url_for('boundary.my_videos'))
+        
+        try:
+            print(f"🔍  Looking for video with _id={video_id} (type: {type(video_id)})")
+            # Update only if video belongs to current user
+            result = mongo.db.generated_videos.update_one(
+                {
+                    "video_id": ObjectId(video_id),  # Changed from _id to video_id
+                    "username": session['username']
+                },
+                {"$set": {"title": request.form.get('new_title')}}
+            )
+            
+            if result.modified_count == 1:
+                flash('Title updated successfully', 'success')
+            else:
+                flash('Video not found or you do not have permission', 'error')
+        except Exception as e:
+            flash('Error updating title', 'error')
+            print(f"Error: {str(e)}")
+        
+        return redirect(url_for('boundary.my_videos'))
  
 # Log In
 class LoginBoundary:

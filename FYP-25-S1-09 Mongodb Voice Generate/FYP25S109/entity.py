@@ -356,7 +356,7 @@ class GenerateVideoEntity:
             print(f"❌ Error saving recording to GridFS: {e}")
             return None
 
-    def generate_video(self, avatar_id, audio_id):
+    def generate_video(self, avatar_id, audio_id,video_title="Generated Video"):
         try:
             SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
 
@@ -412,6 +412,7 @@ class GenerateVideoEntity:
                 "video_id": video_id,
                 "avatar_id": ObjectId(avatar_id),
                 "audio_id": ObjectId(audio_id),
+                "title": video_title,  # Store the title
                 "created_at": datetime.now(),
                 "status": "generated",
                 "username": session.get("username"),
@@ -434,11 +435,11 @@ class GenerateVideoEntity:
             video_list = []
             for video in videos:
                 video_list.append({
-                    "_id": video["_id"],  # Convert ObjectId to string
-                    "video_id": str(video["video_id"]),  # Convert ObjectId to string
+                    "_id": video["_id"],
+                    "video_id": str(video["video_id"]),
+                    "title": video.get("title", "Untitled"),  # Include title
                     "created_at": video["created_at"],
                     "status": video["status"]
-                    # Don't include the actual file content here
                 })
             return video_list
         except Exception as e:

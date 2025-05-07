@@ -493,9 +493,9 @@ class GenerateVideoController:
         return audio_id
 
     @staticmethod
-    def generate_video(text, avatar_id, audio_id):
+    def generate_video(text, avatar_id, audio_id,title):
         entity = GenerateVideoEntity(text=text, avatar_path=avatar_id, audio_path=audio_id)
-        video_id = entity.generate_video(avatar_id,audio_id)
+        video_id = entity.generate_video(avatar_id,audio_id,video_title=title)
         return video_id
     
     @staticmethod
