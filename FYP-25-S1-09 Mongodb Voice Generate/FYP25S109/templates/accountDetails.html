@@ -9,7 +9,7 @@
     <!-- ✅ Display Profile Picture (if available) -->
     <div class="text-center mb-3">
         {% if user_info.profile_pic %}
-            <img src="data:image/png;base64,{{ user_info.profile_pic }}" alt="Profile Picture" class="img-thumbnail rounded-circle" width="150">
+            <img src="{{ url_for('boundary.get_profile_pic', file_id=user_info.profile_pic) }}" alt="Profile Picture" class="img-thumbnail rounded-circle" width="150">
         {% else %}
             <p><em>No profile picture uploaded.</em></p>
         {% endif %}

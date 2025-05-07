@@ -32,9 +32,9 @@ def create_app():
         profile_pic_url = None
 
         if "username" in session:
-                user_info = mongo.db.useraccount.find_one({"username": session["username"]})
+            user_info = mongo.db.useraccount.find_one({"username": session["username"]})
         if user_info and user_info.get("profile_pic"):
-                    profile_pic_url = url_for("boundary.get_profile_pic", file_id=str(user_info["profile_pic"]))
+            profile_pic_url = url_for("boundary.get_profile_pic", file_id=user_info["profile_pic"])
 
         return dict(user_info=user_info, profile_pic_url=profile_pic_url)
     

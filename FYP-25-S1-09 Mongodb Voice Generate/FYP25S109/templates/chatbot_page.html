@@ -746,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (sender === 'user') {
             const userAvatar = document.createElement('img');
-            userAvatar.src = "{{ url_for('boundary.get_profile_pic', username=session['username']) }}";
+            userAvatar.src = "{{ url_for('boundary.get_profile_pic', file_id=user.profile_pic) }}";
             userAvatar.alt = 'User Avatar';
             userAvatar.className = 'user-avatar';
 

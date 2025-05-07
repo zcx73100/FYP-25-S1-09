@@ -21,8 +21,9 @@ class ChatbotBoundary:
             return redirect(url_for('boundary.login'))  
         
         chatbot_chats = mongo.db.chatbot_chats.find({"username": session['username']}).sort("timestamp", -1).limit(10)
+        user = mongo.db.useraccount.find_one({"username": session['username']},{})
 
-        return render_template('chatbot_page.html',chatbot_chats=chatbot_chats)
+        return render_template('chatbot_page.html',chatbot_chats=chatbot_chats,user=user)
 
     @chatbot.route('/api/chat', methods=['POST'])
     def handle_chat():

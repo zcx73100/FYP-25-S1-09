@@ -146,7 +146,7 @@ class UserAccount:
     def find_by_username(username):
         try:
             logging.debug(f"Finding user by username: {username}")
-            return mongo.db.useraccount.find_one({"username": username})
+            return mongo.db.useraccount.find_one({"username": username},{})
         except Exception as e:
             logging.error(f"Failed to find user by username: {str(e)}")
             return None
