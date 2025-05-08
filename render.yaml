@@ -3,6 +3,6 @@ services:
     name: fyp-web-app
     env: python
     plan: free
-    rootDir: FYP-25-S1-09 Mongodb Voice Generate
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
+    rootDir: .
