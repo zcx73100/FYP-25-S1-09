@@ -5,6 +5,7 @@ from FYP25S109 import create_app
 from flask_pymongo import PyMongo
 from flask_cors import CORS
 import logging
+import os
 
 app = create_app()
 CORS(app, supports_credentials=True)
