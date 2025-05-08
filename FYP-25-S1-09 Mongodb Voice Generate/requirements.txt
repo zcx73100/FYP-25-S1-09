@@ -153,9 +153,9 @@ tensorboard-data-server==0.7.2
 threadpoolctl==3.5.0
 tifffile==2025.2.18
 tomlkit==0.13.2
-torch==2.2.0
-torchaudio==2.2.0
-torchvision==0.17.0
+torch==2.2.0+cpu
+torchaudio==2.2.0+cpu
+torchvision==0.17.0+cpu
 tqdm==4.66.4
 typer==0.15.2
 typing_extensions==4.12.2
