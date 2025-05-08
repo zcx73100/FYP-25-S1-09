@@ -100,4 +100,4 @@ if __name__ == '__main__':
     scheduler.add_job(func=send_assignment_notification, trigger="cron", hour=0, minute=0)  
     logger.debug("Scheduler job for sending notifications has been added.")
     scheduler.start()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
