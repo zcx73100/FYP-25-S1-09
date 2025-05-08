@@ -170,3 +170,4 @@ wheel==0.45.1
 WTForms==3.1.2
 yacs==0.1.8
 yapf==0.43.0
+onnxruntime==1.20.1
