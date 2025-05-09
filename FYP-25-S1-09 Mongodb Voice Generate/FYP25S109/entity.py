@@ -20,13 +20,18 @@ import shutil
 import base64
 import mimetypes
 from gtts import gTTS
-import gridfs
+from gridfs import GridFS
+
+def get_fs():
+    return GridFS(mongo.db)
+
 import uuid
 import tempfile
 import time
 from gridfs import GridFS
-fs = gridfs.GridFS(mongo.db)
 
+def get_fs():
+    return GridFS(mongo.db)
 
 # Separate Upload Folders
 UPLOAD_FOLDER_VIDEO = 'FYP25S109/static/uploads/videos/'
@@ -81,7 +86,7 @@ class UserAccount:
 
             elif self.profile_pic and hasattr(self.profile_pic, 'content_type'):
                 fs = GridFS(mongo.db)
-                profile_pic_id = fs.put(
+                profile_pic_id = get_fs().put(
                     self.profile_pic,
                     filename=f"{self.username}_profile_pic",
                     content_type=self.profile_pic.content_type
@@ -215,7 +220,7 @@ class TutorialVideo:
                 raise ValueError("Invalid video format.")
 
             # Save video to GridFS
-            file_id = fs.put(self.video_file, filename=filename, content_type=self.video_file.content_type)
+            file_id = get_fs().put(self.video_file, filename=filename, content_type=self.video_file.content_type)
 
             # Save metadata
             mongo.db.tutorialvideo.insert_one({
@@ -239,7 +244,7 @@ class TutorialVideo:
             video = mongo.db.tutorialvideo.find_one({"_id": ObjectId(video_id)})
             if video:
                 # Delete from GridFS
-                fs.delete(video['file_id'])
+                get_fs().delete(video['file_id'])
                 # Delete metadata
                 mongo.db.tutorialvideo.delete_one({"_id": ObjectId(video_id)})
                 return {"success": True, "message": "Video deleted successfully."}
@@ -270,7 +275,7 @@ class GenerateVideoEntity:
     @staticmethod
     def save_audio_to_gridfs(audio_bytes, filename="audio.mp3", content_type="audio/mpeg"):
         audio_io = BytesIO(audio_bytes)
-        file_id = fs.put(audio_io, filename=filename, content_type=content_type)
+        file_id = get_fs().put(audio_io, filename=filename, content_type=content_type)
         return file_id
     
     def generate_voice(self, lang, gender):
@@ -324,7 +329,7 @@ class GenerateVideoEntity:
             tts.write_to_fp(mp3_buffer)
             mp3_buffer.seek(0)
 
-            audio_id = fs.put(
+            audio_id = get_fs().put(
                 mp3_buffer,
                 filename=f"voice_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.mp3",
                 content_type="audio/mpeg"
@@ -350,7 +355,7 @@ class GenerateVideoEntity:
     def save_recording_to_gridfs(self, audio_bytes, filename="audio.wav"):
         try:
             audio_io = BytesIO(audio_bytes)
-            file_id = fs.put(audio_io, filename=filename, content_type="audio/wav")
+            file_id = get_fs().put(audio_io, filename=filename, content_type="audio/wav")
             return file_id
         except Exception as e:
             print(f"❌ Error saving recording to GridFS: {e}")
@@ -360,8 +365,8 @@ class GenerateVideoEntity:
         try:
             SADTALKER_API = "http://127.0.0.1:7860/generate_video_fastapi"
 
-            avatar_file = fs.get(ObjectId(avatar_id))
-            audio_file = fs.get(ObjectId(audio_id))
+            avatar_file = get_fs().get(ObjectId(avatar_id))
+            audio_file = get_fs().get(ObjectId(audio_id))
 
             avatar_bytes = BytesIO(avatar_file.read())
             audio_bytes = BytesIO(audio_file.read())
@@ -401,7 +406,7 @@ class GenerateVideoEntity:
             with open(safe_video_path, "rb") as vf:
                 video_bytes = BytesIO(vf.read())
 
-            video_id = fs.put(
+            video_id = get_fs().put(
                 video_bytes,
                 filename=os.path.basename(safe_video_path),
                 content_type="video/mp4",
@@ -476,7 +481,7 @@ class Avatar:
             image_no_bg = remove(image_binary)  # This returns binary image data
 
             # Save to GridFS
-            gridfs_id = fs.put(image_no_bg, filename=filename, content_type="image/png")
+            gridfs_id = get_fs().put(image_no_bg, filename=filename, content_type="image/png")
 
             # Optionally save a base64 version for preview
             image_base64 = base64.b64encode(image_no_bg).decode("utf-8")
@@ -755,7 +760,7 @@ class Material:
             filename = secure_filename(self.file.filename)
 
             # Save file to GridFS
-            file_id = fs.put(self.file, filename=filename, content_type=self.file.content_type)
+            file_id = get_fs().put(self.file, filename=filename, content_type=self.file.content_type)
 
             # Store material metadata in MongoDB
             mongo.db.materials.insert_one({
@@ -781,7 +786,7 @@ class Material:
         if not material:
             return None
             
-        file_data = fs.get(material['file_id'])
+        file_data = get_fs().get(material['file_id'])
         return material, file_data
 
 class Assignment:
@@ -803,7 +808,7 @@ class Assignment:
             if self.file:
                 # Ensure the filename is secure
                 safe_name = secure_filename(self.filename or self.file.filename)
-                file_id = fs.put(self.file, filename=safe_name, content_type=self.file.content_type)
+                file_id = get_fs().put(self.file, filename=safe_name, content_type=self.file.content_type)
 
             # ✅ Prepare assignment data
             assignment_data = {
@@ -848,7 +853,7 @@ class Assignment:
         try:
             assignment = mongo.db.assignments.find_one({"_id": ObjectId(assignment_id)})
             if assignment and assignment.get("file_id"):
-                fs.delete(ObjectId(assignment["file_id"]))
+                get_fs().delete(ObjectId(assignment["file_id"]))
                 mongo.db.assignments.delete_one({"_id": ObjectId(assignment_id)})
                 return {"success": True, "message": "Assignment deleted."}
         except Exception as e:
@@ -866,7 +871,7 @@ class Assignment:
     @staticmethod
     def get_assignment_file(file_id):
         try:
-            file = fs.get(ObjectId(file_id))
+            file = get_fs().get(ObjectId(file_id))
             return file.read()
         except Exception as e:
             logging.error(f"❌ Failed to retrieve file: {str(e)}")
@@ -988,10 +993,8 @@ class Submission:
                 raise ValueError("No file selected for upload.")
 
             # Connect to MongoDB and GridFS
-            fs = gridfs.GridFS(mongo.db)
-
-            # Store file in GridFS
-            file_id = fs.put(self.file, filename=self.filename, student=self.student)
+                        # Store file in GridFS
+            file_id = get_fs().put(self.file, filename=self.filename, student=self.student)
 
             # Create submission record
             submission_data = {
@@ -1018,6 +1021,7 @@ class Submission:
         except Exception as e:
             logging.error(f"Error saving submission: {str(e)}")
             return {"success": False, "message": str(e)}
+    
     @staticmethod
     def get_submission_by_student_and_assignment(student_username, assignment_id):
         """
@@ -1040,18 +1044,19 @@ class Submission:
             '_id': ObjectId(submission_id)
         })
         return submission
+    
     def get_submission_file(file_id):
         """
         Retrieve the file from GridFS using the file_id.
         Returns the file content.
         """
         try:
-            fs = gridfs.GridFS(mongo.db)
-            file_data = fs.get(ObjectId(file_id))
+            file_data = get_fs().get(ObjectId(file_id))
             return file_data.read()  # Return file content
         except Exception as e:
-            logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
-            return None
+                logging.error(f"Failed to retrieve file from GridFS: {str(e)}")
+        return None
+            
     def delete_submission(submission_id):
         """
         Deletes the submission from the database and GridFS.
@@ -1061,7 +1066,7 @@ class Submission:
             submission = mongo.db.submissions.find_one({"_id": ObjectId(submission_id)})
             if submission:
                 # Delete the file from GridFS
-                fs.delete(submission['file_id'])
+                get_fs().delete(submission['file_id'])
                 # Delete the submission record from MongoDB
                 mongo.db.submissions.delete_one({"_id": ObjectId(submission_id)})
                 return {"success": True, "message": "Submission deleted successfully."}
