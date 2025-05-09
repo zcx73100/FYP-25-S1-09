@@ -9,4 +9,4 @@ services:
 
 envVars:
       - key: MONGODB_URI
-        value: mongodb+srv://dbUser:<db_password>@fyp-25-s1-09.f2s0ob3.mongodb.net/?retryWrites=true&w=majority&appName=fyp-25-s1-09
+        fromEnv: MONGODB_URI
