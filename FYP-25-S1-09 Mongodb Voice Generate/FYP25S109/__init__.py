@@ -1,48 +1,36 @@
-# FYP25S109/__init__.py
+from flask import Flask
+from flask import session, url_for
 
-import os
-import logging
-from flask import Flask, session, url_for
 from flask_pymongo import PyMongo
-
-# global PyMongo “factory”
+import sys
+import os
 mongo = PyMongo()
 
+
 def create_app():
-    # Create Flask instance
     app = Flask(__name__)
 
-    # Basic logging setup (can be tweaked in your wsgi or main)
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-
-    # Flask config
+    # Flask Configuration
     app.config['SECRET_KEY'] = 'fyp25'
+    # app.config["MONGO_URI"] = "mongodb://localhost:27017/fyps12509"
+    app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
     app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-    # MongoDB URI from env
-    uri = os.environ.get("MONGODB_URI")
-    if uri:
-        app.config["MONGO_URI"] = uri
-        logger.info(f"MONGODB_URI found, initializing PyMongo")
-        mongo.init_app(app)
-    else:
-        logger.error("MONGODB_URI is missing! PyMongo will not be initialized.")
-
-    # Simple health check
     @app.route("/ping")
     def ping():
         return "pong"
+        
+    # Initialize MongoDB
+    mongo.init_app(app)
 
-    # Register your boundary blueprint
+    # Register Blueprints
     from .boundary import boundary
-    app.register_blueprint(boundary, url_prefix="/")
+    app.register_blueprint(boundary, url_prefix='/')
 
-    # Register your chatbot blueprint
+    # ✅ Register Chatbot Blueprint
     from .chatbot import chatbot
-    app.register_blueprint(chatbot, url_prefix="/")
+    app.register_blueprint(chatbot, url_prefix='/')
 
-    # Inject user_info + profile_pic_url into all templates
     @app.context_processor
     def inject_user_info():
         user_info = None
@@ -50,12 +38,9 @@ def create_app():
 
         if "username" in session:
             user_info = mongo.db.useraccount.find_one({"username": session["username"]})
-            if user_info and user_info.get("profile_pic"):
-                profile_pic_url = url_for(
-                    "boundary.get_profile_pic",
-                    file_id=user_info["profile_pic"]
-                )
+        if user_info and user_info.get("profile_pic"):
+            profile_pic_url = url_for("boundary.get_profile_pic", file_id=user_info["profile_pic"])
 
         return dict(user_info=user_info, profile_pic_url=profile_pic_url)
-
+    
     return app
