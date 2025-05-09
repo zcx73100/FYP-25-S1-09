@@ -5,4 +5,8 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
-    rootDir: FYP-25-S1-09 Mongodb Voice Generate
+    rootDir: "FYP-25-S1-09 Mongodb Voice Generate"
+
+envVars:
+      - key: MONGODB_URI
+        value: mongodb+srv://dbUser:<db_password>@fyp-25-s1-09.f2s0ob3.mongodb.net/?retryWrites=true&w=majority&appName=fyp-25-s1-09
