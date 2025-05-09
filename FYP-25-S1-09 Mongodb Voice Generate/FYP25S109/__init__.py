@@ -12,7 +12,8 @@ def create_app():
 
     # Flask Configuration
     app.config['SECRET_KEY'] = 'fyp25'
-    app.config["MONGO_URI"] = "mongodb://localhost:27017/fyps12509"
+    # app.config["MONGO_URI"] = "mongodb://localhost:27017/fyps12509"
+    app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
     app.config['TEMPLATES_AUTO_RELOAD'] = True
 
     # Initialize MongoDB
