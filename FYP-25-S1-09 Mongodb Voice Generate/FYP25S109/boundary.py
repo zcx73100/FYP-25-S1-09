@@ -20,7 +20,6 @@ from bson.errors import InvalidId
 from io import BytesIO
 import re
 import ffmpeg
-from gridfs import GridFS
 
 
 
@@ -194,7 +193,7 @@ class AvatarVideoBoundary:
     @boundary.route("/stream_audio/<audio_id>")
     def stream_audio(audio_id):
         try:
-            file = fs.get(ObjectId(audio_id))
+            file = get_fs().get(ObjectId(audio_id))
             file_size = file.length
 
             # Determine content type based on filename
@@ -304,7 +303,7 @@ class AvatarVideoBoundary:
     @boundary.route("/stream_video/<video_id>")
     def stream_video(video_id):
         try:
-            file = fs.get(ObjectId(video_id))
+            file = get_fs().get(ObjectId(video_id))
             return send_file(file, mimetype="video/mp4", as_attachment=False)
         except Exception as e:
             return f"Video not found: {e}", 404
@@ -394,7 +393,7 @@ class AvatarVideoBoundary:
         
         # Save MP3 file to GridFS
         with open(mp3_path, "rb") as f:
-            file_id = fs.put(f, filename=mp3_filename)
+            file_id = get_fs().put(f, filename=mp3_filename)
         
         # Remove the local mp3 file after storing it in GridFS
         os.remove(mp3_path)
@@ -522,7 +521,7 @@ class AvatarVideoBoundary:
     @boundary.route('/generated_video/<video_id>')
     def serve_generated_video(video_id):
         try:
-            grid_out = fs.get(ObjectId(video_id))
+            grid_out = get_fs().get(ObjectId(video_id))
             file_size = grid_out.length
             range_header = request.headers.get('Range')
 
@@ -566,7 +565,7 @@ class AvatarVideoBoundary:
             if not voice_record:
                 return jsonify(success=False, error="Voice not found"), 404
 
-            file = fs.get(ObjectId(audio_id))
+            file = get_fs().get(ObjectId(audio_id))
             file_size = file.length
 
             # Determine content type based on filename
@@ -701,7 +700,7 @@ class AvatarVideoBoundary:
             voice_name = request.form.get('name', '').strip() or f"Uploaded Voice {datetime.now().strftime('%Y-%m-%d')}"
             
             # Save to GridFS
-            file_id = fs.put(
+            file_id = get_fs().put(
                 audio_file,
                 filename=secure_filename(audio_file.filename),
                 content_type='audio/mpeg'
@@ -744,7 +743,7 @@ class AvatarVideoBoundary:
                 return jsonify(success=False, error="Video file not found"), 404
 
             # Stream the video from GridFS
-            file = fs.get(ObjectId(gridfs_id))
+            file = get_fs().get(ObjectId(gridfs_id))
             return send_file(file, mimetype="video/mp4", as_attachment=False)
         except Exception as e:
             print(f"Error serving published video {file_id}: {str(e)}")
@@ -787,7 +786,7 @@ class AvatarVideoBoundary:
     def download_video(video_id):
         try:
             fs = GridFS(mongo.db)  # ✅ Use the whole database, not a collection
-            file = fs.get(ObjectId(video_id))  # This must be the GridFS file's _id
+            file = get_fs().get(ObjectId(video_id))  # This must be the GridFS file's _id
             return send_file(
                 io.BytesIO(file.read()),
                 download_name=f"{file.filename or 'video'}.mp4",
@@ -973,8 +972,7 @@ class LoginBoundary:
 @boundary.route('/profile_pic/<file_id>')
 def get_profile_pic(file_id):
     try:
-        fs = GridFS(mongo.db)
-        file = fs.get(ObjectId(file_id))
+        ile = get_fs().get(ObjectId(file_id))
         return send_file(file, mimetype='image/jpeg')  # or use file.content_type if available
     except:
         return "Image not found", 404
@@ -1035,9 +1033,8 @@ class CreateAccountBoundary:
             profile_pic_id = None
             if profile_pic and profile_pic.filename != "":
                 try:
-                    fs = GridFS(mongo.db)
                     filename = secure_filename(f"{username}_{profile_pic.filename}")
-                    profile_pic_id = fs.put(profile_pic, filename=filename, content_type=profile_pic.content_type)
+                    profile_pic_id = get_fs().put(profile_pic, filename=filename, content_type=profile_pic.content_type)
                 except Exception as e:
                     flash(f"Failed to upload profile picture: {str(e)}", "error")
                     return redirect(url_for('boundary.sign_up'))
@@ -1115,9 +1112,8 @@ class UpdateAccountBoundary:
             # ✅ Save new profile picture to GridFS if uploaded
             if profile_picture and profile_picture.filename != "":
                 try:
-                    fs = GridFS(mongo.db)
                     filename = secure_filename(f"{username}_updated_profile_{profile_picture.filename}")
-                    file_id = fs.put(profile_picture, filename=filename, content_type=profile_picture.content_type)
+                    file_id = get_fs().put(profile_picture, filename=filename, content_type=profile_picture.content_type)
                     update_data["profile_pic"] = file_id
                 except Exception as e:
                     flash(f"Failed to update profile picture: {str(e)}", category="error")
@@ -1392,7 +1388,7 @@ class ViewUploadedVideosBoundary:
     @boundary.route('/video/<file_id>')
     def serve_video(file_id):
         try:
-            grid_out = fs.get(ObjectId(file_id))
+            grid_out = get_fs().get(ObjectId(file_id))
             file_size = grid_out.length
             range_header = request.headers.get('Range')
 
@@ -2053,7 +2049,7 @@ class TeacherManageMaterialBoundary:
             fs = gridfs.GridFS(mongo.db)
             
             # Retrieve file from GridFS
-            file_data = fs.get(material["file_id"])  
+            file_data = get_fs().get(material["file_id"])  
             
             return send_file(
                 io.BytesIO(file_data.read()),  # Read the binary data
