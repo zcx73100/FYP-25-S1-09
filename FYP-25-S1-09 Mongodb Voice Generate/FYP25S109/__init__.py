@@ -16,6 +16,10 @@ def create_app():
     app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
     app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+    @app.route("/ping")
+    def ping():
+        return "pong"
+        
     # Initialize MongoDB
     mongo.init_app(app)
 
