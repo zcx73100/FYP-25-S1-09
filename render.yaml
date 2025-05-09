@@ -1,13 +1,17 @@
+# render.yaml
 services:
   - type: web
     name: fyp-web-app
-    runtime: python  # Changed from 'env: python'
+    env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
-    rootDir: FYP-25-S1-09-Mongodb-Voice-Generate  # Removed spaces (recommended)
+    startCommand: >
+      gunicorn wsgi:app
+      --bind 0.0.0.0:$PORT
+      --log-level debug         # show tracebacks
+      --workers 1               # keep the log readable
+      --preload                 # fail fast if import crashes
+    rootDir: "FYP-25-S1-09 Mongodb Voice Generate"
     envVars:
       - key: MONGODB_URI
         fromEnv: MONGODB_URI
-      - key: PYTHON_VERSION
-        value: 3.9.13  # Specify your Python version
