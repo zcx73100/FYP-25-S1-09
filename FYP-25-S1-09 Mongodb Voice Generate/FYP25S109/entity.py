@@ -281,7 +281,7 @@ class GenerateVideoEntity:
             # Enhanced voice configuration
             voice_config = {
                 "en": {
-                    "male": {"tld": "com", "lang": "en", "slow": False, "gender_enforced": True},
+                    "male": {"tld": "com.au", "lang": "en", "slow": False, "gender_enforced": True},
                     "female": {"tld": "com.au", "lang": "en", "slow": False, "gender_enforced": True},
                     "neutral": {"tld": "co.uk", "lang": "en", "slow": False, "gender_enforced": False}
                 },
@@ -337,7 +337,8 @@ class GenerateVideoEntity:
                 "gender": gender,
                 "created_at": datetime.now(),
                 "status": "generated",
-                "username": session.get("username")
+                "username": session.get("username"),
+                "source": "chatbot"
             }
 
             mongo.db.voice_records.insert_one(voice_data)

@@ -189,6 +189,29 @@ class AvatarVideoBoundary:
 
         except Exception as e:
             return jsonify(success=False, error=str(e)), 500
+        
+    
+    @boundary.route("/generate_voice_form", methods=["POST"])
+    def generate_voice_form():
+        text = request.form.get("text", "").strip()
+        lang = request.form.get("lang", "en")
+        gender = request.form.get("gender", "female")
+
+        if not text:
+            return jsonify(success=False, error="No text provided."), 400
+
+        try:
+            controller = GenerateVideoController()
+            audio_id = controller.generate_voice(text, lang, gender)
+
+            if not audio_id:
+                return jsonify(success=False, error="Voice generation failed."), 500
+
+            return jsonify(success=True, audio_id=str(audio_id))
+
+        except Exception as e:
+            return jsonify(success=False, error=str(e)), 500
+
 
     # Route: Stream audio from GridFS
     @boundary.route("/stream_audio/<audio_id>")
@@ -250,7 +273,10 @@ class AvatarVideoBoundary:
             source = request.args.get("source")
 
             avatars = list(mongo.db.avatar.find({"username": username}))
-            voice_records = list(mongo.db.voice_records.find({"username": username}))
+            voice_records = list(mongo.db.voice_records.find({
+                "username": username,
+                "source": {"$ne": "chatbot"}  # exclude chatbot-generated clips
+            }))
 
             return render_template(
                 "generateVideo.html",
@@ -309,6 +335,42 @@ class AvatarVideoBoundary:
         except Exception as e:
             return f"Video not found: {e}", 404
 
+    @boundary.route("/generate_video_for_chatbot/<avatar_id>/<audio_id>", methods=["POST"])
+    def generate_video_for_chatbot(avatar_id, audio_id):
+        username = session.get("username")
+        if not username:
+            return jsonify({"success": False, "error": "Not logged in"}), 401
+
+        try:
+            # ✅ Validate Avatar
+            avatar_doc = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+            if not avatar_doc:
+                return jsonify({"success": False, "error": "Avatar not found"}), 404
+            file_id = avatar_doc["file_id"]
+
+            # ✅ Call SadTalker
+            controller = GenerateVideoController()
+            video_gridfs_id = controller.generate_video(
+                text="",  # Not needed for chatbot
+                avatar_id=file_id,
+                audio_id=audio_id,
+                title=None
+            )
+
+            if not video_gridfs_id:
+                return jsonify({"success": False, "error": "Video generation failed"}), 500
+
+            return jsonify({
+                "success": True,
+                "video_url": f"/stream_video/{video_gridfs_id}"
+            })
+
+        except Exception as e:
+            print("❌ Error in generate_video_for_chatbot:", e)
+            return jsonify({"success": False, "error": str(e)}), 500
+
+
+
     @staticmethod
     @boundary.route("/generate_video_page", methods=["GET"])
     def generate_video_page():
@@ -318,7 +380,10 @@ class AvatarVideoBoundary:
                 return redirect("/login")
 
             avatars = list(mongo.db.avatar.find({"username": username}))
-            audios = list(mongo.db.voice_records.find({"username": username}))
+            audios = list(mongo.db.voice_records.find({
+                "username": username,
+                "source": {"$ne": "chatbot"}  # exclude chatbot-generated clips
+            }))
         except Exception as e:
             print(f"❌ Error loading generate_video_page: {e}")
             return "Error loading page", 500
@@ -359,6 +424,21 @@ class AvatarVideoBoundary:
         except Exception as e:
             print("❌ Error in saving video:", str(e))
             return jsonify(success=False, error=str(e)), 500
+
+
+    @boundary.route("/stream_avatar/<avatar_id>")
+    def stream_avatar(avatar_id):
+        try:
+            avatar = mongo.db.avatar.find_one({"_id": ObjectId(avatar_id)})
+            if not avatar:
+                return "Avatar not found", 404
+
+            file_id = avatar["file_id"]
+            file = fs.get(file_id)
+            return Response(file.read(), mimetype="image/png")
+        except Exception as e:
+            print("❌ Error streaming avatar:", e)
+            return "Error", 500
 
     @staticmethod
     @boundary.route("/upload_recorded_voice", methods=["POST"])
@@ -806,7 +886,10 @@ class AvatarVideoBoundary:
             return redirect(url_for("boundary.login"))
 
         avatars = list(mongo.db.avatar.find({"username": username}))
-        voice_records = list(mongo.db.voice_records.find({"username": username}))
+        voice_records = list(mongo.db.voice_records.find({
+                "username": username,
+                "source": {"$ne": "chatbot"}  # exclude chatbot-generated clips
+            }))
 
         classroom_id = request.args.get("classroom_id")
         assignment_id = request.args.get("assignment_id")
